@@ -7,6 +7,7 @@ test('settings download readable full JSON with a privacy warning', async ({ pag
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   const settings = page.getByRole('region', { name: 'Настройки' })
   await expect(settings).toContainText('личные сведения')
   await expect(settings).toContainText('мягко удалённые')

@@ -1,3 +1,4 @@
+import { privateFetch } from './access'
 import { useEffect, useState } from 'react'
 
 type Status = {
@@ -18,7 +19,7 @@ export function BackupStatus() {
     let cancelled = false
     async function load() {
       try {
-        const response = await fetch('/api/backup-status', { cache: 'no-store' })
+        const response = await privateFetch('/api/backup-status', { cache: 'no-store' })
         if (!response.ok) throw new Error()
         const result: Status = await response.json()
         if (!cancelled) { setStatus(result); setError('') }

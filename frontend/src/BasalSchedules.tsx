@@ -1,3 +1,4 @@
+import { privateFetch } from './access'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { moscowLabel } from './time'
 
@@ -23,7 +24,7 @@ export function BasalSchedules({ active, initialTime, expired, csrfToken, onSave
   const sending = useRef(false)
 
   async function request(path: string, options?: RequestInit) {
-    const response = await fetch(path, { cache: 'no-store', ...options })
+    const response = await privateFetch(path, { cache: 'no-store', ...options })
     const result = await response.json()
     if (!response.ok) {
       if (response.status === 401) expired()

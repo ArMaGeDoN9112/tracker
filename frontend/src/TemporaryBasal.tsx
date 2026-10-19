@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom'
+import { privateFetch } from './access'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { localMinute, moscowLabel } from './time'
 
@@ -51,7 +53,7 @@ export function TemporaryBasal({ active, initialTime, expired, csrfToken, onSave
   }
 
   async function request(path: string, options?: RequestInit) {
-    const response = await fetch(path, { cache: 'no-store', ...options })
+    const response = await privateFetch(path, { cache: 'no-store', ...options })
     const result = await response.json()
     if (!response.ok) {
       if (response.status === 401) expired()
@@ -95,7 +97,7 @@ export function TemporaryBasal({ active, initialTime, expired, csrfToken, onSave
     if (sending.current || !undo || !active) return
     sending.current = true; setBusy(true); setError('')
     try {
-      await save({ path: `/api/temporary-basals/${undo.id}/restore`, method: 'POST', restoring: true,
+      await save(pending?.restoring ? pending : { path: `/api/temporary-basals/${undo.id}/restore`, method: 'POST', restoring: true,
         body: JSON.stringify({ operation_id: crypto.randomUUID(), expected_revision: undo.revision }) })
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Ошибка сети. Повторите сохранение временной базы.') }
     finally { sending.current = false; setBusy(false) }
@@ -188,7 +190,7 @@ export function TemporaryBasal({ active, initialTime, expired, csrfToken, onSave
       {editing && !latest.deleted_at && <button disabled={busy} onClick={() => { setEditing(latest); setConflict(null); setLatest(null); setPreview(null) }}>Продолжить с актуальной редакцией</button>}
       {!editing && <button disabled={busy} onClick={() => { setConflict(null); setLatest(null); setUndo(null) }}>Закрыть сравнение</button>}
     </div>}
-    {undo && <div role="status"><p>Временная база удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || editing !== null} onClick={restore}>Отменить удаление временной базы</button></div>}
+    {undo && createPortal(<div role="status"><p>Временная база удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || editing !== null} onClick={restore}>Отменить удаление временной базы</button>{pending?.restoring && !busy && <><p className="error" role="alert">{error}</p><button onClick={restore}>Повторить отмену удаления временной базы</button></>}</div>, document.getElementById('global-undo')!)}
     {error && <p id="temporary-error" role="alert" className="error">{error}</p>}
     {saved && <p role="status">Временная база сохранена. День и база формы обновлены.</p>}
     <h3>История временной базы</h3>

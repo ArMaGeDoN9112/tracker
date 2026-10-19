@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './style.css'
 import { Diary } from './Diary'
 import { BackupStatus } from './BackupStatus'
+import { setAccess } from './access'
 
 async function csrfToken(): Promise<string> {
   const response = await fetch('/api/auth/csrf', { cache: 'no-store' })
@@ -10,7 +11,35 @@ async function csrfToken(): Promise<string> {
   return (await response.json()).csrf_token
 }
 
+type Section = 'diary' | 'charts' | 'basal' | 'settings'
+type Route = { section: Section; day: string; temporary: boolean; error: string }
+function readRoute(): Route {
+  const params = new URLSearchParams(location.search)
+  const section = params.get('section') ?? 'diary'
+  const day = params.get('day') ?? ''
+  const valid = !day || (/^\d{4}-\d{2}-\d{2}$/.test(day) && day >= '0001-01-01' && day <= '9999-12-31' && Number.isFinite(Date.parse(`${day}T00:00:00Z`)) && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day)
+  return { section: ['diary', 'charts', 'basal', 'settings'].includes(section) ? section as Section : 'diary', day: valid ? day : '', temporary: params.get('view') === 'temporary', error: valid ? '' : 'Некорректная дата в адресе. Открыт текущий московский день.' }
+}
+function routeUrl(route: Route) {
+  const params = new URLSearchParams({ section: route.section })
+  if (route.day) params.set('day', route.day)
+  if (route.section === 'basal' && route.temporary) params.set('view', 'temporary')
+  return `?${params}`
+}
+
 function App() {
+  const [route, setRoute] = useState(readRoute)
+  const currentRoute = useRef(route)
+  currentRoute.current = route
+  function navigate(next: Route, replace = false) {
+    history[replace ? 'replaceState' : 'pushState'](null, '', routeUrl(next))
+    setRoute(next)
+  }
+  useEffect(() => {
+    const pop = () => setRoute(readRoute())
+    window.addEventListener('popstate', pop)
+    return () => window.removeEventListener('popstate', pop)
+  }, [])
   const [login, setLogin] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -18,6 +47,12 @@ function App() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
+
+  function expired() {
+    setLogin(null)
+    setError('Сессия истекла. Войдите снова; черновики сохранены. Продолжите операцию явно.')
+  }
+  setAccess(login !== null, expired)
 
   useEffect(() => {
     fetch('/api/auth/session', { cache: 'no-store' })
@@ -71,13 +106,16 @@ function App() {
     }
   }
 
-  return <main>
+  return <main className={login ? "app-shell" : "login-screen"}>
     <p className="eyebrow">ДНЕВНИК ДИАБЕТА</p>
-    <section aria-labelledby="title">
-      <h1 id="title" ref={heading} tabIndex={-1}>{login ? 'Личный дневник' : 'Вход в дневник'}</h1>
+    <section className="workspace">
+      <h1 id="title" ref={heading} tabIndex={-1}>{login ? ({ diary: 'Дневник', charts: 'Графики', basal: 'База', settings: 'Настройки' }[route.section]) : 'Вход в дневник'}</h1>
       {loading ? <p role="status">Проверяем вход…</p> : login ? <>
-        <p>Вы вошли как <strong>{login}</strong>.</p>
-        <button type="button" onClick={logout} disabled={busy}>{busy ? 'Выходим…' : 'Выйти'}</button>
+        <nav className="main-nav" aria-label="Разделы">
+          {([['diary', 'Дневник'], ['charts', 'Графики'], ['basal', 'База'], ['settings', 'Настройки']] as const).map(([section, label]) => <a key={section} href={routeUrl({ ...route, section })} aria-current={route.section === section ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section }) } }}>{label}</a>)}
+        </nav>
+        <div className="account-row"><p className="account">Вы вошли как <strong>{login}</strong>.</p>
+        <button type="button" onClick={logout} disabled={busy}>{busy ? 'Выходим…' : 'Выйти'}</button></div>
       </> : <>
         <p className="muted">Ваши записи доступны только после входа.</p>
         <form onSubmit={submit} aria-busy={busy}>
@@ -92,8 +130,10 @@ function App() {
         <p className="muted hint">Вход сохранится на этом устройстве на 30 дней.</p>
       </>}
       {error && <p role="alert" className="error">{error}</p>}
-      {!loading && <Diary active={login !== null} expired={() => { setLogin(null); setError('Сессия истекла. Войдите снова; введённая запись сохранена в форме.') }} csrfToken={csrfToken} />}
-      {!loading && login && <section className="settings" aria-labelledby="settings-title">
+      {login && route.error && <p role="alert" className="error">{route.error}</p>}
+      <div id="global-undo" hidden={!login} />
+      {!loading && <Diary active={login !== null} section={route.section} day={route.day} temporary={route.temporary} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'diary' : currentRoute.current.section }, !currentRoute.current.day)} onView={temporary => navigate({ ...route, temporary })} expired={expired} csrfToken={csrfToken} />}
+      {!loading && login && <section hidden={route.section !== 'settings'} className="settings" aria-labelledby="settings-title">
         <h2 id="settings-title">Настройки</h2>
         <BackupStatus />
         <p id="export-warning">Файл содержит личные сведения и мягко удалённые данные за всю историю. Храните его приватно.</p>

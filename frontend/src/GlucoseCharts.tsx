@@ -1,3 +1,4 @@
+import { privateFetch } from './access'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Dot, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, type DotItemDotProps } from 'recharts'
 
@@ -22,7 +23,7 @@ export function GlucoseCharts({ active, generation, expired, onDay }: {
     setSummary(null); setError('')
     async function load() {
       try {
-        const response = await fetch(`/api/glucose-summary?${query}`, { cache: 'no-store' })
+        const response = await privateFetch(`/api/glucose-summary?${query}`, { cache: 'no-store' })
         const result = await response.json()
         if (cancelled) return
         if (!response.ok) {

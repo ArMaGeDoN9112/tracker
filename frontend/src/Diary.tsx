@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom'
+import { privateFetch } from './access'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { BasalSchedules } from './BasalSchedules'
 import { GlucoseCharts } from './GlucoseCharts'
@@ -9,13 +11,12 @@ type PendingAction = { path: string; body: string; action: 'delete' | 'restore' 
 const reasons: Record<string, string> = { food: 'Еда', correction: 'Коррекция', food_and_correction: 'Еда и коррекция' }
 const moscowTime = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' })
 
-export function Diary({ active, expired, csrfToken }: { active: boolean; expired: () => void; csrfToken: () => Promise<string> }) {
+export function Diary({ active, section, day, temporary, onDay, onView, expired, csrfToken }: { active: boolean; section: string; day: string; temporary: boolean; onDay: (day: string, open?: boolean) => void; onView: (temporary: boolean) => void; expired: () => void; csrfToken: () => Promise<string> }) {
   const [localTime, setLocalTime] = useState('')
   const [glucose, setGlucose] = useState('')
   const [bolus, setBolus] = useState('')
   const [reason, setReason] = useState('')
   const [comment, setComment] = useState('')
-  const [day, setDay] = useState('')
   const [entries, setEntries] = useState<Entry[]>([])
   const [dayBasal, setDayBasal] = useState<string | null>(null)
   const [formBasal, setFormBasal] = useState<string | null>(null)
@@ -73,7 +74,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   }
 
   async function cancelEdit() {
-    if (sending.current) return
+    if (sending.current || !active) return
     sending.current = true; setBusy(true)
     try {
       const form = await request('/api/entry-form')
@@ -86,11 +87,11 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   }
 
   async function change(action: PendingAction) {
-    if (sending.current) return
+    if (sending.current || !active) return
     sending.current = true; setBusy(true); setError(''); setField(null); setPendingAction(action)
     try {
       const csrf = await csrfToken()
-      const response = await fetch(action.path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: action.body })
+      const response = await privateFetch(action.path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: action.body })
       const result = await response.json()
       if (!response.ok) {
         if (response.status === 401) expired()
@@ -116,7 +117,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   }
 
   async function request(path: string, options?: RequestInit) {
-    const response = await fetch(path, { cache: 'no-store', ...options })
+    const response = await privateFetch(path, { cache: 'no-store', ...options })
     const result = await response.json()
     if (!response.ok) {
       setField(result.field)
@@ -135,9 +136,9 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   async function openForm() {
     const result = await request('/api/entry-form')
     setLocalTime(result.local_time)
-    setDay(result.local_time.slice(0, 10))
+    if (!selectedDay.current) onDay(result.local_time.slice(0, 10))
     initialized.current = true
-    await loadDay(result.local_time.slice(0, 10))
+    await loadDay(selectedDay.current || result.local_time.slice(0, 10))
   }
 
   useEffect(() => {
@@ -147,9 +148,15 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
     // The draft and its operation UUID stay mounted while the user signs in again.
   }, [active])
 
+  useEffect(() => {
+    ++dayRequest.current
+    setEntries([]); setDayBasal(null); setBasalChanges([]); setTemporaryBasals([]); setTemporaryPercent(null)
+    if (active && day && initialized.current) loadDay(day).catch(() => setError('Не удалось загрузить день.'))
+  }, [active, day])
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (sending.current) return
+    if (sending.current || !active) return
     sending.current = true
     setBusy(true)
     setError('')
@@ -170,7 +177,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
         setPending(body)
       }
       const csrf = await csrfToken()
-      const response = await fetch(editing ? `/api/entries/${editing.id}` : '/api/entries', { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body })
+      const response = await privateFetch(editing ? `/api/entries/${editing.id}` : '/api/entries', { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body })
       const result = await response.json()
       if (!response.ok) {
         if (response.status === 401) expired()
@@ -182,7 +189,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
       committed = true
       setEntryGeneration(value => value + 1)
       const savedDay = localTime.slice(0, 10)
-      setDay(savedDay)
+      onDay(savedDay)
       await loadDay(savedDay)
       const form = await request('/api/entry-form')
       setPending(null)
@@ -201,6 +208,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
 
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? 'entry-error' : undefined })
   return <div hidden={!active}>
+    <div hidden={section !== 'diary'}>
     <h2>{editing ? 'Изменение записи' : 'Быстрый ввод'}</h2>
     {!localTime ? <button onClick={() => openForm().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение</button> : <form onSubmit={save} aria-busy={busy}>
       <fieldset disabled={busy || pending !== null || pendingAction !== null}>
@@ -232,11 +240,11 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
         <button disabled={busy} onClick={() => edit(latest)}>Редактировать актуальную</button>
       </>}
     </section>}
-    {pendingAction && !busy && <button onClick={() => change(pendingAction)}>Повторить операцию</button>}
-    {undo && <div role="status"><p>Запись удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || pendingAction !== null} onClick={() => entryAction(undo, 'restore')}>Отменить удаление</button></div>}
+    {pendingAction && !busy && createPortal(<div>{error && section !== 'diary' && <p role="alert" className="error">{error}</p>}<button onClick={() => change(pendingAction)}>Повторить операцию</button></div>, document.getElementById('global-undo')!)}
+    {undo && createPortal(<div role="status"><p>Запись удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || pendingAction !== null} onClick={() => entryAction(undo, 'restore')}>Отменить удаление</button></div>, document.getElementById('global-undo')!)}
     <h2>Хронология дня</h2>
     <label htmlFor="day">День — Москва</label>
-    <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { ++dayRequest.current; setDay(e.target.value); setEntries([]); setDayBasal(null); setBasalChanges([]); setTemporaryBasals([]); setTemporaryPercent(null); if (e.target.value) loadDay(e.target.value).catch(() => setError('Не удалось загрузить день.')) }} />
+    <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { if (e.target.value) onDay(e.target.value) }} />
     <button type="button" disabled={!day} onClick={() => loadDay(day).catch(() => setError('Не удалось загрузить день.'))}>Обновить день</button>
     <p className="muted" data-testid="day-basal">База на начало дня: {basalText(dayBasal)} · по расписанию</p>
     <p data-testid="day-temporary-basal">На начало дня: {temporaryPercent === null ? 'обычное расписание' : `временная база ${temporaryPercent}% от расписания`} · по расписанию</p>
@@ -266,19 +274,30 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
       <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => entryAction(row, 'delete')}>Удалить</button>
     </li> })}</ol>
     {day && entries.length === 0 && <p>Записей нет.</p>}
-    <GlucoseCharts active={active} generation={entryGeneration} expired={expired} onDay={selected => {
-      setDay(selected)
-      loadDay(selected).catch(() => setError('Не удалось загрузить день.'))
-      document.getElementById('day')?.focus()
-      document.getElementById('day')?.scrollIntoView({ block: 'center' })
+    </div>
+    <div hidden={section !== 'charts'}>
+    <GlucoseCharts active={active && section === 'charts'} generation={entryGeneration} expired={expired} onDay={selected => {
+      onDay(selected, true)
+      requestAnimationFrame(() => document.getElementById('day')?.focus())
     }} />
+    </div>
+    <div hidden={section !== 'basal'}>
+      <nav className="basal-nav" aria-label="Представления базы">
+        <a href={`?section=basal${day ? `&day=${day}` : ''}`} aria-current={!temporary ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); onView(false) } }}>Расписание</a>
+        <a href={`?section=basal&view=temporary${day ? `&day=${day}` : ''}`} aria-current={temporary ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); onView(true) } }}>Временная база</a>
+      </nav>
+    <div hidden={temporary}>
     <BasalSchedules active={active} initialTime={localTime} expired={expired} csrfToken={csrfToken} onSaved={async () => {
       setBasalGeneration(value => value + 1)
       if (selectedDay.current) await loadDay(selectedDay.current)
     }} />
+    </div>
+    <div hidden={!temporary}>
     <TemporaryBasal active={active} initialTime={localTime} expired={expired} csrfToken={csrfToken} onSaved={async () => {
       setBasalGeneration(value => value + 1)
       if (selectedDay.current) await loadDay(selectedDay.current)
     }} />
+    </div>
+    </div>
   </div>
 }

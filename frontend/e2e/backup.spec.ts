@@ -11,6 +11,7 @@ test('settings show backup delay, local-only copy and sanitized failure', async 
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   const backup = page.getByRole('region', { name: 'Резервное копирование' })
   await expect(backup).toContainText('внешняя копия: ещё не было')
   await expect(backup).toContainText('Локальная тестовая копия')
