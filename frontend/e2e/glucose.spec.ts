@@ -100,7 +100,11 @@ test('glucose periods, gaps, keyboard day navigation and updated summaries', asy
   const paths = charts.locator('.recharts-line-curve')
   await expect(paths).toHaveCount(3)
   for (const path of await paths.all()) expect((await path.getAttribute('d'))?.match(/M/g)).toHaveLength(2)
+  // Move the pointer away and reach the first day independently of prior hover.
+  await page.mouse.move(0, 0)
   await charts.getByRole('application').focus()
+  await page.keyboard.press('ArrowLeft')
+  await page.keyboard.press('ArrowLeft')
   await page.keyboard.press('ArrowLeft')
   await expect(charts.locator('.recharts-tooltip-wrapper')).toContainText(`${first} · Москва`)
   await expect(charts.locator('.recharts-tooltip-wrapper')).toContainText('ммоль/л')

@@ -36,6 +36,36 @@ test('delete receipt replay does not offer stale undo after another device resto
   await expect(page.getByRole('button', { name: 'Отменить удаление', exact: true })).toHaveCount(0)
 })
 
+test('confirmed entry deletion keeps explicit recovery when its follow-up read fails', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await signIn(page)
+  const day = testInfo.project.name === 'phone' ? '2069-01-02' : '2070-01-02'
+  await page.getByLabel('Время события — Москва').fill(`${day}T12:00`)
+  await page.getByLabel('Комментарий', { exact: true }).fill('Восстановление отмены после сбоя чтения')
+  await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
+  await expect(page.locator('.entries > .entry')).toHaveCount(1)
+  const writes: string[] = []
+  page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/delete')) writes.push(request.postData()!) })
+  await page.route('**/api/entries/*/delete', async route => {
+    const response = await route.fetch()
+    expect(response.ok()).toBe(true)
+    const receipt = await response.json()
+    await page.route(`**/api/entries/${receipt.result_id}`, read => read.abort('failed'), { times: 1 })
+    await route.fulfill({ response })
+  }, { times: 1 })
+  await page.locator('.entries').getByRole('button', { name: 'Удалить', exact: true }).click()
+  await expect(page.getByRole('alert').filter({ hasText: 'подтверждено' })).toBeVisible()
+  await expect(page.locator('.entries > .entry')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('button', { name: 'Повторить операцию', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Отменить удаление', exact: true })).toBeVisible()
+  expect(writes).toHaveLength(2)
+  expect(writes[1]).toBe(writes[0])
+  await page.getByRole('button', { name: 'Отменить удаление', exact: true }).click()
+  await page.getByRole('link', { name: 'Дневник', exact: true }).click()
+  await expect(page.locator('.entries > .entry')).toHaveCount(1)
+})
+
 test('move, keyboard undo and conflict preserve the draft for comparison', async ({ page, browser, context }, testInfo) => {
   await page.goto('/')
   await signIn(page)

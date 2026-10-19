@@ -90,6 +90,8 @@ button[type=submit] { background:var(--accent); color:#102b22; border-color:var(
 #global-undo>div { padding:12px 16px; border:1px solid var(--accent); border-radius:10px; margin:12px 0; background:#20312c; }
 #global-undo button { width:auto; }
 @media(max-width:767px) {
+  html { scroll-padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
+  input,button,select,textarea,a { scroll-margin-block:16px; }
   .app-shell { padding:24px 16px calc(112px + env(safe-area-inset-bottom)); }
   .app-shell>.eyebrow { position:static; width:auto; }
   .workspace { padding:20px; }

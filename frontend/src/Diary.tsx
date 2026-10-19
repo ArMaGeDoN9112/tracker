@@ -106,17 +106,20 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         throw new Error(result.message)
       }
       committed = true
-      setPendingAction(null)
       setNotice(action.action === 'delete' ? 'Запись удалена.' : 'Запись восстановлена.')
       setEntryGeneration(value => value + 1)
-      if (action.action === 'delete') {
+      if (action.action === 'restore') setUndo(null)
+      const updates = await Promise.allSettled([action.action === 'delete' ? (async () => {
         const until = performance.now() + result.undo_remaining_ms
         const current: Entry = await request(`/api/entries/${result.result_id}`)
         setUndo(current.deleted_at !== null && current.revision === result.revision && until > performance.now()
           ? { id: current.id, revision: current.revision, until } : null)
+      })() : Promise.resolve(), selectedDay.current ? loadDay(selectedDay.current) : Promise.resolve()])
+      if (updates[0].status === 'rejected') setError('Удаление подтверждено сервером, но доступность отмены не удалось проверить. Повторите операцию с прежним UUID.')
+      else {
+        setPendingAction(null)
+        if (updates[1].status === 'rejected') setError('Операция подтверждена сервером, но обновление дня не удалось. Обновите день.')
       }
-      else setUndo(null)
-      if (selectedDay.current) await loadDay(selectedDay.current)
     } catch (failure) {
       setError(committed ? 'Операция подтверждена сервером, но обновление дня не удалось. Обновите день.' : failure instanceof Error ? failure.message : 'Ошибка сети. Повторите операцию.')
     } finally {

@@ -158,9 +158,9 @@ function App() {
       <div id="global-undo" hidden={!login} />
       {!loading && <Diary active={login !== null} section={route.section} day={route.day} temporary={route.temporary} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'diary' : currentRoute.current.section }, !currentRoute.current.day)} onView={temporary => navigate({ ...route, temporary })} csrfToken={privateCsrfToken} />}
       {!loading && login && <section hidden={route.section !== 'settings'} className="settings" aria-labelledby="settings-title">
-        <h2 id="settings-title">Настройки</h2>
+        <h2 id="settings-title" className="sr-only">Настройки</h2>
         <div className="settings-grid">
-        <section aria-labelledby="account-title"><span className="eyebrow">ДОСТУП</span><h3 id="account-title">Аккаунт</h3><p>Вы вошли как <strong>{login}</strong>.</p><p className="muted">Кнопка «Выйти» закрывает доступ на этом устройстве. Другие устройства сохранят вход.</p></section>
+        <section aria-labelledby="account-title"><span className="eyebrow">ДОСТУП</span><h3 id="account-title">Аккаунт</h3><p>Логин: <strong>{login}</strong>.</p><p className="muted">Кнопка «Выйти» закрывает доступ на этом устройстве. Другие устройства сохранят вход.</p></section>
         <section aria-labelledby="export-title"><span className="eyebrow">ЛИЧНЫЙ АРХИВ</span><h3 id="export-title">Экспорт</h3>
         <p id="export-warning">Файл содержит личные сведения и мягко удалённые данные за всю историю. Храните его приватно.</p>
         <a className="download" href="/api/export" download aria-describedby="export-warning" aria-busy={exportBusy} onClick={downloadExport}>Экспорт всех данных</a>

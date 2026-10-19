@@ -98,17 +98,21 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
     setPending(action)
     const csrf = await csrfToken()
     const result = await request(action.path, { method: action.method, headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: action.body })
-    setPending(null); setPreview(null); setSaved(true)
-    if (editing) cancel()
-    if (action.deleting) {
+    setSaved(true)
+    if (action.restoring) setUndo(null)
+    const updates = await Promise.allSettled([action.deleting ? (async () => {
       const until = performance.now() + result.undo_remaining_ms
       const current: TemporaryPeriod = await request(`/api/temporary-basals/${result.result_id}`)
       setUndo(current.deleted_at !== null && current.revision === result.revision && until > performance.now()
         ? { id: current.id, revision: current.revision, until } : null)
+    })() : Promise.resolve(), loadHistory(), onSaved()])
+    if (updates[0].status === 'rejected') {
+      setError('Удаление подтверждено сервером, но доступность отмены не удалось проверить. Повторите сохранение временной базы с прежним UUID.')
+      return
     }
-    if (action.restoring) setUndo(null)
-    const updates = await Promise.allSettled([loadHistory(), onSaved()])
-    if (updates.some(update => update.status === 'rejected')) setError('Временная база сохранена, но обновление данных не удалось. Обновите историю и день.')
+    setPending(null); setPreview(null)
+    if (editing) cancel()
+    if (updates.slice(1).some(update => update.status === 'rejected')) setError('Временная база сохранена, но обновление данных не удалось. Обновите историю и день.')
   }
 
   async function restore() {
@@ -124,7 +128,8 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (sending.current || !active) return
-    sending.current = true; setBusy(true); setError(''); setField(null); setSaved(false)
+    sending.current = true; setBusy(true); setError(''); setField(null)
+    if (!pending) setSaved(false)
     try {
       if (!preview && !pending) {
         async function resolve(value: string, original: string | undefined, chosen: string, isEnd = false): Promise<string> {
@@ -204,7 +209,7 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
         <p>Заданное окончание: {moscowLabel(preview.endsAt)}. Эффективное окончание: {moscowLabel(preview.effectiveEnd)}.</p>
         <p>Затрагиваемый период: с {moscowLabel(preview.affectedStart)} до {moscowLabel(preview.affectedEnd)} (не включая). {deleting ? 'Без удалённой записи действует расписание либо другая временная база, которая действовала бы без неё.' : 'Предыдущая временная база прекращается и не возобновляется. После окончания действует обычное расписание, если не началась следующая временная база.'} Период уточняется при сохранении с учётом других устройств.</p>
       </div>}
-      {pending && !busy && <p role="status">Результат сохранения нужно проверить. Повтор использует те же данные и UUID.</p>}
+      {pending && !busy && <p role="status">{saved ? 'Сохранение подтверждено. Возможность отмены нужно проверить.' : 'Результат сохранения нужно проверить.'} Повтор использует те же данные и UUID.</p>}
       <button type="submit" disabled={busy || conflict !== null}>{pending ? 'Повторить сохранение временной базы' : preview ? deleting ? 'Подтвердить удаление временной базы' : editing ? 'Сохранить изменения временной базы' : 'Сохранить временную базу' : 'Проверить период временной базы'}</button>
     </form>
     {editing && <button disabled={busy || pending !== null} onClick={cancel}>Отменить редактирование</button>}

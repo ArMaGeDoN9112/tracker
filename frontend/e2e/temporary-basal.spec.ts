@@ -65,6 +65,46 @@ test('temporary undo keeps its original deadline across navigation', async ({ pa
   await expect(undo).toHaveCount(0)
 })
 
+test('confirmed temporary deletion recovers undo after its follow-up read fails', async ({ page }, testInfo) => {
+  await page.clock.install()
+  await page.goto('/?section=basal&view=temporary')
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  const section = page.getByRole('region', { name: 'Временная база', exact: true })
+  const year = testInfo.project.name === 'phone' ? '2068' : '2067'
+  await section.getByLabel('Начало временной базы — Москва').fill(`${year}-01-02T10:00`)
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Сохранить временную базу', exact: true }).click()
+  const row = section.getByRole('article').filter({ hasText: year })
+  await row.getByRole('button', { name: 'Удалить', exact: true }).click()
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  const writes: string[] = []
+  page.on('request', request => {
+    if (request.method() === 'POST' && request.url().endsWith('/delete')) writes.push(request.postData()!)
+  })
+  await page.route('**/api/temporary-basals/*/delete', async route => {
+    const response = await route.fetch()
+    expect(response.ok()).toBe(true)
+    const receipt = await response.json()
+    await page.route(`**/api/temporary-basals/${receipt.result_id}`, read => read.abort('failed'), { times: 1 })
+    await route.fulfill({ response })
+  }, { times: 1 })
+  await section.getByRole('button', { name: 'Подтвердить удаление временной базы' }).click()
+  await expect(section.getByRole('alert').filter({ hasText: 'подтверждено' })).toBeVisible()
+  await expect(row).toHaveCount(0)
+  await expect(section.getByRole('button', { name: 'Повторить сохранение временной базы' })).toBeVisible()
+  await section.getByRole('button', { name: 'Повторить сохранение временной базы' }).click()
+  const undo = page.getByRole('button', { name: 'Отменить удаление временной базы', exact: true })
+  await expect(undo).toBeVisible()
+  expect(writes).toHaveLength(2)
+  expect(writes[1]).toBe(writes[0])
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await undo.click()
+  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await expect(row).toHaveCount(1)
+})
+
 test('correct historical end, compare conflicts, delete and undo temporary basal', async ({ page }, testInfo) => {
   const day = testInfo.project.name === 'phone' ? '2046-08-17' : '2045-08-17'
   await page.goto('/')
