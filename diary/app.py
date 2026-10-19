@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from diary.db import database_engine
 from diary.body_limit import BodyLimit
 from diary.entries import register_entries
+from diary.basal import register_basal
 from diary.security import (
     PRE_COOKIE, PRE_SECONDS, SESSION_COOKIE, SESSION_SECONDS,
     csrf_token, digest, now_ms, password_hash, validate_login,
@@ -111,6 +112,15 @@ def create_app(database: Path, origin: str) -> FastAPI:
         location = error.errors()[0]["loc"]
         field = str(location[-1]) if location and location[-1] != "body" else None
         message = "Проверьте введённые данные."
+        if request.url.path == "/api/basal-schedules":
+            message = {
+                "starts_at": "Укажите существующую дату RFC 3339 с явным смещением, с точностью до миллисекунд.",
+                "intervals": "Начните с 00:00; интервалы должны идти строго по возрастанию без повторов (до 23:59).",
+                "minute": "Минута интервала должна быть целым числом от 0 до 1439.",
+                "rate": "Скорость: число от 0 до 21474836,47 ед/ч; два знака после запятой, завершающие нули допустимы.",
+                "operation_id": "UUID операции имеет неверный формат.",
+                None: "Проверьте начало действия и полное расписание с 00:00.",
+            }.get(field, message)
         if request.url.path == "/api/entries" or request.url.path.startswith("/api/entries/"):
             message = {
                 "glucose": "Сахар: положительное число до 214748364,7; один знак после запятой, завершающие нули допустимы.",
@@ -201,6 +211,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
         return response
 
     register_entries(app, engine)
+    register_basal(app, engine)
     return app
 
 

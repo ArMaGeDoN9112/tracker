@@ -122,6 +122,12 @@ class DayOutput(BaseModel):
     day: date
     basal: str | None
     entries: list[EntryOutput]
+    basal_changes: list["BasalChangeOutput"]
+
+
+class BasalChangeOutput(BaseModel):
+    occurred_at: str = Field(json_schema_extra={"format": "date-time"})
+    basal: str | None
 
 
 class ReceiptOutput(BaseModel):
@@ -141,20 +147,23 @@ def receipt_output(receipt: Any, replayed: bool) -> dict[str, Any]:
             if receipt["action"] == "delete_entry" else 0}
 
 
-def entry_output(row: Any) -> dict[str, Any]:
+def entry_output(row: Any, basal: str | None) -> dict[str, Any]:
     return {**dict(row), "glucose": decimal_string(row["glucose"]) if row["glucose"] is not None else None,
             "bolus": decimal_string(row["bolus"]), "occurred_at": timestamp(row["occurred_at"]),
             "created_at": timestamp(row["created_at"]), "updated_at": timestamp(row["updated_at"]),
-            "deleted_at": timestamp(row["deleted_at"]) if row["deleted_at"] is not None else None, "basal": None}
+            "deleted_at": timestamp(row["deleted_at"]) if row["deleted_at"] is not None else None, "basal": basal}
 
 
 def register_entries(app: FastAPI, engine: Engine) -> None:
     from diary.app import failure
+    from diary.basal import basal_at, basal_changes, schedules
 
     @app.get("/api/entry-form")
     def entry_form() -> dict[str, str | None]:
         now = (EPOCH + timedelta(milliseconds=now_ms())).astimezone(MOSCOW)
-        return {"local_time": now.isoformat(timespec="minutes")[:16], "basal": None}
+        with engine.connect() as connection:
+            basal = basal_at(schedules(connection), milliseconds(now))
+        return {"local_time": now.isoformat(timespec="minutes")[:16], "basal": basal}
 
     @app.get("/api/moscow-time")
     def moscow_time(local_time: str) -> Any:
@@ -195,10 +204,12 @@ def register_entries(app: FastAPI, engine: Engine) -> None:
     @app.get("/api/entries/{entry_id}", response_model=EntryOutput)
     def read_entry(entry_id: UUID) -> Any:
         with engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN")
             row = connection.execute(text("SELECT * FROM entry WHERE id = :id"), {"id": str(entry_id)}).mappings().first()
+            versions = schedules(connection)
         if row is None:
             return failure("not_found", "Запись не найдена.", 404)
-        return entry_output(row)
+        return entry_output(row, basal_at(versions, row["occurred_at"]))
 
     def change_entry(action: str, payload: EntryInput | RevisionInput, entry_id: str | None = None) -> Any:
         normalized = payload.model_dump(exclude={"operation_id"})
@@ -255,9 +266,12 @@ def register_entries(app: FastAPI, engine: Engine) -> None:
         except (ValueError, OverflowError):
             return failure("validation", "Дата за пределами календаря.", 422, "day")
         with engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN")
             rows = connection.execute(text(
                 "SELECT * FROM entry WHERE deleted_at IS NULL AND occurred_at >= :start AND occurred_at < :end "
                 "ORDER BY occurred_at, created_at, id"
             ), {"start": start, "end": end}).mappings().all()
-        entries = [entry_output(row) for row in rows]
-        return {"day": day.isoformat(), "basal": None, "entries": entries}
+            versions = schedules(connection)
+        entries = [entry_output(row, basal_at(versions, row["occurred_at"])) for row in rows]
+        return {"day": day.isoformat(), "basal": basal_at(versions, start), "entries": entries,
+                "basal_changes": basal_changes(versions, start, end)}

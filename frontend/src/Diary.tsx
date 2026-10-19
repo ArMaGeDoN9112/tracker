@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { BasalSchedules } from './BasalSchedules'
+import { localMinute, basalText } from './time'
 
 type Entry = { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null; revision: number; deleted_at: string | null }
 type PendingAction = { path: string; body: string; action: 'delete' | 'restore' }
 const reasons: Record<string, string> = { food: 'Еда', correction: 'Коррекция', food_and_correction: 'Еда и коррекция' }
 const moscowTime = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' })
-const moscowDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-function localMinute(value: string) {
-  const parts = Object.fromEntries(moscowDate.formatToParts(new Date(value)).map(part => [part.type, part.value]))
-  return `${parts.year.padStart(4, '0')}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
-}
 
 export function Diary({ active, expired, csrfToken }: { active: boolean; expired: () => void; csrfToken: () => Promise<string> }) {
   const [localTime, setLocalTime] = useState('')
@@ -18,6 +15,10 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   const [comment, setComment] = useState('')
   const [day, setDay] = useState('')
   const [entries, setEntries] = useState<Entry[]>([])
+  const [dayBasal, setDayBasal] = useState<string | null>(null)
+  const [formBasal, setFormBasal] = useState<string | null>(null)
+  const [basalChanges, setBasalChanges] = useState<{ occurred_at: string; basal: string | null }[]>([])
+  const [basalGeneration, setBasalGeneration] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [field, setField] = useState<string | null>(null)
@@ -34,6 +35,23 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   const dayRequest = useRef(0)
   const selectedDay = useRef(day)
   selectedDay.current = day
+
+  useEffect(() => {
+    let cancelled = false
+    setFormBasal(null)
+    if (!active || !localTime) return
+    async function updateBasal() {
+      const result = editing && localTime === localMinute(editing.occurred_at) && !instant
+        ? { candidates: [editing.occurred_at] }
+        : await request(`/api/moscow-time?local_time=${encodeURIComponent(localTime)}`)
+      const at = instant || (result.candidates.length === 1 ? result.candidates[0] : '')
+      if (!at) return
+      const resultBasal = await request(`/api/basal?at=${encodeURIComponent(at)}`)
+      if (!cancelled) setFormBasal(resultBasal.basal)
+    }
+    updateBasal().catch(() => { if (!cancelled) setError('Не удалось вычислить базу для выбранного времени.') })
+    return () => { cancelled = true }
+  }, [active, localTime, instant, editing, basalGeneration])
 
   useEffect(() => {
     if (!undo) return
@@ -105,7 +123,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   async function loadDay(selected: string) {
     const sequence = ++dayRequest.current
     const result = await request(`/api/day?day=${selected}`)
-    if (sequence === dayRequest.current) setEntries(result.entries)
+    if (sequence === dayRequest.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes) }
   }
 
   async function openForm() {
@@ -184,7 +202,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
         <label htmlFor="occurred_at">Время события — Москва</label>
         <input id="occurred_at" type="datetime-local" step="60" required value={localTime} onChange={e => { setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />
         {candidates.length > 1 && <><label htmlFor="offset">Смещение UTC</label><select id="offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
-        <p className="muted">База неизвестна · по расписанию</p>
+        <p className="muted" data-testid="form-basal">База: {basalText(formBasal)} · по расписанию</p>
         <label htmlFor="bolus">Подколка, ед.</label>
         <input id="bolus" inputMode="decimal" value={bolus} onChange={e => setBolus(e.target.value)} {...invalid('bolus')} />
         <label htmlFor="reason">Причина подколки</label>
@@ -211,18 +229,31 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
     {undo && <div role="status"><p>Запись удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || pendingAction !== null} onClick={() => entryAction(undo, 'restore')}>Отменить удаление</button></div>}
     <h2>Хронология дня</h2>
     <label htmlFor="day">День — Москва</label>
-    <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { ++dayRequest.current; setDay(e.target.value); setEntries([]); if (e.target.value) loadDay(e.target.value).catch(() => setError('Не удалось загрузить день.')) }} />
+    <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { ++dayRequest.current; setDay(e.target.value); setEntries([]); setDayBasal(null); setBasalChanges([]); if (e.target.value) loadDay(e.target.value).catch(() => setError('Не удалось загрузить день.')) }} />
     <button type="button" disabled={!day} onClick={() => loadDay(day).catch(() => setError('Не удалось загрузить день.'))}>Обновить день</button>
-    <p className="muted">База на начало дня неизвестна · по расписанию</p>
-    <ol className="entries">{entries.map(row => <li key={row.id}>
+    <p className="muted" data-testid="day-basal">База на начало дня: {basalText(dayBasal)} · по расписанию</p>
+    <ol className="entries">{[...entries.map(row => ({ kind: 'entry' as const, row, occurred_at: row.occurred_at })),
+      ...basalChanges.map(change => ({ kind: 'basal' as const, row: change, occurred_at: change.occurred_at }))]
+      .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at) || (a.kind === b.kind ? 0 : a.kind === 'basal' ? -1 : 1))
+      .map(item => {
+        if (item.kind === 'basal') return <li className="basal-change" key={`basal-${item.occurred_at}`}>
+        <time dateTime={item.occurred_at}>{moscowTime.format(new Date(item.occurred_at))}</time>
+        <p>Изменение базы: {basalText(item.row.basal)} · по расписанию</p>
+      </li>
+        const row = item.row
+        return <li className="entry" key={row.id}>
       <time dateTime={row.occurred_at}>{moscowTime.format(new Date(row.occurred_at))}</time>
       <p>Сахар: {row.glucose?.replace('.', ',') ?? 'не указан'} · Подколка: {row.bolus.replace('.', ',')} ед.</p>
       {row.reason && <p>{reasons[row.reason]}</p>}
       {row.comment && <p className="comment">{row.comment}</p>}
-      <p className="muted">База: {row.basal ?? 'неизвестна'} · по расписанию</p>
+      <p className="muted">База: {basalText(row.basal)} · по расписанию</p>
       <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => edit(row)}>Изменить</button>
       <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => entryAction(row, 'delete')}>Удалить</button>
-    </li>)}</ol>
+    </li> })}</ol>
     {day && entries.length === 0 && <p>Записей нет.</p>}
+    <BasalSchedules active={active} initialTime={localTime} expired={expired} csrfToken={csrfToken} onSaved={async () => {
+      setBasalGeneration(value => value + 1)
+      if (selectedDay.current) await loadDay(selectedDay.current)
+    }} />
   </div>
 }
