@@ -1,0 +1,59 @@
+services:
+  back:
+    build:
+      context: .
+      target: back
+    environment:
+      DIARY_DATABASE: /data/diary.sqlite3
+      DIARY_ORIGIN: ${DIARY_ORIGIN:-https://localhost:5173}
+    volumes:
+      - diary_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import http.client, os; from urllib.parse import urlsplit; c = http.client.HTTPConnection('127.0.0.1', 8000, timeout=3); c.request('GET', '/api/auth/session', headers={'Host': urlsplit(os.environ['DIARY_ORIGIN']).netloc}); assert c.getresponse().status == 401"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  front:
+    build:
+      context: .
+      target: front
+    environment:
+      DIARY_HOST: ${DIARY_HOST:-localhost}
+      DIARY_TLS: ${DIARY_TLS:-internal}
+      DIARY_ORIGIN: ${DIARY_ORIGIN:-https://localhost:5173}
+    ports:
+      - "${DIARY_BIND:-127.0.0.1}:${DIARY_HTTPS_PORT:-5173}:443"
+      - "${DIARY_BIND:-127.0.0.1}:${DIARY_HTTP_PORT:-8080}:80"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      back:
+        condition: service_healthy
+    restart: unless-stopped
+
+  checks:
+    profiles: [tools]
+    build:
+      context: .
+      target: checks
+
+  e2e:
+    profiles: [tools]
+    build:
+      context: .
+      target: e2e
+    init: true
+    shm_size: 1gb
+
+volumes:
+  diary_data:
+  caddy_data:
+  caddy_config:

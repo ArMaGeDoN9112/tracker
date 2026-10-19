@@ -1,0 +1,22 @@
+{
+    auto_https disable_redirects
+}
+
+http://{$DIARY_HOST:localhost} {
+    redir {$DIARY_ORIGIN:https://localhost:5173}{uri} permanent
+}
+
+{$DIARY_HOST:localhost} {
+    tls {$DIARY_TLS:internal}
+    encode zstd gzip
+
+    handle /api/* {
+        reverse_proxy back:8000
+    }
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}
