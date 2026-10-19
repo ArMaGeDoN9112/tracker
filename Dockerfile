@@ -28,6 +28,7 @@ FROM python-base AS checks
 RUN uv sync --frozen --no-install-project
 COPY tests/ tests/
 COPY scripts/ scripts/
+COPY docs/export/ docs/export/
 CMD ["pytest", "-q"]
 
 FROM checks AS e2e
