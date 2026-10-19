@@ -37,7 +37,7 @@ button:disabled { opacity: .65; cursor: wait; }
 .glucose-total { font-variant-numeric:tabular-nums; }
 .glucose-total strong { font-size:1.5rem; font-weight:500; color:var(--accent); }
 .glucose-total strong>span { white-space:nowrap; }
-.glucose-plot { width: 100%; min-width: 0; margin: 24px 0; }
+.glucose-plot { width: 100%; min-width: 0; margin: 24px 0; overflow:clip; overflow-clip-margin:8px; }
 .glucose-plot .recharts-line-dot,.glucose-plot .recharts-bar-rectangle { cursor:pointer; }
 .glucose-table { max-width: 100%; overflow-x: auto; border:1px solid var(--border); border-radius:12px; padding:8px; }
 .glucose-table table { width: 100%; border-collapse: collapse; font-size: .875rem; font-variant-numeric: tabular-nums; }
