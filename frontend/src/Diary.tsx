@@ -297,7 +297,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     </section>
     <section className="diary-timeline" aria-label="Хронология дня">
     <span className="eyebrow">ХРОНОЛОГИЯ · МОСКВА</span>
-    <h2>Записи дня <span className="entry-count">{entries.length}</span></h2>
+    <h2 id="day-history" tabIndex={-1}>Записи дня <span className="entry-count">{entries.length}</span></h2>
     <label htmlFor="day">День — Москва</label>
     <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { if (e.target.value) onDay(e.target.value) }} />
     <div className="day-navigation">
@@ -343,7 +343,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     <div hidden={section !== 'charts'}>
     <GlucoseCharts active={active && section === 'charts'} generation={entryGeneration} onDay={selected => {
       onDay(selected, true)
-      requestAnimationFrame(() => document.getElementById('day')?.focus())
+      requestAnimationFrame(() => document.getElementById('day-history')?.focus())
     }} />
     </div>
     <div hidden={section !== 'basal'}>

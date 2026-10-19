@@ -53,37 +53,41 @@ export function GlucoseCharts({ active, generation, onDay }: {
   }))
   const dayDot = (props: DotItemDotProps) => <Dot className="recharts-line-dot" cx={props.cx} cy={props.cy} stroke={props.stroke} fill={props.stroke} r={4} onClick={() => onDay(props.payload.day)} />
   return <section className="glucose-charts" aria-label="Графики сахара">
-    <h2>Графики сахара</h2>
-    <form onSubmit={show}>
-      <label htmlFor="glucose-period">Период</label>
+    <span className="eyebrow">СВОДКИ · МОСКВА</span>
+    <h2>Сахар за период</h2>
+    <form className="glucose-period" onSubmit={show}>
+      <div><label htmlFor="glucose-period">Период</label>
       <select id="glucose-period" value={period} onChange={event => setPeriod(event.target.value)}>
-        <option value="week">Неделя — 7 дней</option><option value="month">Месяц — 30 дней</option><option value="custom">Произвольный период</option>
-      </select>
-      {period === 'custom' && <><label htmlFor="glucose-start">Начало периода — Москва</label>
-        <input id="glucose-start" type="date" required value={start} onChange={event => setStart(event.target.value)} /></>}
-      <label htmlFor="glucose-end">Конец периода — Москва</label>
-      <input id="glucose-end" type="date" value={end} onChange={event => setEnd(event.target.value)} />
-      <p className="muted">Если конец не выбран, используется сегодня по Москве.</p>
+        <option value="week">7 дней</option><option value="month">30 дней</option><option value="custom">Период</option>
+      </select></div>
+      {period === 'custom' && <div><label htmlFor="glucose-start">Начало периода — Москва</label>
+        <input id="glucose-start" type="date" required value={start} onChange={event => setStart(event.target.value)} /></div>}
+      <div><label htmlFor="glucose-end">Конец периода — Москва</label>
+      <input id="glucose-end" type="date" aria-describedby="glucose-period-hint" value={end} onChange={event => setEnd(event.target.value)} /></div>
       <button type="submit">Показать период</button>
+      <p id="glucose-period-hint" className="muted">Если конец не выбран, используется сегодня по Москве.</p>
     </form>
-    {error ? <p role="alert" className="error">{error}</p> : !summary && <p role="status">Загружаем сводку…</p>}
+    {error ? <div><p role="alert" className="error">Не удалось загрузить сводку. {error}</p>
+      <button type="button" onClick={() => setRefresh(value => value + 1)}>Повторить загрузку</button></div>
+      : !summary && <p role="status">Загружаем сводку…</p>}
     {summary && <>
-      <p data-testid="period-bounds">{summary.start} — {summary.end} · Москва · обе даты включены</p>
-      <p data-testid="period-average">Среднее за период: {glucoseText(summary.average)} ммоль/л · измерений: {summary.count}</p>
+      <p className="glucose-bounds" data-testid="period-bounds">{summary.start} — {summary.end} · Москва · обе даты включены</p>
+      <p className="glucose-total" data-testid="period-average">Среднее за период: <strong>{glucoseText(summary.average)} <span>ммоль/л</span></strong> · измерений: <strong>{summary.count}</strong></p>
+      {summary.count === 0 && <p role="status">В этом периоде нет измерений сахара.</p>}
       <p className="muted">Среднее по всем измерениям. Пустые дни — разрывы. Нажмите день графика или кнопку в таблице, чтобы открыть исходные записи.</p>
       <div className="glucose-plot">
         <ResponsiveContainer width="100%" height={320}>
-          <ComposedChart data={points} accessibilityLayer title="Дневные сводки сахара и число измерений" margin={{ top: 12, right: 0, bottom: 12, left: 0 }}>
-            <CartesianGrid stroke="#344155" />
-            <XAxis dataKey="day" tick={{ fill: '#e8edf3', fontSize: 11 }} tickFormatter={value => String(value).slice(5)} minTickGap={20} />
-            <YAxis yAxisId="glucose" width={42} tick={{ fill: '#e8edf3', fontSize: 11 }} />
-            <YAxis yAxisId="count" orientation="right" width={28} allowDecimals={false} tick={{ fill: '#b6c3d4', fontSize: 11 }} />
-            <Tooltip contentStyle={{ background: '#10151d', borderColor: '#74849a', color: '#e8edf3' }} formatter={(value, name, item) => [item.dataKey === 'count' ? String(value) : Number(value).toFixed(1).replace('.', ','), name]} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar yAxisId="count" dataKey="count" name="Измерений (справа)" fill="#b6c3d4" maxBarSize={16} isAnimationActive={false} onClick={point => onDay(point.payload.day)} />
-            <Line yAxisId="glucose" dataKey="minimum" name="Минимум, ммоль/л" stroke="#a9c9ff" strokeDasharray="3 3" dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
-            <Line yAxisId="glucose" dataKey="maximum" name="Максимум, ммоль/л" stroke="#e9be70" strokeDasharray="8 4" dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
-            <Line yAxisId="glucose" dataKey="average" name="Среднее, ммоль/л" stroke="#9de0cf" strokeWidth={2} dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
+          <ComposedChart data={points} accessibilityLayer title="Дневные сводки сахара и число измерений" margin={{ top: 32, right: 4, bottom: 12, left: 4 }}>
+            <CartesianGrid stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 12 }} tickFormatter={value => String(value).slice(5)} minTickGap={20} />
+            <YAxis yAxisId="glucose" width={40} tick={{ fill: 'var(--text)', fontSize: 12 }} label={{ value: 'ммоль/л', position: 'top', fill: 'var(--muted)', fontSize: 12, dx: 10 }} />
+            <YAxis yAxisId="count" orientation="right" width={40} allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 12 }} label={{ value: 'Измерения', position: 'top', fill: 'var(--muted)', fontSize: 12, dx: -18 }} />
+            <Tooltip wrapperStyle={{ maxWidth: '100%' }} contentStyle={{ background: 'var(--background)', borderColor: 'var(--muted)', color: 'var(--text)', borderRadius: 8, whiteSpace: 'normal', overflowWrap: 'anywhere' }} labelFormatter={label => `${label} · Москва`} formatter={(value, name, item) => [item.dataKey === 'count' ? `${value} измерений` : `${Number(value).toFixed(1).replace('.', ',')} ммоль/л`, name]} />
+            <Legend wrapperStyle={{ fontSize: 14 }} />
+            <Bar yAxisId="count" dataKey="count" name="Измерений (справа)" fill="var(--muted)" maxBarSize={24} isAnimationActive={false} onClick={point => onDay(point.payload.day)} />
+            <Line yAxisId="glucose" dataKey="minimum" name="Минимум" stroke="var(--chart-minimum)" strokeDasharray="3 3" dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
+            <Line yAxisId="glucose" dataKey="maximum" name="Максимум" stroke="var(--chart-maximum)" strokeDasharray="8 4" dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
+            <Line yAxisId="glucose" dataKey="average" name="Среднее" stroke="var(--accent)" strokeWidth={3} dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
