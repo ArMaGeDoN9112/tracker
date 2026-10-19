@@ -1,0 +1,14 @@
+.venv/
+.uv-cache/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+*.pyc
+*.sqlite*
+data/
+.env
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+.local/
