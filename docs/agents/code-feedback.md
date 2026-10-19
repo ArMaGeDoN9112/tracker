@@ -35,10 +35,13 @@
 Основание: пользователь указал на `change_entry("restore_entry", ...)`
 и попросил использовать enum.
 
-## Асинхронные контекстные менеджеры
+## Контекстные менеджеры
+
+Для функции с `@contextmanager` указывай `Generator`,
+например `def exclusive(database: Path) -> Generator[None]`.
 
 Для функции с `@asynccontextmanager` указывай `AsyncGenerator`,
 например `async def lifespan(...) -> AsyncGenerator[None]`.
 
-Основание: пользователь сообщил предупреждение об устаревшей аннотации `AsyncIterator`
-для этого декоратора.
+Основание: пользователь сообщил предупреждения об устаревших аннотациях `Iterator`
+для `@contextmanager` и `AsyncIterator` для `@asynccontextmanager`.

@@ -2,7 +2,7 @@
 
 import argparse
 from contextlib import closing, contextmanager
-from collections.abc import Iterator
+from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 import fcntl
@@ -96,7 +96,7 @@ def register_backup_status(app: FastAPI, database: Path) -> None:
 
 
 @contextmanager
-def exclusive(database: Path) -> Iterator[None]:
+def exclusive(database: Path) -> Generator[None]:
     with database.with_suffix(".backup.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         yield
