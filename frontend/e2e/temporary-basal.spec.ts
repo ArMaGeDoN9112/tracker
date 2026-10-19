@@ -2,6 +2,76 @@ import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
+test('correct historical end, compare conflicts, delete and undo temporary basal', async ({ page }, testInfo) => {
+  const day = testInfo.project.name === 'phone' ? '2046-08-17' : '2045-08-17'
+  await page.goto('/')
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  const section = page.getByRole('region', { name: 'Временная база', exact: true })
+  await section.getByLabel('Начало временной базы — Москва').fill(`${day}T10:00`)
+  await section.getByLabel('Длительность, мин').fill('240')
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Сохранить временную базу', exact: true }).click()
+  const row = section.getByRole('article').filter({ hasText: day.slice(0, 4) }).last()
+  await row.getByRole('button', { name: 'Изменить / завершить' }).click()
+  await section.getByLabel('Заданное окончание — Москва').fill(`${day}T11:30`)
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await expect(section.getByRole('status').filter({ hasText: 'Затрагиваемый период' })).toContainText('14:00')
+  await page.route('**/api/temporary-basals/*', async route => {
+    if (route.request().method() !== 'PUT') { await route.continue(); return }
+    await route.fetch(); await route.abort('failed')
+  }, { times: 1 })
+  await section.getByRole('button', { name: 'Сохранить изменения временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Повторить сохранение временной базы', exact: true }).click()
+  await expect(row).toContainText('11:30')
+  await expect(row).toContainText('240 мин')
+  await page.getByLabel('День — Москва').fill(day)
+  await expect(page.getByLabel('Временная база дня')).toContainText('11:30')
+  await row.getByRole('button', { name: 'Изменить / завершить' }).click()
+  await section.getByLabel('Процент от расписания').fill('150')
+  await page.evaluate(async () => {
+    const csrf = await (await fetch('/api/auth/csrf')).json()
+    const rows = await (await fetch('/api/temporary-basals')).json()
+    const row = rows.at(-1)
+    await fetch(`/api/temporary-basals/${row.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf.csrf_token },
+      body: JSON.stringify({ operation_id: crypto.randomUUID(), expected_revision: row.revision, starts_at: row.starts_at, ends_at: row.ends_at, percent: 110 }) })
+  })
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Сохранить изменения временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Загрузить актуальную временную базу' }).click()
+  await expect(section.getByLabel('Процент от расписания')).toHaveValue('150')
+  await expect(section.getByTestId('temporary-latest')).toContainText('110%')
+  await section.getByRole('button', { name: 'Продолжить с актуальной редакцией' }).click()
+  await section.getByRole('button', { name: 'Отменить редактирование' }).click()
+  await row.getByRole('button', { name: 'Удалить', exact: true }).click()
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await expect(section.getByRole('status').filter({ hasText: 'Затрагиваемый период' })).toBeVisible()
+  await section.getByRole('button', { name: 'Подтвердить удаление временной базы' }).click()
+  await expect(row).toHaveCount(0)
+  await section.getByRole('button', { name: 'Отменить удаление временной базы' }).click()
+  await expect(row).toContainText('110%')
+  await row.getByRole('button', { name: 'Удалить', exact: true }).click()
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await page.route('**/api/temporary-basals/*/delete', async route => {
+    const response = await route.fetch()
+    const receipt = await response.json()
+    await page.evaluate(async receipt => {
+      const csrf = await (await fetch('/api/auth/csrf')).json()
+      const response = await fetch(`/api/temporary-basals/${receipt.result_id}/restore`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf.csrf_token },
+        body: JSON.stringify({ operation_id: crypto.randomUUID(), expected_revision: receipt.revision }) })
+      if (!response.ok) throw new Error('Second device could not restore')
+    }, receipt)
+    await route.abort('failed')
+  }, { times: 1 })
+  await section.getByRole('button', { name: 'Подтвердить удаление временной базы' }).click()
+  await section.getByRole('button', { name: 'Повторить сохранение временной базы' }).click()
+  await expect(section.getByRole('status').filter({ hasText: 'сохранена' })).toBeVisible()
+  await expect(row).toContainText('110%')
+  await expect(section.getByRole('button', { name: 'Отменить удаление временной базы' })).toHaveCount(0)
+})
+
 test('create temporary basal, retry lost response, replace and inspect next day', async ({ page }, testInfo) => {
   const day = testInfo.project.name === 'phone' ? '2036-08-17' : '2035-08-17'
   const tomorrow = day.replace('17', '18')

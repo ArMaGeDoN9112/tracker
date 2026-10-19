@@ -164,7 +164,7 @@ def receipt_output(receipt: ReceiptRecord, replayed: bool) -> ReceiptOutput:
         result_id=UUID(receipt.result_id), revision=receipt.revision, completed_at=timestamp(receipt.completed_at),
         replayed=replayed,
         undo_remaining_ms=max(0, min(30000, receipt.completed_at + 30000 - now_ms()))
-        if receipt.action == OperationAction.DELETE_ENTRY else 0,
+        if receipt.action in (OperationAction.DELETE_ENTRY, OperationAction.DELETE_TEMPORARY_BASAL) else 0,
     )
 
 

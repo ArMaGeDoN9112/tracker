@@ -14,6 +14,9 @@ class OperationAction(StrEnum):
     RESTORE_ENTRY = "restore_entry"
     CREATE_BASAL_SCHEDULE = "create_basal_schedule"
     CREATE_TEMPORARY_BASAL = "create_temporary_basal"
+    EDIT_TEMPORARY_BASAL = "edit_temporary_basal"
+    DELETE_TEMPORARY_BASAL = "delete_temporary_basal"
+    RESTORE_TEMPORARY_BASAL = "restore_temporary_basal"
 
 
 class EntryValues(BaseModel):
