@@ -103,4 +103,9 @@ function App() {
   </main>
 }
 
-createRoot(document.getElementById('root')!).render(<App />)
+const root = createRoot(document.getElementById('root')!)
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('prototype') === 'diary') {
+  import('./DiaryPrototype').then(({ DiaryPrototype }) => root.render(<DiaryPrototype />))
+} else {
+  root.render(<App />)
+}
