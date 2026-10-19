@@ -16,6 +16,7 @@ from starlette.concurrency import run_in_threadpool
 
 from diary.db import database_engine
 from diary.body_limit import BodyLimit
+from diary.entries import register_entries
 from diary.security import (
     PRE_COOKIE, PRE_SECONDS, SESSION_COOKIE, SESSION_SECONDS,
     csrf_token, digest, now_ms, password_hash, validate_login,
@@ -105,11 +106,22 @@ def create_app(database: Path, origin: str) -> FastAPI:
         return response
 
     @app.exception_handler(RequestValidationError)
-    async def invalid_input(_: Request, error: RequestValidationError) -> Response:
+    async def invalid_input(request: Request, error: RequestValidationError) -> Response:
         # Pydantic's default errors include the submitted password.
         location = error.errors()[0]["loc"]
-        field = str(location[-1]) if location else None
-        return failure("validation", "Проверьте введённые данные.", 422, field)
+        field = str(location[-1]) if location and location[-1] != "body" else None
+        message = "Проверьте введённые данные."
+        if request.url.path == "/api/entries":
+            message = {
+                "glucose": "Сахар: положительное число до 214748364,7; один знак после запятой, завершающие нули допустимы.",
+                "bolus": "Подколка: число от 0 до 214748364,7; один знак после запятой, завершающие нули допустимы.",
+                "comment": "Комментарий должен быть текстом до 10 000 символов.",
+                "reason": "Выберите причину: еда, коррекция, еда и коррекция, либо оставьте пустой.",
+                "occurred_at": "Укажите существующую дату RFC 3339 с явным смещением, с точностью до миллисекунд.",
+                "operation_id": "UUID операции имеет неверный формат.",
+                None: "Укажите сахар, ненулевую подколку или комментарий.",
+            }.get(field, message)
+        return failure("validation", message, 422, field)
 
     @app.get("/api/auth/csrf")
     def csrf(request: Request) -> Response:
@@ -187,6 +199,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
         clear_cookie(response, SESSION_COOKIE)
         return response
 
+    register_entries(app, engine)
     return app
 
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
+import { Diary } from './Diary'
 
 async function csrfToken(): Promise<string> {
   const response = await fetch('/api/auth/csrf', { cache: 'no-store' })
@@ -75,7 +76,6 @@ function App() {
       <h1 id="title" ref={heading} tabIndex={-1}>{login ? 'Личный дневник' : 'Вход в дневник'}</h1>
       {loading ? <p role="status">Проверяем вход…</p> : login ? <>
         <p>Вы вошли как <strong>{login}</strong>.</p>
-        <p className="muted">Доступ к дневнику открыт. Ввод записей появится на следующем этапе.</p>
         <button type="button" onClick={logout} disabled={busy}>{busy ? 'Выходим…' : 'Выйти'}</button>
       </> : <>
         <p className="muted">Ваши записи доступны только после входа.</p>
@@ -91,6 +91,7 @@ function App() {
         <p className="muted hint">Вход сохранится на этом устройстве на 30 дней.</p>
       </>}
       {error && <p role="alert" className="error">{error}</p>}
+      {!loading && <Diary active={login !== null} expired={() => { setLogin(null); setError('Сессия истекла. Войдите снова; введённая запись сохранена в форме.') }} csrfToken={csrfToken} />}
     </section>
   </main>
 }

@@ -8,8 +8,14 @@ h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 16px; }
 .muted { color: #b6c3d4; }
 .hint { font-size: .875rem; margin-bottom: 0; }
 form { display: grid; gap: 8px; margin-top: 24px; }
-input, button { width: 100%; min-height: 48px; border-radius: 10px; font: inherit; padding: 10px 12px; }
-input { min-width: 0; border: 1px solid #74849a; background: #101722; color: #fff; margin-bottom: 10px; }
+input, button, select, textarea { width: 100%; min-height: 48px; border-radius: 10px; font: inherit; padding: 10px 12px; }
+input, select, textarea { min-width: 0; border: 1px solid #74849a; background: #101722; color: #fff; margin-bottom: 10px; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 8px; }
+textarea { min-height: 110px; resize: vertical; }
+.entries { padding-left: 20px; }
+.entries li { border-top: 1px solid #344155; padding-top: 16px; margin-top: 16px; overflow-wrap: anywhere; }
+.comment { white-space: pre-wrap; }
+[aria-invalid="true"] { border-color: #ffb6b6; }
 button { border: 0; background: #9de0cf; color: #09271f; font-weight: 700; cursor: pointer; margin-top: 8px; }
 button:disabled { opacity: .65; cursor: wait; }
 :focus-visible { outline: 3px solid #e9be70; outline-offset: 4px; }
