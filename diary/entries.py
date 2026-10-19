@@ -42,19 +42,26 @@ def decimal_string(value: int) -> str:
     return f"{value // 10}.{value % 10}"
 
 
-class EntryInput(BaseModel):
+class OperationInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     operation_id: str = Field(json_schema_extra={"format": "uuid"})
-    occurred_at: str = Field(json_schema_extra={"format": "date-time"}, description="RFC 3339 с явным смещением; точность до миллисекунд")
-    glucose: str | None = Field(default=None, max_length=10000, description="Положительное десятичное число, до 214748364.7; точка или запятая, десятые без скрытого округления; завершающие нули допустимы")
-    bolus: str = Field(default="0.0", max_length=10000, description="От 0 до 214748364.7, точность до десятых, точка или запятая; пустая строка равна нулю")
-    reason: Literal["food", "correction", "food_and_correction"] | None = None
-    comment: str = Field(default="", max_length=10000)
 
     @field_validator("operation_id")
     @classmethod
     def operation_uuid(cls, value: str) -> str:
         return str(UUID(value))
+
+
+class RevisionInput(OperationInput):
+    expected_revision: int = Field(ge=1, le=9223372036854775806)
+
+
+class EntryInput(OperationInput):
+    occurred_at: str = Field(json_schema_extra={"format": "date-time"}, description="RFC 3339 с явным смещением; точность до миллисекунд")
+    glucose: str | None = Field(default=None, max_length=10000, description="Положительное десятичное число, до 214748364.7; точка или запятая, десятые без скрытого округления; завершающие нули допустимы")
+    bolus: str = Field(default="0.0", max_length=10000, description="От 0 до 214748364.7, точность до десятых, точка или запятая; пустая строка равна нулю")
+    reason: Literal["food", "correction", "food_and_correction"] | None = None
+    comment: str = Field(default="", max_length=10000)
 
     @field_validator("occurred_at")
     @classmethod
@@ -93,6 +100,10 @@ class EntryInput(BaseModel):
         return self
 
 
+class EditEntryInput(EntryInput, RevisionInput):
+    pass
+
+
 class EntryOutput(BaseModel):
     id: UUID
     occurred_at: str = Field(json_schema_extra={"format": "date-time"})
@@ -121,6 +132,20 @@ class ReceiptOutput(BaseModel):
     revision: int
     completed_at: str = Field(json_schema_extra={"format": "date-time"})
     replayed: bool
+    undo_remaining_ms: int = 0
+
+
+def receipt_output(receipt: Any, replayed: bool) -> dict[str, Any]:
+    return {**dict(receipt), "completed_at": timestamp(receipt["completed_at"]), "replayed": replayed,
+            "undo_remaining_ms": max(0, min(30000, receipt["completed_at"] + 30000 - now_ms()))
+            if receipt["action"] == "delete_entry" else 0}
+
+
+def entry_output(row: Any) -> dict[str, Any]:
+    return {**dict(row), "glucose": decimal_string(row["glucose"]) if row["glucose"] is not None else None,
+            "bolus": decimal_string(row["bolus"]), "occurred_at": timestamp(row["occurred_at"]),
+            "created_at": timestamp(row["created_at"]), "updated_at": timestamp(row["updated_at"]),
+            "deleted_at": timestamp(row["deleted_at"]) if row["deleted_at"] is not None else None, "basal": None}
 
 
 def register_entries(app: FastAPI, engine: Engine) -> None:
@@ -153,28 +178,74 @@ def register_entries(app: FastAPI, engine: Engine) -> None:
 
     @app.post("/api/entries", response_model=ReceiptOutput)
     def create_entry(payload: EntryInput) -> Any:
+        return change_entry("create_entry", payload)
+
+    @app.put("/api/entries/{entry_id}", response_model=ReceiptOutput)
+    def edit_entry(entry_id: UUID, payload: EditEntryInput) -> Any:
+        return change_entry("edit_entry", payload, str(entry_id))
+
+    @app.post("/api/entries/{entry_id}/delete", response_model=ReceiptOutput)
+    def delete_entry(entry_id: UUID, payload: RevisionInput) -> Any:
+        return change_entry("delete_entry", payload, str(entry_id))
+
+    @app.post("/api/entries/{entry_id}/restore", response_model=ReceiptOutput)
+    def restore_entry(entry_id: UUID, payload: RevisionInput) -> Any:
+        return change_entry("restore_entry", payload, str(entry_id))
+
+    @app.get("/api/entries/{entry_id}", response_model=EntryOutput)
+    def read_entry(entry_id: UUID) -> Any:
+        with engine.connect() as connection:
+            row = connection.execute(text("SELECT * FROM entry WHERE id = :id"), {"id": str(entry_id)}).mappings().first()
+        if row is None:
+            return failure("not_found", "Запись не найдена.", 404)
+        return entry_output(row)
+
+    def change_entry(action: str, payload: EntryInput | RevisionInput, entry_id: str | None = None) -> Any:
         normalized = payload.model_dump(exclude={"operation_id"})
+        if entry_id is not None:
+            normalized["entry_id"] = entry_id
         request_hash = hashlib.sha256(json.dumps(normalized, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
         with engine.connect() as connection:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
             existing = connection.execute(text("SELECT * FROM operation_receipt WHERE operation_id = :id"),
                                           {"id": payload.operation_id}).mappings().first()
             if existing:
-                if existing["action"] != "create_entry" or existing["request_hash"] != request_hash:
+                if existing["action"] != action or existing["request_hash"] != request_hash:
                     return failure("operation_conflict", "UUID уже использован с другими данными.", 409, "operation_id")
-                return {**dict(existing), "completed_at": timestamp(existing["completed_at"]), "replayed": True}
+                return receipt_output(existing, True)
             now = now_ms()
-            result_id = str(uuid4())
-            connection.execute(text(
-                "INSERT INTO entry VALUES (:id, :occurred_at, :glucose, :bolus, :reason, :comment, :now, :now, 1, NULL)"
-            ), {"id": result_id, "occurred_at": milliseconds(datetime.fromisoformat(payload.occurred_at)),
-                "glucose": tenths(payload.glucose) if payload.glucose else None,
-                "bolus": tenths(payload.bolus), "reason": payload.reason, "comment": payload.comment, "now": now})
-            receipt = {"operation_id": payload.operation_id, "action": "create_entry", "request_hash": request_hash,
-                       "result_id": result_id, "revision": 1, "completed_at": now}
+            result_id = entry_id or str(uuid4())
+            values: dict[str, Any] = {"id": result_id, "now": now}
+            if isinstance(payload, EntryInput):
+                values.update({"occurred_at": milliseconds(datetime.fromisoformat(payload.occurred_at)),
+                    "glucose": tenths(payload.glucose) if payload.glucose else None,
+                    "bolus": tenths(payload.bolus), "reason": payload.reason, "comment": payload.comment})
+            revision = 1
+            if isinstance(payload, RevisionInput):
+                current = connection.execute(text("SELECT * FROM entry WHERE id = :id"), {"id": result_id}).mappings().first()
+                if current is None:
+                    return failure("not_found", "Запись не найдена.", 404)
+                if current["revision"] != payload.expected_revision or (current["deleted_at"] is not None) != (action == "restore_entry"):
+                    return failure("revision_conflict", "Запись изменена на другом устройстве. Загрузите актуальную запись для сравнения.", 409, "expected_revision")
+                revision = payload.expected_revision + 1
+                if action == "restore_entry" and now >= current["deleted_at"] + 30000:
+                    return failure("undo_expired", "30 секунд истекли. Отменить удаление уже нельзя.", 409)
+                if action == "edit_entry":
+                    assignments = "occurred_at = :occurred_at, glucose = :glucose, bolus = :bolus, reason = :reason, comment = :comment"
+                else:
+                    assignments = "deleted_at = :now" if action == "delete_entry" else "deleted_at = NULL"
+                connection.execute(text(
+                    f"UPDATE entry SET {assignments}, updated_at = :now, revision = revision + 1 WHERE id = :id"
+                ), values)
+            else:
+                connection.execute(text(
+                    "INSERT INTO entry VALUES (:id, :occurred_at, :glucose, :bolus, :reason, :comment, :now, :now, 1, NULL)"
+                ), values)
+            receipt = {"operation_id": payload.operation_id, "action": action, "request_hash": request_hash,
+                       "result_id": result_id, "revision": revision, "completed_at": now}
             connection.execute(text("INSERT INTO operation_receipt VALUES (:operation_id, :action, :request_hash, :result_id, :revision, :completed_at)"), receipt)
             connection.commit()
-        return {**receipt, "completed_at": timestamp(now), "replayed": False}
+        return receipt_output(receipt, False)
 
     @app.get("/api/day", response_model=DayOutput)
     def read_day(day: date) -> Any:
@@ -188,8 +259,5 @@ def register_entries(app: FastAPI, engine: Engine) -> None:
                 "SELECT * FROM entry WHERE deleted_at IS NULL AND occurred_at >= :start AND occurred_at < :end "
                 "ORDER BY occurred_at, created_at, id"
             ), {"start": start, "end": end}).mappings().all()
-        entries = [{**dict(row), "glucose": decimal_string(row["glucose"]) if row["glucose"] is not None else None,
-                    "bolus": decimal_string(row["bolus"]), "occurred_at": timestamp(row["occurred_at"]),
-                    "created_at": timestamp(row["created_at"]), "updated_at": timestamp(row["updated_at"]), "basal": None}
-                   for row in rows]
+        entries = [entry_output(row) for row in rows]
         return {"day": day.isoformat(), "basal": None, "entries": entries}

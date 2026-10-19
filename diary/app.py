@@ -111,7 +111,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
         location = error.errors()[0]["loc"]
         field = str(location[-1]) if location and location[-1] != "body" else None
         message = "Проверьте введённые данные."
-        if request.url.path == "/api/entries":
+        if request.url.path == "/api/entries" or request.url.path.startswith("/api/entries/"):
             message = {
                 "glucose": "Сахар: положительное число до 214748364,7; один знак после запятой, завершающие нули допустимы.",
                 "bolus": "Подколка: число от 0 до 214748364,7; один знак после запятой, завершающие нули допустимы.",
@@ -119,6 +119,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
                 "reason": "Выберите причину: еда, коррекция, еда и коррекция, либо оставьте пустой.",
                 "occurred_at": "Укажите существующую дату RFC 3339 с явным смещением, с точностью до миллисекунд.",
                 "operation_id": "UUID операции имеет неверный формат.",
+                "expected_revision": "Укажите целую положительную ожидаемую редакцию записи.",
                 None: "Укажите сахар, ненулевую подколку или комментарий.",
             }.get(field, message)
         return failure("validation", message, 422, field)
