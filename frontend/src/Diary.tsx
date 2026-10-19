@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { BasalSchedules } from './BasalSchedules'
-import { localMinute, basalText } from './time'
+import { TemporaryBasal, type TemporaryPeriod } from './TemporaryBasal'
+import { localMinute, basalText, moscowLabel } from './time'
 
 type Entry = { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null; revision: number; deleted_at: string | null }
 type PendingAction = { path: string; body: string; action: 'delete' | 'restore' }
@@ -18,6 +19,8 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   const [dayBasal, setDayBasal] = useState<string | null>(null)
   const [formBasal, setFormBasal] = useState<string | null>(null)
   const [basalChanges, setBasalChanges] = useState<{ occurred_at: string; basal: string | null }[]>([])
+  const [temporaryBasals, setTemporaryBasals] = useState<TemporaryPeriod[]>([])
+  const [temporaryPercent, setTemporaryPercent] = useState<number | null>(null)
   const [basalGeneration, setBasalGeneration] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -123,7 +126,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   async function loadDay(selected: string) {
     const sequence = ++dayRequest.current
     const result = await request(`/api/day?day=${selected}`)
-    if (sequence === dayRequest.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes) }
+    if (sequence === dayRequest.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes); setTemporaryBasals(result.temporary_basals); setTemporaryPercent(result.temporary_percent) }
   }
 
   async function openForm() {
@@ -229,9 +232,17 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
     {undo && <div role="status"><p>Запись удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || pendingAction !== null} onClick={() => entryAction(undo, 'restore')}>Отменить удаление</button></div>}
     <h2>Хронология дня</h2>
     <label htmlFor="day">День — Москва</label>
-    <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { ++dayRequest.current; setDay(e.target.value); setEntries([]); setDayBasal(null); setBasalChanges([]); if (e.target.value) loadDay(e.target.value).catch(() => setError('Не удалось загрузить день.')) }} />
+    <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { ++dayRequest.current; setDay(e.target.value); setEntries([]); setDayBasal(null); setBasalChanges([]); setTemporaryBasals([]); setTemporaryPercent(null); if (e.target.value) loadDay(e.target.value).catch(() => setError('Не удалось загрузить день.')) }} />
     <button type="button" disabled={!day} onClick={() => loadDay(day).catch(() => setError('Не удалось загрузить день.'))}>Обновить день</button>
     <p className="muted" data-testid="day-basal">База на начало дня: {basalText(dayBasal)} · по расписанию</p>
+    <p data-testid="day-temporary-basal">На начало дня: {temporaryPercent === null ? 'обычное расписание' : `временная база ${temporaryPercent}% от расписания`} · по расписанию</p>
+    <section aria-label="Временная база дня">
+      {temporaryBasals.map(row => <article key={row.id}>
+        <p>Временная база {row.percent}% · с {moscowLabel(row.starts_at)} · по расписанию</p>
+        <p>Исходная длительность: {row.duration_minutes} мин. Заданное окончание: {moscowLabel(row.ends_at)}.</p>
+        <p>Эффективное окончание: {moscowLabel(row.effective_ends_at)} (не включая).</p>
+      </article>)}
+    </section>
     <ol className="entries">{[...entries.map(row => ({ kind: 'entry' as const, row, occurred_at: row.occurred_at })),
       ...basalChanges.map(change => ({ kind: 'basal' as const, row: change, occurred_at: change.occurred_at }))]
       .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at) || (a.kind === b.kind ? 0 : a.kind === 'basal' ? -1 : 1))
@@ -252,6 +263,10 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
     </li> })}</ol>
     {day && entries.length === 0 && <p>Записей нет.</p>}
     <BasalSchedules active={active} initialTime={localTime} expired={expired} csrfToken={csrfToken} onSaved={async () => {
+      setBasalGeneration(value => value + 1)
+      if (selectedDay.current) await loadDay(selectedDay.current)
+    }} />
+    <TemporaryBasal active={active} initialTime={localTime} expired={expired} csrfToken={csrfToken} onSaved={async () => {
       setBasalGeneration(value => value + 1)
       if (selectedDay.current) await loadDay(selectedDay.current)
     }} />

@@ -6,10 +6,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Query
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import Connection, Engine, text
 
-from diary.entries import EPOCH, MOSCOW, EntryInput, OperationInput, ReceiptOutput, milliseconds, receipt_output, timestamp
+from diary.entries import EPOCH, MOSCOW, EntryInput, OperationInput, ReceiptOutput, TemporaryBasalOutput, milliseconds, receipt_output, timestamp
 from diary.security import now_ms
 
 
@@ -84,21 +84,22 @@ def schedules(connection: Connection) -> list[dict[str, Any]]:
     return versions
 
 
-def basal_at(versions: list[dict[str, Any]], instant: int) -> str | None:
+def basal_at(versions: list[dict[str, Any]], instant: int, temporary: list[dict[str, Any]]) -> str | None:
     version = next((version for version in reversed(versions) if version["starts_at"] <= instant), None)
     if version is None:
         return None
     local = (EPOCH + timedelta(milliseconds=instant)).astimezone(MOSCOW)
     minute = local.hour * 60 + local.minute
     interval = next(interval for interval in reversed(version["intervals"]) if interval["minute"] <= minute)
-    return rate_string(interval["rate"])
+    period = next((row for row in reversed(temporary) if row["starts_at"] <= instant < row["effective_ends_at"]), None)
+    return rate_string((interval["rate"] * period["percent"] + 50) // 100 if period else interval["rate"])
 
 
-def basal_changes(versions: list[dict[str, Any]], start: int, end: int) -> list[dict[str, Any]]:
-    if not versions:
-        return []
+def basal_changes(versions: list[dict[str, Any]], start: int, end: int, temporary: list[dict[str, Any]]) -> list[dict[str, Any]]:
     day = (EPOCH + timedelta(milliseconds=start)).astimezone(MOSCOW).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
     boundaries = {version["starts_at"] for version in versions if start < version["starts_at"] < end}
+    temporary_boundaries = {row[key] for row in temporary for key in ("starts_at", "effective_ends_at") if start < row[key] < end}
+    boundaries.update(temporary_boundaries)
     for version in versions:
         for interval in version["intervals"]:
             local = day + timedelta(minutes=interval["minute"])
@@ -124,8 +125,42 @@ def basal_changes(versions: list[dict[str, Any]], start: int, end: int) -> list[
             if start < high < end:
                 boundaries.add(high)
         cursor = next_cursor
-    return [{"occurred_at": timestamp(instant), "basal": basal_at(versions, instant)} for instant in sorted(boundaries)
-            if basal_at(versions, instant) != basal_at(versions, instant - 1)]
+    return [{"occurred_at": timestamp(instant), "basal": basal_at(versions, instant, temporary)} for instant in sorted(boundaries)
+            if instant in temporary_boundaries or basal_at(versions, instant, temporary) != basal_at(versions, instant - 1, temporary)]
+
+
+class TemporaryBasalInput(OperationInput):
+    starts_at: str = Field(json_schema_extra={"format": "date-time"})
+    duration_minutes: int = Field(ge=1, le=2147483647)
+    percent: int = Field(ge=0, le=2147483647)
+
+    @field_validator("starts_at")
+    @classmethod
+    def start_time(cls, value: str) -> str:
+        return EntryInput.event_time(value)
+
+    @model_validator(mode="after")
+    def representable_end(self) -> "TemporaryBasalInput":
+        try:
+            end = datetime.fromisoformat(self.starts_at) + timedelta(minutes=self.duration_minutes)
+            end.astimezone(MOSCOW)
+        except (ValueError, OverflowError) as error:
+            raise ValueError("Окончание за пределами календаря.") from error
+        return self
+
+
+def temporary_basals(connection: Connection) -> list[dict[str, Any]]:
+    rows = [dict(row) for row in connection.execute(text(
+        "SELECT * FROM temporary_basal WHERE deleted_at IS NULL ORDER BY starts_at"
+    )).mappings()]
+    for index, row in enumerate(rows):
+        row["effective_ends_at"] = min(row["ends_at"], rows[index + 1]["starts_at"]) if index + 1 < len(rows) else row["ends_at"]
+    return rows
+
+
+def temporary_output(row: dict[str, Any]) -> dict[str, Any]:
+    return {**row, **{key: timestamp(row[key]) for key in ("starts_at", "ends_at", "effective_ends_at", "created_at", "updated_at")},
+            "deleted_at": timestamp(row["deleted_at"]) if row["deleted_at"] is not None else None}
 
 
 def register_basal(app: FastAPI, engine: Engine) -> None:
@@ -147,7 +182,38 @@ def register_basal(app: FastAPI, engine: Engine) -> None:
         except ValueError:
             return failure("validation", "Укажите дату RFC 3339 с явным смещением.", 422, "at")
         with engine.connect() as connection:
-            return {"basal": basal_at(schedules(connection), instant)}
+            connection.exec_driver_sql("BEGIN")
+            return {"basal": basal_at(schedules(connection), instant, temporary_basals(connection))}
+
+    @app.get("/api/temporary-basals", response_model=list[TemporaryBasalOutput])
+    def temporary_history() -> Any:
+        with engine.connect() as connection:
+            return [temporary_output(row) for row in temporary_basals(connection)]
+
+    @app.post("/api/temporary-basals", response_model=ReceiptOutput)
+    def create_temporary(payload: TemporaryBasalInput) -> Any:
+        request_hash = hashlib.sha256(json.dumps(payload.model_dump(exclude={"operation_id"}), sort_keys=True, ensure_ascii=True).encode()).hexdigest()
+        start = milliseconds(datetime.fromisoformat(payload.starts_at))
+        with engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
+            existing = connection.execute(text("SELECT * FROM operation_receipt WHERE operation_id = :id"),
+                                          {"id": payload.operation_id}).mappings().first()
+            if existing:
+                if existing["action"] != "create_temporary_basal" or existing["request_hash"] != request_hash:
+                    return failure("operation_conflict", "UUID уже использован с другими данными.", 409, "operation_id")
+                return receipt_output(existing, True)
+            occupied = connection.execute(text("SELECT id FROM temporary_basal WHERE starts_at = :start AND deleted_at IS NULL"), {"start": start}).scalar()
+            if occupied:
+                return failure("temporary_conflict", "Начало уже занято временной базой. Обновите историю.", 409, "starts_at")
+            result_id, now = str(uuid4()), now_ms()
+            connection.execute(text("INSERT INTO temporary_basal VALUES (:id, :start, :end, :duration, :percent, :now, :now, 1, NULL)"),
+                               {"id": result_id, "start": start, "end": start + payload.duration_minutes * 60000,
+                                "duration": payload.duration_minutes, "percent": payload.percent, "now": now})
+            receipt = {"operation_id": payload.operation_id, "action": "create_temporary_basal", "request_hash": request_hash,
+                       "result_id": result_id, "revision": 1, "completed_at": now}
+            connection.execute(text("INSERT INTO operation_receipt VALUES (:operation_id, :action, :request_hash, :result_id, :revision, :completed_at)"), receipt)
+            connection.commit()
+        return receipt_output(receipt, False)
 
     @app.post("/api/basal-schedules", response_model=ReceiptOutput)
     def create_schedule(payload: ScheduleInput) -> Any:

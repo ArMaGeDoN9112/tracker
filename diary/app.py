@@ -112,6 +112,14 @@ def create_app(database: Path, origin: str) -> FastAPI:
         location = error.errors()[0]["loc"]
         field = str(location[-1]) if location and location[-1] != "body" else None
         message = "Проверьте введённые данные."
+        if request.url.path == "/api/temporary-basals":
+            message = {
+                "starts_at": "Укажите существующую дату RFC 3339 с явным смещением, с точностью до миллисекунд.",
+                "duration_minutes": "Длительность: целое число минут от 1 до 2147483647.",
+                "percent": "Процент: целое число от 0 до 2147483647; 100% означает обычную скорость.",
+                "operation_id": "UUID операции имеет неверный формат.",
+                None: "Окончание временной базы за пределами календаря. Уменьшите начало или длительность.",
+            }.get(field, message)
         if request.url.path == "/api/basal-schedules":
             message = {
                 "starts_at": "Укажите существующую дату RFC 3339 с явным смещением, с точностью до миллисекунд.",

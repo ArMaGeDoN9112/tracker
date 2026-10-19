@@ -123,6 +123,21 @@ class DayOutput(BaseModel):
     basal: str | None
     entries: list[EntryOutput]
     basal_changes: list["BasalChangeOutput"]
+    temporary_basals: list["TemporaryBasalOutput"]
+    temporary_percent: int | None
+
+
+class TemporaryBasalOutput(BaseModel):
+    id: UUID
+    starts_at: str = Field(json_schema_extra={"format": "date-time"})
+    ends_at: str = Field(json_schema_extra={"format": "date-time"})
+    effective_ends_at: str = Field(json_schema_extra={"format": "date-time"})
+    duration_minutes: int
+    percent: int
+    created_at: str = Field(json_schema_extra={"format": "date-time"})
+    updated_at: str = Field(json_schema_extra={"format": "date-time"})
+    revision: int
+    deleted_at: str | None
 
 
 class BasalChangeOutput(BaseModel):
@@ -156,13 +171,14 @@ def entry_output(row: Any, basal: str | None) -> dict[str, Any]:
 
 def register_entries(app: FastAPI, engine: Engine) -> None:
     from diary.app import failure
-    from diary.basal import basal_at, basal_changes, schedules
+    from diary.basal import basal_at, basal_changes, schedules, temporary_basals, temporary_output
 
     @app.get("/api/entry-form")
     def entry_form() -> dict[str, str | None]:
         now = (EPOCH + timedelta(milliseconds=now_ms())).astimezone(MOSCOW)
         with engine.connect() as connection:
-            basal = basal_at(schedules(connection), milliseconds(now))
+            connection.exec_driver_sql("BEGIN")
+            basal = basal_at(schedules(connection), milliseconds(now), temporary_basals(connection))
         return {"local_time": now.isoformat(timespec="minutes")[:16], "basal": basal}
 
     @app.get("/api/moscow-time")
@@ -207,9 +223,10 @@ def register_entries(app: FastAPI, engine: Engine) -> None:
             connection.exec_driver_sql("BEGIN")
             row = connection.execute(text("SELECT * FROM entry WHERE id = :id"), {"id": str(entry_id)}).mappings().first()
             versions = schedules(connection)
+            temporary = temporary_basals(connection)
         if row is None:
             return failure("not_found", "Запись не найдена.", 404)
-        return entry_output(row, basal_at(versions, row["occurred_at"]))
+        return entry_output(row, basal_at(versions, row["occurred_at"], temporary))
 
     def change_entry(action: str, payload: EntryInput | RevisionInput, entry_id: str | None = None) -> Any:
         normalized = payload.model_dump(exclude={"operation_id"})
@@ -272,6 +289,9 @@ def register_entries(app: FastAPI, engine: Engine) -> None:
                 "ORDER BY occurred_at, created_at, id"
             ), {"start": start, "end": end}).mappings().all()
             versions = schedules(connection)
-        entries = [entry_output(row, basal_at(versions, row["occurred_at"])) for row in rows]
-        return {"day": day.isoformat(), "basal": basal_at(versions, start), "entries": entries,
-                "basal_changes": basal_changes(versions, start, end)}
+            temporary = temporary_basals(connection)
+        entries = [entry_output(row, basal_at(versions, row["occurred_at"], temporary)) for row in rows]
+        return {"day": day.isoformat(), "basal": basal_at(versions, start, temporary), "entries": entries,
+                "basal_changes": basal_changes(versions, start, end, temporary),
+                "temporary_percent": next((row["percent"] for row in temporary if row["starts_at"] <= start < row["effective_ends_at"]), None),
+                "temporary_basals": [temporary_output(row) for row in temporary if row["starts_at"] < end and row["effective_ends_at"] > start]}
