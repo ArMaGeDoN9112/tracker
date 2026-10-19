@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
 import { Diary } from './Diary'
+import { BackupStatus } from './BackupStatus'
 
 async function csrfToken(): Promise<string> {
   const response = await fetch('/api/auth/csrf', { cache: 'no-store' })
@@ -94,6 +95,7 @@ function App() {
       {!loading && <Diary active={login !== null} expired={() => { setLogin(null); setError('Сессия истекла. Войдите снова; введённая запись сохранена в форме.') }} csrfToken={csrfToken} />}
       {!loading && login && <section className="settings" aria-labelledby="settings-title">
         <h2 id="settings-title">Настройки</h2>
+        <BackupStatus />
         <p id="export-warning">Файл содержит личные сведения и мягко удалённые данные за всю историю. Храните его приватно.</p>
         <a className="download" href="/api/export" download aria-describedby="export-warning">Экспорт всех данных</a>
       </section>}

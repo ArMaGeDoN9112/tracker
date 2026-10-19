@@ -24,8 +24,24 @@ RUN useradd --create-home --uid 10001 diary \
 USER diary
 CMD ["uvicorn", "diary.app:from_env", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers", "--no-access-log"]
 
+FROM back AS backup
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends restic ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY frontend/package-lock.json frontend/package-lock.json
+COPY Dockerfile compose.yaml Caddyfile ./
+ARG DIARY_RELEASE=development
+RUN printf '%s' "$DIARY_RELEASE" > /app/RELEASE
+USER diary
+CMD ["python", "-m", "diary.backup", "--database", "/data/diary.sqlite3", "backup"]
+
 FROM python-base AS checks
+RUN apt-get update && apt-get install -y --no-install-recommends restic ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN uv sync --frozen --no-install-project
+COPY frontend/package-lock.json frontend/package-lock.json
+COPY Dockerfile compose.yaml Caddyfile ./
+RUN printf 'test-release' > /app/RELEASE
 COPY tests/ tests/
 COPY scripts/ scripts/
 COPY docs/export/ docs/export/

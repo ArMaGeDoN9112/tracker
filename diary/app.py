@@ -21,6 +21,7 @@ from diary.entries import register_entries
 from diary.basal import register_basal
 from diary.glucose import register_glucose
 from diary.export import register_export
+from diary.backup import register_backup_status
 from diary.security import (
     PRE_COOKIE, PRE_SECONDS, SESSION_COOKIE, SESSION_SECONDS,
     csrf_token, digest, now_ms, password_hash, validate_login,
@@ -215,6 +216,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
     register_basal(app, engine)
     register_glucose(app, engine)
     register_export(app, engine)
+    register_backup_status(app, database)
     return app
 
 

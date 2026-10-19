@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly diary recovery drill
+
+[Timer]
+OnCalendar=Sun *-*-* 05:00:00 Europe/Moscow
+Persistent=true
+Unit=diary-verify.service
+
+[Install]
+WantedBy=timers.target

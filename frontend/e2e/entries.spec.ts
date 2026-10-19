@@ -53,7 +53,7 @@ test('move, keyboard undo and conflict preserve the draft for comparison', async
     await expect(other.locator('.entries')).toContainText('Изменение другого устройства')
     await page.getByLabel('Комментарий', { exact: true }).fill('Мой черновик')
     await page.getByRole('button', { name: 'Сохранить изменения', exact: true }).click()
-    await expect(page.getByRole('alert')).toContainText('другом устройстве')
+    await expect(page.getByRole('alert').filter({ hasText: 'другом устройстве' })).toBeVisible()
     await page.getByRole('button', { name: 'Загрузить актуальную запись', exact: true }).click()
     await expect(page.getByLabel('Актуальная запись')).toContainText('Изменение другого устройства')
     await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Мой черновик')

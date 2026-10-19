@@ -45,6 +45,22 @@ services:
       context: .
       target: checks
 
+  backup:
+    profiles: [tools]
+    build:
+      context: .
+      target: backup
+      args:
+        DIARY_RELEASE: ${DIARY_RELEASE:-development}
+    env_file: ${DIARY_BACKUP_ENV:-.local/backup.env}
+    environment:
+      DIARY_RECOVERY_CONFIG: /run/diary-recovery.env
+    volumes:
+      - diary_data:/data
+      - ${DIARY_BACKUP_SECRETS:-./.local/backup-secrets}:/run/backup-secrets:ro
+      - ${DIARY_RECOVERY_CONFIG:-./.env}:/run/diary-recovery.env:ro
+      - ${DIARY_BACKUP_LOCAL_REPOSITORY:-./.local/restic}:/repository
+
   e2e:
     profiles: [tools]
     build:

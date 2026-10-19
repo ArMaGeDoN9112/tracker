@@ -1,0 +1,11 @@
+[Unit]
+Description=Read all restic blocks and restore diary in isolation
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/diary
+UMask=0077
+ExecStart=/usr/bin/docker compose run --rm -T backup python -m diary.backup --database /data/diary.sqlite3 verify
