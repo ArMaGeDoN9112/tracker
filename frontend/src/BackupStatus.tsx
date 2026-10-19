@@ -12,25 +12,32 @@ type Status = {
 
 const when = (value: string | null) => value ? new Date(value).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) + ' МСК' : 'ещё не было'
 
-export function BackupStatus() {
+export function useBackupStatus(active: boolean) {
   const [status, setStatus] = useState<Status | null>(null)
   const [error, setError] = useState('')
   useEffect(() => {
     let cancelled = false
+    let sequence = 0
+    if (!active) { setStatus(null); setError(''); return }
     async function load() {
+      const current = ++sequence
       try {
         const response = await privateFetch('/api/backup-status', { cache: 'no-store' })
         if (!response.ok) throw new Error()
         const result: Status = await response.json()
-        if (!cancelled) { setStatus(result); setError('') }
+        if (!cancelled && current === sequence) { setStatus(result); setError('') }
       } catch {
-        if (!cancelled) setError('Не удалось получить состояние резервирования.')
+        if (!cancelled && current === sequence) { setStatus(null); setError('Состояние резервирования неизвестно. Не удалось получить состояние резервирования.') }
       }
     }
     void load()
     const timer = setInterval(load, 60_000)
     return () => { cancelled = true; clearInterval(timer) }
-  }, [])
+  }, [active])
+  return { status, error }
+}
+
+export function BackupStatus({ status, error }: ReturnType<typeof useBackupStatus>) {
   return <section aria-labelledby="backup-title">
     <h3 id="backup-title">Резервное копирование</h3>
     {status ? <>

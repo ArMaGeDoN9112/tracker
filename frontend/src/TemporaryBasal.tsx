@@ -17,6 +17,9 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
   const [endCandidates, setEndCandidates] = useState<string[]>([])
   const [endInstant, setEndInstant] = useState('')
   const [history, setHistory] = useState<TemporaryPeriod[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const [editing, setEditing] = useState<TemporaryPeriod | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [conflict, setConflict] = useState<string | null>(null)
@@ -34,7 +37,7 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
 
   useEffect(() => { if (!start && initialTime) setStart(initialTime) }, [initialTime])
   useEffect(() => {
-    if (active) loadHistory().catch(failure => setError(failure.message))
+    if (active) loadHistory().catch(() => {})
   }, [active])
   useEffect(() => {
     if (!undo) return
@@ -42,7 +45,17 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
     return () => window.clearTimeout(timer)
   }, [undo])
 
-  async function loadHistory() { setHistory(await request('/api/temporary-basals')) }
+  async function loadHistory() {
+    setHistoryLoading(true); setHistoryError('')
+    try {
+      const rows: TemporaryPeriod[] = await request('/api/temporary-basals')
+      setHistory(rows); setHistoryLoaded(true)
+      return rows
+    } catch (failure) {
+      setHistoryError('Не удалось загрузить историю временной базы. Обновите историю.')
+      throw failure
+    } finally { setHistoryLoading(false) }
+  }
 
   async function loadLatest() {
     try {
@@ -56,9 +69,15 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
     const response = await privateFetch(path, { cache: 'no-store', ...options })
     const result = await response.json()
     if (!response.ok) {
-      if ([409, 422].includes(response.status)) { setPending(null); setPreview(null) }
+      if ([404, 409, 422].includes(response.status)) { setPending(null); setPreview(null) }
       if (result.code === 'revision_conflict') { setConflict(path.split('/')[3]); setLatest(null) }
-      if (result.code === 'undo_expired') setUndo(null)
+      if (response.status === 409 && result.field === 'starts_at') {
+        const rows: TemporaryPeriod[] = await loadHistory()
+        const requestedStart = JSON.parse(options?.body as string).starts_at ?? editing?.starts_at
+        const occupied = rows.find(row => Date.parse(row.starts_at) === Date.parse(requestedStart))
+        if (occupied) { setConflict(occupied.id); setLatest(null) }
+      }
+      if (result.code === 'undo_expired' || (path.endsWith('/restore') && result.code === 'revision_conflict')) setUndo(null)
       setField(result.field)
       throw new Error(result.message)
     }
@@ -72,13 +91,15 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
   }
 
   function cancel() {
-    setEditing(null); setDeleting(false); setStart(initialTime); setPreview(null); setConflict(null); setLatest(null); setCandidates([]); setInstant('')
+    setEditing(null); setDeleting(false); setStart(initialTime); setPreview(null); setConflict(null); setLatest(null); setCandidates([]); setInstant(''); setEndCandidates([]); setEndInstant('')
   }
 
   async function save(action: Action) {
     setPending(action)
     const csrf = await csrfToken()
     const result = await request(action.path, { method: action.method, headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: action.body })
+    setPending(null); setPreview(null); setSaved(true)
+    if (editing) cancel()
     if (action.deleting) {
       const until = performance.now() + result.undo_remaining_ms
       const current: TemporaryPeriod = await request(`/api/temporary-basals/${result.result_id}`)
@@ -86,10 +107,8 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
         ? { id: current.id, revision: current.revision, until } : null)
     }
     if (action.restoring) setUndo(null)
-    await loadHistory()
-    await onSaved()
-    setPending(null); setPreview(null); setSaved(true)
-    if (editing) cancel()
+    const updates = await Promise.allSettled([loadHistory(), onSaved()])
+    if (updates.some(update => update.status === 'rejected')) setError('Временная база сохранена, но обновление данных не удалось. Обновите историю и день.')
   }
 
   async function restore() {
@@ -123,9 +142,11 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
         const endMs = editing ? Date.parse(deleting ? editing.ends_at : await resolve(end, editing.ends_at, endInstant, true)) : startMs + Number(duration) * 60000
         if (!Number.isFinite(endMs) || endMs > Date.parse('9999-12-31T20:59:59.999Z')) throw new Error('Окончание за пределами календаря. Уменьшите длительность.')
         if (endMs < startMs) { setField('ends_at'); throw new Error('Окончание не может быть раньше начала.') }
-        const history: TemporaryPeriod[] = await request('/api/temporary-basals')
-        if (!deleting && history.some(row => row.id !== editing?.id && Date.parse(row.starts_at) === startMs)) {
+        const history = await loadHistory()
+        const occupied = history.find(row => row.id !== editing?.id && Date.parse(row.starts_at) === startMs)
+        if (!deleting && occupied) {
           setField('starts_at')
+          setConflict(occupied.id); setLatest(null)
           throw new Error('Начало уже занято временной базой. Выберите другое время.')
         }
         const others = history.filter(row => row.id !== editing?.id)
@@ -159,8 +180,10 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
 
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? 'temporary-error' : undefined })
   return <section className="basal-schedules" aria-label="Временная база">
+    <div className="schedule-editor">
+    <span className="eyebrow">ЗАПИСЬ В ДНЕВНИКЕ</span>
     <h2>Временная база</h2>
-    <p>100% — обычная скорость, 120% — 1,2 от неё, 0% — нулевая скорость при известном расписании. До первого расписания скорость неизвестна. Все значения — по расписанию.</p>
+    <p className="muted">100% — обычная скорость, 120% — 1,2 от неё, 0% — нулевая скорость при известном расписании. До первого расписания скорость неизвестна. Все значения — по расписанию.</p>
     <form onSubmit={submit} onChange={() => { setPreview(null); setSaved(false) }} aria-busy={busy}>
       {editing && <p>{deleting ? 'Удаление временной базы' : 'Исправление / досрочное завершение временной базы'}. Исходная длительность: {editing.duration_minutes} мин.</p>}
       <fieldset disabled={busy || pending !== null || deleting}>
@@ -176,7 +199,8 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
         <label htmlFor="temporary-percent">Процент от расписания</label>
         <input id="temporary-percent" type="number" inputMode="numeric" min="0" max="2147483647" step="1" required value={percent} onChange={e => setPercent(e.target.value)} {...invalid('percent')} />
       </fieldset>
-      {preview && <div role="status">
+      {preview && <div className="schedule-preview" role="status">
+        <p>Начало: {moscowLabel(preview.startsAt)}.</p>
         <p>Заданное окончание: {moscowLabel(preview.endsAt)}. Эффективное окончание: {moscowLabel(preview.effectiveEnd)}.</p>
         <p>Затрагиваемый период: с {moscowLabel(preview.affectedStart)} до {moscowLabel(preview.affectedEnd)} (не включая). {deleting ? 'Без удалённой записи действует расписание либо другая временная база, которая действовала бы без неё.' : 'Предыдущая временная база прекращается и не возобновляется. После окончания действует обычное расписание, если не началась следующая временная база.'} Период уточняется при сохранении с учётом других устройств.</p>
       </div>}
@@ -186,18 +210,30 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
     {editing && <button disabled={busy || pending !== null} onClick={cancel}>Отменить редактирование</button>}
     {conflict && <button disabled={busy} onClick={loadLatest}>Загрузить актуальную временную базу</button>}
     {latest && <div data-testid="temporary-latest"><p>Актуальная запись: {moscowLabel(latest.starts_at)} — {moscowLabel(latest.ends_at)}, {latest.percent}%, редакция {latest.revision}. {latest.deleted_at ? 'Удалена.' : ''} Ваш ввод оставлен в форме для сравнения.</p>
-      {editing && !latest.deleted_at && <button disabled={busy} onClick={() => { setEditing(latest); setConflict(null); setLatest(null); setPreview(null) }}>Продолжить с актуальной редакцией</button>}
+      {editing && latest.id === editing.id && !latest.deleted_at && <button disabled={busy} onClick={() => { setEditing(latest); setConflict(null); setLatest(null); setPreview(null) }}>Продолжить с актуальной редакцией</button>}
+      {editing && latest.id !== editing.id && <button disabled={busy} onClick={() => { setConflict(null); setLatest(null) }}>Закрыть сравнение</button>}
       {!editing && <button disabled={busy} onClick={() => { setConflict(null); setLatest(null); setUndo(null) }}>Закрыть сравнение</button>}
     </div>}
     {undo && createPortal(<div role="status"><p>Временная база удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || editing !== null} onClick={restore}>Отменить удаление временной базы</button>{pending?.restoring && !busy && <><p className="error" role="alert">{error}</p><button onClick={restore}>Повторить отмену удаления временной базы</button></>}</div>, document.getElementById('global-undo')!)}
     {error && <p id="temporary-error" role="alert" className="error">{error}</p>}
-    {saved && <p role="status">Временная база сохранена. День и база формы обновлены.</p>}
+    {saved && <p role="status" className="entry-notice">Временная база сохранена.{!busy && !error && ' День и база формы обновлены.'}</p>}
+    </div>
+    <div className="schedule-history temporary-history" aria-label="История временной базы" aria-busy={historyLoading}>
+    <span className="eyebrow">ПЕРИОДЫ ДЕЙСТВИЯ</span>
     <h3>История временной базы</h3>
+    <button type="button" disabled={busy || historyLoading} onClick={() => loadHistory().catch(() => {})}>Обновить историю временной базы</button>
+    {historyLoading && <p role="status">Загружаем историю временной базы…</p>}
+    {historyError && <p role="alert" className="error">{historyError}</p>}
+    {historyLoaded && !historyLoading && !historyError && history.length === 0 && <p>Временная база ещё не задана.</p>}
     {history.map(row => <article key={row.id}>
-      <p>{moscowLabel(row.starts_at)} — {moscowLabel(row.effective_ends_at)}: {row.percent}% · по расписанию</p>
+      <p className="temporary-percent">{row.percent}% <span>· по расписанию</span></p>
+      <p><time dateTime={row.starts_at}>{moscowLabel(row.starts_at)}</time> — {moscowLabel(row.effective_ends_at)}</p>
+      <p className="muted">Эффективное окончание: {moscowLabel(row.effective_ends_at)}.</p>
       <p>Заданное окончание: {moscowLabel(row.ends_at)}. Исходная длительность: {row.duration_minutes} мин.</p>
-      <button disabled={busy || pending !== null || editing !== null} onClick={() => select(row)}>Изменить / завершить</button>
+      <div className="entry-actions"><button disabled={busy || pending !== null || editing !== null} onClick={() => select(row)}>Изменить / завершить</button>
       <button disabled={busy || pending !== null || editing !== null} onClick={() => select(row, true)}>Удалить</button>
+      </div>
     </article>)}
+    </div>
   </section>
 }

@@ -102,14 +102,19 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       if (!response.ok) {
         if ([404, 409, 422].includes(response.status)) setPendingAction(null)
         if (result.code === 'revision_conflict') { setConflictId(action.path.split('/')[3]); setLatest(null) }
-        if (result.code === 'undo_expired') setUndo(null)
+        if (result.code === 'undo_expired' || (action.action === 'restore' && result.code === 'revision_conflict')) setUndo(null)
         throw new Error(result.message)
       }
       committed = true
       setPendingAction(null)
       setNotice(action.action === 'delete' ? 'Запись удалена.' : 'Запись восстановлена.')
       setEntryGeneration(value => value + 1)
-      if (action.action === 'delete') setUndo({ id: result.result_id, revision: result.revision, until: performance.now() + result.undo_remaining_ms })
+      if (action.action === 'delete') {
+        const until = performance.now() + result.undo_remaining_ms
+        const current: Entry = await request(`/api/entries/${result.result_id}`)
+        setUndo(current.deleted_at !== null && current.revision === result.revision && until > performance.now()
+          ? { id: current.id, revision: current.revision, until } : null)
+      }
       else setUndo(null)
       if (selectedDay.current) await loadDay(selectedDay.current)
     } catch (failure) {

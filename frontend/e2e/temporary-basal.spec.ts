@@ -2,6 +2,69 @@ import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
+test('temporary history retries and occupied start compares without losing the draft', async ({ page }, testInfo) => {
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/temporary-basals', async route => { await gate; await route.continue() }, { times: 1 })
+  await page.goto('/')
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await page.getByRole('link', { name: 'Временная база', exact: true }).click()
+  const section = page.getByRole('region', { name: 'Временная база', exact: true })
+  await expect(section.getByText('Загружаем историю временной базы…')).toBeVisible()
+  release()
+  await section.getByRole('button', { name: 'Обновить историю временной базы' }).click()
+  await page.route('**/api/temporary-basals', route => route.abort('failed'), { times: 1 })
+  await section.getByRole('button', { name: 'Обновить историю временной базы' }).click()
+  await expect(section.getByRole('alert')).toContainText('Не удалось загрузить историю')
+  await section.getByRole('button', { name: 'Обновить историю временной базы' }).click()
+  await expect(section.getByRole('alert')).toHaveCount(0)
+  const day = testInfo.project.name === 'phone' ? '2062-01-02' : '2061-01-02'
+  await section.getByLabel('Начало временной базы — Москва').fill(`${day}T10:00`)
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Сохранить временную базу', exact: true }).click()
+  await section.getByLabel('Процент от расписания').fill('125')
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Загрузить актуальную временную базу' }).click()
+  await expect(section.getByTestId('temporary-latest')).toContainText('100%')
+  await expect(section.getByLabel('Процент от расписания')).toHaveValue('125')
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await expect(section.getByTestId('temporary-latest')).toBeVisible()
+  await section.getByRole('button', { name: 'Закрыть сравнение' }).click()
+  await section.getByLabel('Начало временной базы — Москва').fill(`${day}T11:00`)
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await expect(section.getByRole('button', { name: 'Сохранить временную базу', exact: true })).toBeEnabled()
+})
+
+test('temporary undo keeps its original deadline across navigation', async ({ page }, testInfo) => {
+  await page.clock.install()
+  await page.goto('/?section=basal&view=temporary')
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  const section = page.getByRole('region', { name: 'Временная база', exact: true })
+  const year = testInfo.project.name === 'phone' ? '2066' : '2065'
+  await section.getByLabel('Начало временной базы — Москва').fill(`${year}-01-02T10:00`)
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Сохранить временную базу', exact: true }).click()
+  const row = section.getByRole('article').filter({ hasText: year })
+  await row.getByRole('button', { name: 'Удалить', exact: true }).click()
+  await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
+  await section.getByRole('button', { name: 'Подтвердить удаление временной базы' }).click()
+  const undo = page.getByRole('button', { name: 'Отменить удаление временной базы', exact: true })
+  await expect(undo).toBeVisible()
+  await page.clock.fastForward(20000)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await expect(undo).toBeVisible()
+  await page.clock.fastForward(11000)
+  await expect(undo).toHaveCount(0)
+  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await expect(undo).toHaveCount(0)
+})
+
 test('correct historical end, compare conflicts, delete and undo temporary basal', async ({ page }, testInfo) => {
   const day = testInfo.project.name === 'phone' ? '2046-08-17' : '2045-08-17'
   await page.goto('/')
@@ -36,13 +99,13 @@ test('correct historical end, compare conflicts, delete and undo temporary basal
   await page.getByRole('link', { name: 'База', exact: true }).click()
   await row.getByRole('button', { name: 'Изменить / завершить' }).click()
   await section.getByLabel('Процент от расписания').fill('150')
-  await page.evaluate(async () => {
+  await page.evaluate(async day => {
     const csrf = await (await fetch('/api/auth/csrf')).json()
     const rows = await (await fetch('/api/temporary-basals')).json()
-    const row = rows.at(-1)
+    const row = rows.find((row: { starts_at: string }) => row.starts_at.startsWith(day))
     await fetch(`/api/temporary-basals/${row.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf.csrf_token },
       body: JSON.stringify({ operation_id: crypto.randomUUID(), expected_revision: row.revision, starts_at: row.starts_at, ends_at: row.ends_at, percent: 110 }) })
-  })
+  }, day)
   await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
   await section.getByRole('button', { name: 'Сохранить изменения временной базы', exact: true }).click()
   await section.getByRole('button', { name: 'Загрузить актуальную временную базу' }).click()
@@ -80,7 +143,7 @@ test('correct historical end, compare conflicts, delete and undo temporary basal
   await expect(page.getByRole('button', { name: 'Отменить удаление временной базы' })).toHaveCount(0)
 })
 
-test('create temporary basal, retry lost response, replace and inspect next day', async ({ page }, testInfo) => {
+test('create temporary basal, retry lost response after login, replace and inspect next day', async ({ page, context }, testInfo) => {
   const day = testInfo.project.name === 'phone' ? '2036-08-17' : '2035-08-17'
   const tomorrow = day.replace('17', '18')
   await page.goto('/')
@@ -95,6 +158,8 @@ test('create temporary basal, retry lost response, replace and inspect next day'
   await section.getByLabel('Процент от расписания').fill('120')
   await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
   await expect(section.getByRole('status')).toContainText('Затрагиваемый период')
+  const writes: string[] = []
+  page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/api/temporary-basals')) writes.push(request.postData()!) })
   await page.route('**/api/temporary-basals', async route => {
     if (route.request().method() !== 'POST') { await route.continue(); return }
     await route.fetch()
@@ -103,8 +168,20 @@ test('create temporary basal, retry lost response, replace and inspect next day'
   await section.getByRole('button', { name: 'Сохранить временную базу', exact: true }).click()
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await page.getByRole('link', { name: 'База', exact: true }).click()
+  await context.clearCookies()
+  await section.getByRole('button', { name: 'Повторить сохранение временной базы', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
+  const beforeLogin = writes.length
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await expect(section.getByLabel('Процент от расписания')).toHaveValue('120')
+  await expect(section.getByLabel('Длительность, мин')).toHaveValue('240')
+  expect(writes).toHaveLength(beforeLogin)
   await section.getByRole('button', { name: 'Повторить сохранение временной базы', exact: true }).click()
   await expect(section.getByRole('status').filter({ hasText: 'сохранена' })).toBeVisible()
+  expect(writes).toHaveLength(beforeLogin + 1)
+  expect(writes.every(body => body === writes[0])).toBe(true)
   await page.getByRole('link', { name: 'Расписание', exact: true }).click()
   await page.getByLabel('Начало расписания — Москва').fill(`${day}T00:00`)
   await page.getByLabel('Скорость 1, ед/ч').fill('0,50')

@@ -40,3 +40,26 @@ test('settings download readable full JSON with a privacy warning', async ({ pag
   }))
   expect(Object.keys(document.account).sort()).toEqual(['created_at', 'id', 'login'])
 })
+
+test('expired export returns to login and requires an explicit retry', async ({ page, context }) => {
+  await page.goto('/')
+  const login = async () => {
+    await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+    await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+    await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  }
+  await login()
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await context.clearCookies()
+  let downloads = 0
+  page.on('download', () => downloads++)
+  await page.getByRole('link', { name: 'Экспорт всех данных' }).click()
+  await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
+  expect(downloads).toBe(0)
+  await login()
+  await expect(page.getByRole('link', { name: 'Экспорт всех данных' })).toBeVisible()
+  expect(downloads).toBe(0)
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('link', { name: 'Экспорт всех данных' }).click()
+  expect(await (await downloading).failure()).toBeNull()
+})

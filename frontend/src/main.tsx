@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
 import { Diary } from './Diary'
-import { BackupStatus } from './BackupStatus'
+import { BackupStatus, useBackupStatus } from './BackupStatus'
 import { privateFetch, setAccess } from './access'
 
 async function csrfToken(request: (path: string, options?: RequestInit) => Promise<Response> = fetch): Promise<string> {
@@ -49,6 +49,9 @@ function App() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
+  const backup = useBackupStatus(login !== null)
+  const [exportBusy, setExportBusy] = useState(false)
+  const [exportError, setExportError] = useState('')
 
   function expired() {
     setLogin(null)
@@ -108,6 +111,21 @@ function App() {
     }
   }
 
+  async function downloadExport(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    if (exportBusy) return
+    setExportBusy(true); setExportError('')
+    try {
+      const response = await privateFetch('/api/auth/session')
+      if (!response.ok) throw new Error('Войдите снова и повторите экспорт явно.')
+      const link = document.createElement('a')
+      link.href = '/api/export'; link.download = ''
+      link.click()
+    } catch (failure) {
+      setExportError(failure instanceof Error ? failure.message : 'Не удалось проверить вход. Повторите экспорт.')
+    } finally { setExportBusy(false) }
+  }
+
   return <main className={login ? "app-shell" : "login-screen"}>
     <p className="eyebrow">ДНЕВНИК ДИАБЕТА</p>
     <section className="workspace">
@@ -133,13 +151,24 @@ function App() {
       </>}
       {error && <p role="alert" className="error">{error}</p>}
       {login && route.error && <p role="alert" className="error">{route.error}</p>}
+      {login && route.section !== 'settings' && (backup.error || backup.status?.overdue || backup.status?.error || backup.status?.verification_error) && <aside className="backup-warning" aria-label="Предупреждение резервирования">
+        <p>{backup.error ? 'Состояние резервирования неизвестно.' : 'Резервирование требует внимания.'}</p>
+        <a href={routeUrl({ ...route, section: 'settings' })} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section: 'settings' }) } }}>Проверить резервирование</a>
+      </aside>}
       <div id="global-undo" hidden={!login} />
       {!loading && <Diary active={login !== null} section={route.section} day={route.day} temporary={route.temporary} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'diary' : currentRoute.current.section }, !currentRoute.current.day)} onView={temporary => navigate({ ...route, temporary })} csrfToken={privateCsrfToken} />}
       {!loading && login && <section hidden={route.section !== 'settings'} className="settings" aria-labelledby="settings-title">
         <h2 id="settings-title">Настройки</h2>
-        <BackupStatus />
+        <div className="settings-grid">
+        <section aria-labelledby="account-title"><span className="eyebrow">ДОСТУП</span><h3 id="account-title">Аккаунт</h3><p>Вы вошли как <strong>{login}</strong>.</p><p className="muted">Кнопка «Выйти» закрывает доступ на этом устройстве. Другие устройства сохранят вход.</p></section>
+        <section aria-labelledby="export-title"><span className="eyebrow">ЛИЧНЫЙ АРХИВ</span><h3 id="export-title">Экспорт</h3>
         <p id="export-warning">Файл содержит личные сведения и мягко удалённые данные за всю историю. Храните его приватно.</p>
-        <a className="download" href="/api/export" download aria-describedby="export-warning">Экспорт всех данных</a>
+        <a className="download" href="/api/export" download aria-describedby="export-warning" aria-busy={exportBusy} onClick={downloadExport}>Экспорт всех данных</a>
+        {exportBusy && <p role="status">Проверяем вход перед скачиванием…</p>}
+        {exportError && <p role="alert" className="error">{exportError}</p>}
+        </section>
+        <BackupStatus {...backup} />
+        </div>
       </section>}
     </section>
   </main>

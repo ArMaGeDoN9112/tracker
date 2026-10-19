@@ -9,6 +9,33 @@ async function signIn(page: Page) {
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
+test('delete receipt replay does not offer stale undo after another device restores', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await signIn(page)
+  const day = testInfo.project.name === 'phone' ? '2064-01-02' : '2063-01-02'
+  await page.getByLabel('Время события — Москва').fill(`${day}T12:00`)
+  await page.getByLabel('Комментарий', { exact: true }).fill('Проверка устаревшей отмены')
+  await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
+  await expect(page.locator('.entries > .entry')).toHaveCount(1)
+  await page.route('**/api/entries/*/delete', async route => {
+    const response = await route.fetch()
+    const receipt = await response.json()
+    const csrf = await (await page.request.get('/api/auth/csrf')).json()
+    const restored = await page.request.post(`/api/entries/${receipt.result_id}/restore`, {
+      headers: { Origin: 'https://localhost:5173', 'X-CSRF-Token': csrf.csrf_token },
+      data: { operation_id: crypto.randomUUID(), expected_revision: receipt.revision },
+    })
+    expect(restored.ok()).toBe(true)
+    await route.abort('failed')
+  }, { times: 1 })
+  await page.locator('.entries').getByRole('button', { name: 'Удалить', exact: true }).click()
+  await page.getByRole('button', { name: 'Повторить операцию', exact: true }).click()
+  await expect(page.getByText('Запись удалена.', { exact: true })).toBeVisible()
+  await expect(page.locator('.entries > .entry')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Повторить операцию', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Отменить удаление', exact: true })).toHaveCount(0)
+})
+
 test('move, keyboard undo and conflict preserve the draft for comparison', async ({ page, browser, context }, testInfo) => {
   await page.goto('/')
   await signIn(page)
