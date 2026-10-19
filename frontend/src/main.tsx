@@ -3,10 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './style.css'
 import { Diary } from './Diary'
 import { BackupStatus } from './BackupStatus'
-import { setAccess } from './access'
+import { privateFetch, setAccess } from './access'
 
-async function csrfToken(): Promise<string> {
-  const response = await fetch('/api/auth/csrf', { cache: 'no-store' })
+async function csrfToken(request: (path: string, options?: RequestInit) => Promise<Response> = fetch): Promise<string> {
+  const response = await request('/api/auth/csrf', { cache: 'no-store' })
   if (!response.ok) throw new Error('Не удалось подключиться. Повторите попытку.')
   return (await response.json()).csrf_token
 }
@@ -26,6 +26,8 @@ function routeUrl(route: Route) {
   if (route.section === 'basal' && route.temporary) params.set('view', 'temporary')
   return `?${params}`
 }
+
+const privateCsrfToken = () => csrfToken(privateFetch)
 
 function App() {
   const [route, setRoute] = useState(readRoute)
@@ -132,7 +134,7 @@ function App() {
       {error && <p role="alert" className="error">{error}</p>}
       {login && route.error && <p role="alert" className="error">{route.error}</p>}
       <div id="global-undo" hidden={!login} />
-      {!loading && <Diary active={login !== null} section={route.section} day={route.day} temporary={route.temporary} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'diary' : currentRoute.current.section }, !currentRoute.current.day)} onView={temporary => navigate({ ...route, temporary })} expired={expired} csrfToken={csrfToken} />}
+      {!loading && <Diary active={login !== null} section={route.section} day={route.day} temporary={route.temporary} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'diary' : currentRoute.current.section }, !currentRoute.current.day)} onView={temporary => navigate({ ...route, temporary })} csrfToken={privateCsrfToken} />}
       {!loading && login && <section hidden={route.section !== 'settings'} className="settings" aria-labelledby="settings-title">
         <h2 id="settings-title">Настройки</h2>
         <BackupStatus />

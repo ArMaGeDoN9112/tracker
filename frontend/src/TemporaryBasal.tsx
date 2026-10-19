@@ -7,8 +7,8 @@ export type TemporaryPeriod = { id: string; starts_at: string; ends_at: string; 
 type Preview = { startsAt: string; endsAt: string; effectiveEnd: string; affectedStart: string; affectedEnd: string }
 type Action = { path: string; method: string; body: string; deleting?: boolean; restoring?: boolean }
 
-export function TemporaryBasal({ active, initialTime, expired, csrfToken, onSaved }: {
-  active: boolean; initialTime: string; expired: () => void; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
+export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
+  active: boolean; initialTime: string; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
 }) {
   const [start, setStart] = useState('')
   const [duration, setDuration] = useState('60')
@@ -56,7 +56,6 @@ export function TemporaryBasal({ active, initialTime, expired, csrfToken, onSave
     const response = await privateFetch(path, { cache: 'no-store', ...options })
     const result = await response.json()
     if (!response.ok) {
-      if (response.status === 401) expired()
       if ([409, 422].includes(response.status)) { setPending(null); setPreview(null) }
       if (result.code === 'revision_conflict') { setConflict(path.split('/')[3]); setLatest(null) }
       if (result.code === 'undo_expired') setUndo(null)

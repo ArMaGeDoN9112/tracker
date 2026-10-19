@@ -6,8 +6,8 @@ type GlucoseDay = { day: string; count: number; average: string | null; minimum:
 type Summary = { start: string; end: string; count: number; average: string | null; days: GlucoseDay[] }
 const glucoseText = (value: string | null) => value === null ? '—' : value.replace('.', ',')
 
-export function GlucoseCharts({ active, generation, expired, onDay }: {
-  active: boolean; generation: number; expired: () => void; onDay: (day: string) => void
+export function GlucoseCharts({ active, generation, onDay }: {
+  active: boolean; generation: number; onDay: (day: string) => void
 }) {
   const [period, setPeriod] = useState('week')
   const [start, setStart] = useState('')
@@ -27,7 +27,6 @@ export function GlucoseCharts({ active, generation, expired, onDay }: {
         const result = await response.json()
         if (cancelled) return
         if (!response.ok) {
-          if (response.status === 401) expired()
           throw new Error(result.message)
         }
         setSummary(result)

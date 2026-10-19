@@ -11,7 +11,7 @@ type PendingAction = { path: string; body: string; action: 'delete' | 'restore' 
 const reasons: Record<string, string> = { food: 'Еда', correction: 'Коррекция', food_and_correction: 'Еда и коррекция' }
 const moscowTime = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' })
 
-export function Diary({ active, section, day, temporary, onDay, onView, expired, csrfToken }: { active: boolean; section: string; day: string; temporary: boolean; onDay: (day: string, open?: boolean) => void; onView: (temporary: boolean) => void; expired: () => void; csrfToken: () => Promise<string> }) {
+export function Diary({ active, section, day, temporary, onDay, onView, csrfToken }: { active: boolean; section: string; day: string; temporary: boolean; onDay: (day: string, open?: boolean) => void; onView: (temporary: boolean) => void; csrfToken: () => Promise<string> }) {
   const [localTime, setLocalTime] = useState('')
   const [glucose, setGlucose] = useState('')
   const [bolus, setBolus] = useState('')
@@ -94,7 +94,6 @@ export function Diary({ active, section, day, temporary, onDay, onView, expired,
       const response = await privateFetch(action.path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: action.body })
       const result = await response.json()
       if (!response.ok) {
-        if (response.status === 401) expired()
         if ([404, 409, 422].includes(response.status)) setPendingAction(null)
         if (result.code === 'revision_conflict') { setConflictId(action.path.split('/')[3]); setLatest(null) }
         if (result.code === 'undo_expired') setUndo(null)
@@ -121,7 +120,6 @@ export function Diary({ active, section, day, temporary, onDay, onView, expired,
     const result = await response.json()
     if (!response.ok) {
       setField(result.field)
-      if (response.status === 401) expired()
       throw new Error(result.message)
     }
     return result
@@ -180,7 +178,6 @@ export function Diary({ active, section, day, temporary, onDay, onView, expired,
       const response = await privateFetch(editing ? `/api/entries/${editing.id}` : '/api/entries', { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body })
       const result = await response.json()
       if (!response.ok) {
-        if (response.status === 401) expired()
         if ([404, 409, 422].includes(response.status)) setPending(null)
         if (result.code === 'revision_conflict' && editing) { setConflictId(editing.id); setLatest(null) }
         setField(result.field)
@@ -276,7 +273,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, expired,
     {day && entries.length === 0 && <p>Записей нет.</p>}
     </div>
     <div hidden={section !== 'charts'}>
-    <GlucoseCharts active={active && section === 'charts'} generation={entryGeneration} expired={expired} onDay={selected => {
+    <GlucoseCharts active={active && section === 'charts'} generation={entryGeneration} onDay={selected => {
       onDay(selected, true)
       requestAnimationFrame(() => document.getElementById('day')?.focus())
     }} />
@@ -287,13 +284,13 @@ export function Diary({ active, section, day, temporary, onDay, onView, expired,
         <a href={`?section=basal&view=temporary${day ? `&day=${day}` : ''}`} aria-current={temporary ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); onView(true) } }}>Временная база</a>
       </nav>
     <div hidden={temporary}>
-    <BasalSchedules active={active} initialTime={localTime} expired={expired} csrfToken={csrfToken} onSaved={async () => {
+    <BasalSchedules active={active} initialTime={localTime} csrfToken={csrfToken} onSaved={async () => {
       setBasalGeneration(value => value + 1)
       if (selectedDay.current) await loadDay(selectedDay.current)
     }} />
     </div>
     <div hidden={!temporary}>
-    <TemporaryBasal active={active} initialTime={localTime} expired={expired} csrfToken={csrfToken} onSaved={async () => {
+    <TemporaryBasal active={active} initialTime={localTime} csrfToken={csrfToken} onSaved={async () => {
       setBasalGeneration(value => value + 1)
       if (selectedDay.current) await loadDay(selectedDay.current)
     }} />

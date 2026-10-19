@@ -6,8 +6,8 @@ type Version = { id: string; starts_at: string; ends_at: string | null; interval
 type Preview = { startsAt: string; endsAt: string | null }
 const clock = (minute: number) => `${Math.floor(minute / 60).toString().padStart(2, '0')}:${(minute % 60).toString().padStart(2, '0')}`
 
-export function BasalSchedules({ active, initialTime, expired, csrfToken, onSaved }: {
-  active: boolean; initialTime: string; expired: () => void; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
+export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
+  active: boolean; initialTime: string; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
 }) {
   const [versions, setVersions] = useState<Version[]>([])
   const [start, setStart] = useState('')
@@ -27,7 +27,6 @@ export function BasalSchedules({ active, initialTime, expired, csrfToken, onSave
     const response = await privateFetch(path, { cache: 'no-store', ...options })
     const result = await response.json()
     if (!response.ok) {
-      if (response.status === 401) expired()
       setField(result.field)
       if (result.existing_id) { setExistingId(result.existing_id); await loadHistory() }
       if ([409, 422].includes(response.status)) setPending(null)
