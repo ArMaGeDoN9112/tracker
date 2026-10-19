@@ -88,7 +88,7 @@ test('leaving and returning does not restart the server undo countdown', async (
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await page.getByLabel('Время события — Москва').fill(`${testInfo.project.name === 'phone' ? '2081' : '2080'}-01-01T10:00`)
   await page.getByLabel('Комментарий', { exact: true }).fill('Для отмены')
-  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
   await expect(page.locator('.entries > .entry')).toHaveCount(1)
   await page.locator('.entries').getByRole('button', { name: 'Удалить', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Отменить удаление', exact: true })).toBeVisible()

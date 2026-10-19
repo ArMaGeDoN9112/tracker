@@ -20,7 +20,7 @@ test('old save paused at CSRF cannot resume automatically under a new login', as
     await gate
     await route.fulfill({ response })
   }, { times: 1 })
-  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
   await reached
   await context.clearCookies()
   await page.clock.fastForward(60001)

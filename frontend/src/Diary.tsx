@@ -17,6 +17,9 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   const [bolus, setBolus] = useState('')
   const [reason, setReason] = useState('')
   const [comment, setComment] = useState('')
+  const [dayLoading, setDayLoading] = useState(false)
+  const [dayError, setDayError] = useState('')
+  const [todayLoading, setTodayLoading] = useState(false)
   const [entries, setEntries] = useState<Entry[]>([])
   const [dayBasal, setDayBasal] = useState<string | null>(null)
   const [formBasal, setFormBasal] = useState<string | null>(null)
@@ -26,6 +29,8 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   const [basalGeneration, setBasalGeneration] = useState(0)
   const [entryGeneration, setEntryGeneration] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [saveConfirmed, setSaveConfirmed] = useState(false)
+  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [field, setField] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<string[]>([])
@@ -69,7 +74,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     setEditing(row)
     setLocalTime(localMinute(row.occurred_at))
     setGlucose(row.glucose ?? ''); setBolus(row.bolus); setReason(row.reason ?? ''); setComment(row.comment)
-    setCandidates([]); setInstant(''); setConflictId(null); setLatest(null); setError(''); setField(null)
+    setCandidates([]); setInstant(''); setConflictId(null); setLatest(null); setError(''); setField(null); setNotice('')
     document.getElementById('glucose')?.focus()
   }
 
@@ -89,6 +94,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   async function change(action: PendingAction) {
     if (sending.current || !active) return
     sending.current = true; setBusy(true); setError(''); setField(null); setPendingAction(action)
+    let committed = false
     try {
       const csrf = await csrfToken()
       const response = await privateFetch(action.path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: action.body })
@@ -99,13 +105,15 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         if (result.code === 'undo_expired') setUndo(null)
         throw new Error(result.message)
       }
+      committed = true
       setPendingAction(null)
+      setNotice(action.action === 'delete' ? 'Запись удалена.' : 'Запись восстановлена.')
       setEntryGeneration(value => value + 1)
       if (action.action === 'delete') setUndo({ id: result.result_id, revision: result.revision, until: performance.now() + result.undo_remaining_ms })
       else setUndo(null)
       if (selectedDay.current) await loadDay(selectedDay.current)
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Ошибка сети. Повторите операцию.')
+      setError(committed ? 'Операция подтверждена сервером, но обновление дня не удалось. Обновите день.' : failure instanceof Error ? failure.message : 'Ошибка сети. Повторите операцию.')
     } finally {
       sending.current = false; setBusy(false)
     }
@@ -127,8 +135,18 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
 
   async function loadDay(selected: string) {
     const sequence = ++dayRequest.current
-    const result = await request(`/api/day?day=${selected}`)
-    if (sequence === dayRequest.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes); setTemporaryBasals(result.temporary_basals); setTemporaryPercent(result.temporary_percent) }
+    setDayLoading(true); setDayError('')
+    try {
+      const response = await privateFetch(`/api/day?day=${selected}`, { cache: 'no-store' })
+      if (!response.ok) throw new Error('Не удалось загрузить день.')
+      const result = await response.json()
+      if (sequence === dayRequest.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes); setTemporaryBasals(result.temporary_basals); setTemporaryPercent(result.temporary_percent) }
+    } catch (failure) {
+      if (sequence === dayRequest.current) setDayError('Не удалось загрузить день. Повторите обновление.')
+      if (sequence === dayRequest.current) throw failure
+    } finally {
+      if (sequence === dayRequest.current) setDayLoading(false)
+    }
   }
 
   async function openForm() {
@@ -149,7 +167,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   useEffect(() => {
     ++dayRequest.current
     setEntries([]); setDayBasal(null); setBasalChanges([]); setTemporaryBasals([]); setTemporaryPercent(null)
-    if (active && day && initialized.current) loadDay(day).catch(() => setError('Не удалось загрузить день.'))
+    if (active && day && initialized.current) loadDay(day).catch(() => {})
   }, [active, day])
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -158,6 +176,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     sending.current = true
     setBusy(true)
     setError('')
+    setNotice('')
     setField(null)
     let body = pending
     let committed = false
@@ -184,12 +203,15 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         throw new Error(result.message)
       }
       committed = true
+      setSaveConfirmed(true)
       setEntryGeneration(value => value + 1)
       const savedDay = localTime.slice(0, 10)
       onDay(savedDay)
       await loadDay(savedDay)
       const form = await request('/api/entry-form')
       setPending(null)
+      setSaveConfirmed(false)
+      setNotice('Запись сохранена.')
       setEditing(null); setConflictId(null); setLatest(null)
       setGlucose(''); setBolus(''); setReason(''); setComment(''); setCandidates([]); setInstant('')
       setLocalTime(form.local_time)
@@ -203,30 +225,62 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     }
   }
 
-  const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? 'entry-error' : undefined })
+  function adjacentDay(offset: number) {
+    const date = new Date(`${day}T12:00:00Z`)
+    date.setUTCDate(date.getUTCDate() + offset)
+    const next = date.toISOString().slice(0, 10)
+    if (/^\d{4}-/.test(next)) onDay(next)
+  }
+
+  async function today() {
+    const sequence = dayRequest.current
+    setTodayLoading(true)
+    try {
+      const response = await privateFetch('/api/entry-form', { cache: 'no-store' })
+      if (!response.ok) throw new Error()
+      const form = await response.json()
+      if (sequence === dayRequest.current) onDay(form.local_time.slice(0, 10))
+    } catch {
+      if (sequence === dayRequest.current) setDayError('Не удалось получить сегодняшний день с сервера.')
+    } finally { setTodayLoading(false) }
+  }
+
+  const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? `${name}-error` : undefined })
+  const fieldError = (name: string) => field === name && error ? <p id={`${name}-error`} role="alert" className="error field-error">{error}</p> : null
   return <div hidden={!active}>
-    <div hidden={section !== 'diary'}>
+    <div hidden={section !== 'diary'} className="diary-layout">
+    <section className="diary-composer" aria-label="Ввод записи">
+    <span className="eyebrow">БЫСТРЫЙ ВВОД</span>
     <h2>{editing ? 'Изменение записи' : 'Быстрый ввод'}</h2>
     {!localTime ? <button onClick={() => openForm().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение</button> : <form onSubmit={save} aria-busy={busy}>
       <fieldset disabled={busy || pending !== null || pendingAction !== null}>
+        <div className="entry-numbers"><div className="glucose-field">
         <label htmlFor="glucose">Сахар, ммоль/л</label>
         <input id="glucose" inputMode="decimal" autoFocus value={glucose} onChange={e => setGlucose(e.target.value)} {...invalid('glucose')} />
-        <label htmlFor="occurred_at">Время события — Москва</label>
-        <input id="occurred_at" type="datetime-local" step="60" required value={localTime} onChange={e => { setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />
-        {candidates.length > 1 && <><label htmlFor="offset">Смещение UTC</label><select id="offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
-        <p className="muted" data-testid="form-basal">База: {basalText(formBasal)} · по расписанию</p>
+        {fieldError('glucose')}
+        </div><div>
         <label htmlFor="bolus">Подколка, ед.</label>
         <input id="bolus" inputMode="decimal" value={bolus} onChange={e => setBolus(e.target.value)} {...invalid('bolus')} />
+        {fieldError('bolus')}
+        </div></div>
+        <label htmlFor="occurred_at">Время события — Москва</label>
+        <input id="occurred_at" type="datetime-local" step="60" required value={localTime} onChange={e => { setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />
+        {fieldError('occurred_at')}
+        {candidates.length > 1 && <><label htmlFor="offset">Смещение UTC</label><select id="offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
+        <p className="muted" data-testid="form-basal">База: {basalText(formBasal)} · по расписанию</p>
         <label htmlFor="reason">Причина подколки</label>
         <select id="reason" value={reason} onChange={e => setReason(e.target.value)} {...invalid('reason')}><option value="">Без причины</option>{Object.entries(reasons).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        {fieldError('reason')}
         <label htmlFor="comment">Комментарий</label>
-        <textarea id="comment" value={comment} onChange={e => setComment(e.target.value)} {...invalid('comment')} />
+        <textarea rows={2} id="comment" value={comment} onChange={e => setComment(e.target.value)} {...invalid('comment')} />
+        {fieldError('comment')}
       </fieldset>
-      {pending && !busy && <p role="status">Результат запроса нужно проверить. Повтор отправит те же данные и UUID, без дубликата.</p>}
-      <button disabled={busy || pendingAction !== null || conflictId === editing?.id} type="submit">{busy ? 'Сохраняем…' : pending ? 'Повторить сохранение' : editing ? 'Сохранить изменения' : 'Сохранить'}</button>
+      {pending && !busy && <p role="status">{saveConfirmed ? 'Сохранение подтверждено.' : 'Результат запроса неизвестен.'} Повтор отправит те же данные и UUID, без дубликата.</p>}
+      <button disabled={busy || pendingAction !== null || conflictId === editing?.id} type="submit">{busy ? 'Сохраняем…' : pending ? 'Повторить сохранение' : editing ? 'Сохранить изменения' : 'Сохранить запись'}</button>
       {editing && <button type="button" disabled={busy || pending !== null || pendingAction !== null} onClick={() => cancelEdit().catch(() => setError('Не удалось открыть форму.'))}>Отменить редактирование</button>}
     </form>}
-    {error && <p id="entry-error" role="alert" className="error">{error}</p>}
+    {error && !['glucose', 'bolus', 'occurred_at', 'reason', 'comment'].includes(field ?? '') && <p id="entry-error" role="alert" className="error">{error}</p>}
+    {notice && <p role="status" className="entry-notice">{notice}</p>}
     {conflictId && <button disabled={busy} onClick={() => request(`/api/entries/${conflictId}`).then(setLatest).catch(failure => setError(failure.message))}>Загрузить актуальную запись</button>}
     {latest && <section aria-label="Актуальная запись">
       <p>Редакция {latest.revision} · {latest.deleted_at ? 'Удалена' : 'Сохранена'} · Москва {localMinute(latest.occurred_at).replace('T', ' ')}</p>
@@ -239,13 +293,24 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     </section>}
     {pendingAction && !busy && createPortal(<div>{error && section !== 'diary' && <p role="alert" className="error">{error}</p>}<button onClick={() => change(pendingAction)}>Повторить операцию</button></div>, document.getElementById('global-undo')!)}
     {undo && createPortal(<div role="status"><p>Запись удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || pendingAction !== null} onClick={() => entryAction(undo, 'restore')}>Отменить удаление</button></div>, document.getElementById('global-undo')!)}
-    <h2>Хронология дня</h2>
+    </section>
+    <section className="diary-timeline" aria-label="Хронология дня">
+    <span className="eyebrow">ХРОНОЛОГИЯ · МОСКВА</span>
+    <h2>Записи дня <span className="entry-count">{entries.length}</span></h2>
     <label htmlFor="day">День — Москва</label>
     <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { if (e.target.value) onDay(e.target.value) }} />
-    <button type="button" disabled={!day} onClick={() => loadDay(day).catch(() => setError('Не удалось загрузить день.'))}>Обновить день</button>
+    <div className="day-navigation">
+      <button type="button" disabled={!day || day === '0001-01-01'} onClick={() => adjacentDay(-1)}>Предыдущий день</button>
+      <button type="button" disabled={todayLoading} onClick={today}>{todayLoading ? 'Получаем сегодня…' : 'Сегодня'}</button>
+      <button type="button" disabled={!day || day === '9999-12-31'} onClick={() => adjacentDay(1)}>Следующий день</button>
+      <button type="button" disabled={!day || dayLoading} onClick={() => loadDay(day).catch(() => {})}>Обновить день</button>
+    </div>
+    {dayLoading && <p role="status">Загружаем день…</p>}
+    {dayError && <p role="alert" className="error">{dayError}</p>}
+    <div hidden={dayLoading || !!dayError}>
     <p className="muted" data-testid="day-basal">База на начало дня: {basalText(dayBasal)} · по расписанию</p>
     <p data-testid="day-temporary-basal">На начало дня: {temporaryPercent === null ? 'обычное расписание' : `временная база ${temporaryPercent}% от расписания`} · по расписанию</p>
-    <section aria-label="Временная база дня">
+    <section className="day-temporary" aria-label="Временная база дня" hidden={temporaryBasals.length === 0}>
       {temporaryBasals.map(row => <article key={row.id}>
         <p>Временная база {row.percent}% · с {moscowLabel(row.starts_at)} · по расписанию</p>
         <p>Исходная длительность: {row.duration_minutes} мин. Заданное окончание: {moscowLabel(row.ends_at)}.</p>
@@ -263,14 +328,16 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         const row = item.row
         return <li className="entry" key={row.id}>
       <time dateTime={row.occurred_at}>{moscowTime.format(new Date(row.occurred_at))}</time>
-      <p>Сахар: {row.glucose?.replace('.', ',') ?? 'не указан'} · Подколка: {row.bolus.replace('.', ',')} ед.</p>
+      <div className="entry-values"><p className="entry-glucose"><span>Сахар: </span><strong>{row.glucose?.replace('.', ',') ?? 'не указан'}</strong><small>ммоль/л</small></p><p className="entry-bolus">Подколка: {row.bolus.replace('.', ',')} ед.</p></div>
       {row.reason && <p>{reasons[row.reason]}</p>}
       {row.comment && <p className="comment">{row.comment}</p>}
       <p className="muted">База: {basalText(row.basal)} · по расписанию</p>
-      <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => edit(row)}>Изменить</button>
-      <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => entryAction(row, 'delete')}>Удалить</button>
+      <div className="entry-actions"><button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => edit(row)}>Изменить</button>
+      <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => entryAction(row, 'delete')}>Удалить</button></div>
     </li> })}</ol>
-    {day && entries.length === 0 && <p>Записей нет.</p>}
+    {day && !dayLoading && !dayError && entries.length === 0 && <p>Записей нет.</p>}
+    </div>
+    </section>
     </div>
     <div hidden={section !== 'charts'}>
     <GlucoseCharts active={active && section === 'charts'} generation={entryGeneration} onDay={selected => {

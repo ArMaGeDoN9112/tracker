@@ -10,7 +10,7 @@ test('create immutable schedule, retry a lost response and inspect a historical 
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await page.getByLabel('Время события — Москва').fill(`${day}T07:00`)
   await page.getByLabel('Сахар, ммоль/л').fill('5,5')
-  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
   await expect(page.locator('.entries > .entry')).toHaveCount(1)
   await page.getByRole('link', { name: 'База', exact: true }).click()
   await page.getByLabel('Начало расписания — Москва').fill(`${day}T06:00`)
