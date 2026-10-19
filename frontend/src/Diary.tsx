@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { BasalSchedules } from './BasalSchedules'
+import { GlucoseCharts } from './GlucoseCharts'
 import { TemporaryBasal, type TemporaryPeriod } from './TemporaryBasal'
 import { localMinute, basalText, moscowLabel } from './time'
 
@@ -22,6 +23,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
   const [temporaryBasals, setTemporaryBasals] = useState<TemporaryPeriod[]>([])
   const [temporaryPercent, setTemporaryPercent] = useState<number | null>(null)
   const [basalGeneration, setBasalGeneration] = useState(0)
+  const [entryGeneration, setEntryGeneration] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [field, setField] = useState<string | null>(null)
@@ -98,6 +100,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
         throw new Error(result.message)
       }
       setPendingAction(null)
+      setEntryGeneration(value => value + 1)
       if (action.action === 'delete') setUndo({ id: result.result_id, revision: result.revision, until: performance.now() + result.undo_remaining_ms })
       else setUndo(null)
       if (selectedDay.current) await loadDay(selectedDay.current)
@@ -177,6 +180,7 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
         throw new Error(result.message)
       }
       committed = true
+      setEntryGeneration(value => value + 1)
       const savedDay = localTime.slice(0, 10)
       setDay(savedDay)
       await loadDay(savedDay)
@@ -262,6 +266,12 @@ export function Diary({ active, expired, csrfToken }: { active: boolean; expired
       <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => entryAction(row, 'delete')}>Удалить</button>
     </li> })}</ol>
     {day && entries.length === 0 && <p>Записей нет.</p>}
+    <GlucoseCharts active={active} generation={entryGeneration} expired={expired} onDay={selected => {
+      setDay(selected)
+      loadDay(selected).catch(() => setError('Не удалось загрузить день.'))
+      document.getElementById('day')?.focus()
+      document.getElementById('day')?.scrollIntoView({ block: 'center' })
+    }} />
     <BasalSchedules active={active} initialTime={localTime} expired={expired} csrfToken={csrfToken} onSaved={async () => {
       setBasalGeneration(value => value + 1)
       if (selectedDay.current) await loadDay(selectedDay.current)
