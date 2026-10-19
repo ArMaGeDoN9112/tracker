@@ -1,5 +1,10 @@
 ## Agent skills
 
+### Code feedback
+
+Before changing or reviewing code, read `docs/agents/code-feedback.md`.
+When the user corrects a coding approach, update that document with the agreed rule.
+
 ### Issue tracker
 
 Local Markdown in `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
