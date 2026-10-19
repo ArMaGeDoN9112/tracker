@@ -15,8 +15,24 @@ textarea { min-height: 110px; resize: vertical; }
 .entries { padding-left: 20px; }
 .entries li { border-top: 1px solid #344155; padding-top: 16px; margin-top: 16px; overflow-wrap: anywhere; }
 .comment { white-space: pre-wrap; }
-.basal-schedules { margin-top: 32px; padding: 0; border: 0; border-radius: 0; }
-.basal-schedules article { border-top: 1px solid #74849a; overflow-wrap: anywhere; }
+.basal-schedules { display:grid; gap:24px; align-items:start; margin-top:24px; padding:0; border:0; background:transparent; min-width:0; }
+.schedule-editor,.schedule-history { padding:24px; border:1px solid var(--border); border-radius:14px; min-width:0; }
+.basal-schedules h2,.basal-schedules h3 { margin:8px 0 16px; font-size:1.35rem; font-weight:600; }
+.basal-schedules label { display:block; font-size:.875rem; margin-bottom:6px; }
+.basal-schedules input,.basal-schedules select { margin-bottom:0; }
+.basal-schedules fieldset { gap:16px; }
+.schedule-interval { display:grid; gap:8px; padding-top:16px; border-top:1px solid var(--border); }
+.schedule-interval-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,7rem),1fr)); gap:8px 12px; }
+.schedule-remove { width:auto; justify-self:start; margin:0; font-size:.875rem; }
+.schedule-preview { padding:16px; border:1px solid var(--accent); border-radius:10px; background:#20312c; }
+.schedule-history>button { margin:0 0 16px; }
+.basal-schedules article { border-top:1px solid var(--border); overflow-wrap:anywhere; }
+.schedule-history summary { cursor:pointer; min-height:48px; padding:16px 4px; font-variant-numeric:tabular-nums; }
+.schedule-history summary span { display:block; color:var(--muted); font-size:.875rem; margin-top:4px; }
+.schedule-history ul { padding-left:24px; font-variant-numeric:tabular-nums; }
+.schedule-history li { margin:12px 0; }
+@media(min-width:1100px) { .basal-schedules { grid-template-columns:minmax(0,1fr) minmax(0,1fr); } }
+@media(max-width:767px) { .schedule-editor,.schedule-history { padding:16px; } }
 a { color:var(--accent); }
 .settings { margin-top: 24px; padding: 0; border: 0; }
 .download { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 12px; border: 1px solid #9de0cf; border-radius: 10px; }
