@@ -199,7 +199,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       if (!response.ok) {
         if ([404, 409, 422].includes(response.status)) setPending(null)
         if (result.code === 'revision_conflict' && editing) { setConflictId(editing.id); setLatest(null) }
-        setField(result.field)
+        setField(result.field ?? (response.status === 422 ? 'entry-fields' : null))
         throw new Error(result.message)
       }
       committed = true
@@ -253,7 +253,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     <span className="eyebrow">БЫСТРЫЙ ВВОД</span>
     <h2>{editing ? 'Изменение записи' : 'Быстрый ввод'}</h2>
     {!localTime ? <button onClick={() => openForm().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение</button> : <form onSubmit={save} aria-busy={busy}>
-      <fieldset disabled={busy || pending !== null || pendingAction !== null}>
+      <fieldset aria-label="Данные записи" {...invalid('entry-fields')} disabled={busy || pending !== null || pendingAction !== null}>
         <div className="entry-numbers"><div className="glucose-field">
         <label htmlFor="glucose">Сахар, ммоль/л</label>
         <input id="glucose" inputMode="decimal" autoFocus value={glucose} onChange={e => setGlucose(e.target.value)} {...invalid('glucose')} />
@@ -274,12 +274,13 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         <label htmlFor="comment">Комментарий</label>
         <textarea rows={2} id="comment" value={comment} onChange={e => setComment(e.target.value)} {...invalid('comment')} />
         {fieldError('comment')}
+        {fieldError('entry-fields')}
       </fieldset>
       {pending && !busy && <p role="status">{saveConfirmed ? 'Сохранение подтверждено.' : 'Результат запроса неизвестен.'} Повтор отправит те же данные и UUID, без дубликата.</p>}
       <button disabled={busy || pendingAction !== null || conflictId === editing?.id} type="submit">{busy ? 'Сохраняем…' : pending ? 'Повторить сохранение' : editing ? 'Сохранить изменения' : 'Сохранить запись'}</button>
       {editing && <button type="button" disabled={busy || pending !== null || pendingAction !== null} onClick={() => cancelEdit().catch(() => setError('Не удалось открыть форму.'))}>Отменить редактирование</button>}
     </form>}
-    {error && !['glucose', 'bolus', 'occurred_at', 'reason', 'comment'].includes(field ?? '') && <p id="entry-error" role="alert" className="error">{error}</p>}
+    {error && !['glucose', 'bolus', 'occurred_at', 'reason', 'comment', 'entry-fields'].includes(field ?? '') && <p id="entry-error" role="alert" className="error">{error}</p>}
     {notice && <p role="status" className="entry-notice">{notice}</p>}
     {conflictId && <button disabled={busy} onClick={() => request(`/api/entries/${conflictId}`).then(setLatest).catch(failure => setError(failure.message))}>Загрузить актуальную запись</button>}
     {latest && <section aria-label="Актуальная запись">

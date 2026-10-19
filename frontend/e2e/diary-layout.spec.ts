@@ -27,11 +27,14 @@ test('neighbor days and server Today preserve the draft and expose day loading a
   await page.getByLabel('День — Москва').fill('2027-01-03')
   await expect(page.getByRole('status').filter({ hasText: 'Загружаем день' })).toBeVisible()
   await expect(page.getByText('Записей нет.', { exact: true })).toBeHidden()
+  if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/loading-${test.info().project.name}.png`, fullPage: true })
   release()
   await expect(page.getByRole('alert').filter({ hasText: 'Не удалось загрузить день' })).toBeVisible()
   await expect(page.getByText('Записей нет.', { exact: true })).toBeHidden()
+  if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/day-error-${test.info().project.name}.png`, fullPage: true })
   await page.getByLabel('День — Москва').fill('2027-01-04')
   await expect(page.getByText('Записей нет.', { exact: true })).toBeVisible()
+  if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/empty-${test.info().project.name}.png`, fullPage: true })
 })
 
 test('field errors stay beside the draft and confirmed save differs from failed refresh', async ({ page }, testInfo) => {
@@ -45,6 +48,7 @@ test('field errors stay beside the draft and confirmed save differs from failed 
   const glucose = page.getByLabel('Сахар, ммоль/л')
   await expect(glucose).toHaveAttribute('aria-describedby', 'glucose-error')
   await expect(page.locator('#glucose-error')).toBeVisible()
+  if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/field-error-${testInfo.project.name}.png`, fullPage: true })
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Полный черновик')
   const day = testInfo.project.name === 'phone' ? '2028-02-02' : '2028-02-01'
   await page.getByLabel('Время события — Москва').fill(`${day}T12:00`)
@@ -87,10 +91,26 @@ test('full history remains readable at phone, tablet and desktop widths and stal
     if (width >= 1280) expect(form!.x + form!.width).toBeLessThan(timeline!.x)
     else expect(form!.y + form!.height).toBeLessThan(timeline!.y)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    expect(await page.locator('.diary-layout button, .diary-layout input, .diary-layout select, .diary-layout textarea').evaluateAll(elements => elements.filter(element => element.getClientRects().length).every(element => element.getBoundingClientRect().height >= 44))).toBe(true)
+    if (width === 375) {
+      await page.getByLabel('Комментарий', { exact: true }).focus()
+      await page.keyboard.press('Tab')
+      const save = page.getByRole('button', { name: 'Сохранить запись', exact: true })
+      await expect(save).toBeFocused()
+      const saveBounds = await save.boundingBox()
+      const navBounds = await page.getByRole('navigation', { name: 'Разделы', exact: true }).boundingBox()
+      expect(saveBounds!.y + saveBounds!.height).toBeLessThanOrEqual(navBounds!.y)
+    }
+
     if (process.env.DIARY_ACCEPTANCE_DIR && testInfo.project.name === 'desktop') {
       await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/diary-${width}.png`, fullPage: width === 390 })
     }
   }
+  await page.setViewportSize({ width: 375, height: 1000 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%' })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.evaluate(() => { document.documentElement.style.fontSize = '' })
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/day?day=2028-05-01', async route => { const response = await route.fetch(); await gate; await route.fulfill({ response }) })
@@ -119,4 +139,18 @@ test('late Today response cannot replace a newer calendar choice', async ({ page
   await page.unrouteAll({ behavior: 'wait' })
   await expect(page.getByRole('button', { name: 'Сегодня', exact: true })).toBeVisible()
   await expect(page.getByLabel('День — Москва')).toHaveValue('2029-01-01')
+})
+
+test('empty entry validation is attached to the entry fields without requiring sugar', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
+  await expect(page.getByRole('group', { name: 'Данные записи', exact: true })).toHaveAttribute('aria-describedby', 'entry-fields-error')
+  await expect(page.locator('#entry-fields-error')).toContainText('Укажите сахар')
+  await expect(page.getByLabel('Сахар, ммоль/л')).toHaveValue('')
+  await page.getByLabel('Комментарий', { exact: true }).fill('Комментарий достаточен')
+  await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Запись сохранена.' })).toBeVisible()
 })
