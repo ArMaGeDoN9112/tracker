@@ -1,6 +1,8 @@
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.responses import JSONResponse
 
+from diary.dto import ErrorOutput
+
 
 class BodyLimit:
     def __init__(self, app: ASGIApp) -> None:
@@ -17,7 +19,7 @@ class BodyLimit:
                 return
             body.extend(message.get("body", b""))
             if len(body) > 65_536:
-                response = JSONResponse({"code": "body_too_large", "message": "Запрос слишком большой.", "field": None}, status_code=413)
+                response = JSONResponse(ErrorOutput(code="body_too_large", message="Запрос слишком большой.").model_dump(mode="json"), status_code=413)
                 await response(scope, receive, send)
                 return
             if not message.get("more_body", False):

@@ -3,11 +3,12 @@ import getpass
 import warnings
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from diary.db import database_engine, migrate
 from diary.security import now_ms, password_hash, validate_login, validate_password
+from diary.tables import account, session
 
 
 def create_account(database: Path, login: str, password: str) -> None:
@@ -18,10 +19,9 @@ def create_account(database: Path, login: str, password: str) -> None:
     try:
         with engine.connect() as connection:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
-            if connection.execute(text("SELECT id FROM account")).first():
+            if connection.execute(select(account.c.id)).first():
                 raise ValueError("Аккаунт уже существует.")
-            connection.execute(text("INSERT INTO account VALUES (1, :login, :hash, :now)"),
-                               {"login": login, "hash": hashed, "now": now_ms()})
+            connection.execute(insert(account).values(id=1, login=login, password_hash=hashed, created_at=now_ms()))
             connection.commit()
     finally:
         engine.dispose()
@@ -34,10 +34,10 @@ def reset_password(database: Path, password: str) -> None:
     try:
         with engine.connect() as connection:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
-            if not connection.execute(text("SELECT id FROM account")).first():
+            if not connection.execute(select(account.c.id)).first():
                 raise ValueError("Сначала создайте аккаунт.")
-            connection.execute(text("UPDATE account SET password_hash = :hash"), {"hash": hashed})
-            connection.execute(text("DELETE FROM session"))
+            connection.execute(update(account).values(password_hash=hashed))
+            connection.execute(delete(session))
             connection.commit()
     finally:
         engine.dispose()
