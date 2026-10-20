@@ -70,7 +70,7 @@ def test_encrypted_point_restores_snapshot_and_revokes_sessions(diary, tmp_path)
     assert (destination / "recovery.env").read_text() == "DIARY_ORIGIN=https://diary.test\n"
     manifest = json.loads((destination / "manifest.json").read_text())
     assert manifest["release"] == "synthetic-release"
-    assert manifest["schema_version"] == "006_meals"
+    assert manifest["schema_version"] == "007_one_off_meals"
     assert "uv.lock" in manifest["files"]
     assert len(client.get("/api/export").json()["entries"]) == 3
     command(database, "verify", env=env)

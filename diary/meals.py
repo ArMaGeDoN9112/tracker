@@ -2,12 +2,12 @@ import hashlib
 import json
 from datetime import date, datetime, time, timedelta
 from fractions import Fraction
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 from sqlalchemy import Connection, Engine, delete, insert, select, update
 
 from diary.basal import hundredths, rate_string
@@ -23,34 +23,63 @@ Category = Literal["breakfast", "lunch", "dinner", "snack"]
 
 class MealLineInput(NamedInput):
     id: str
-    kind: Literal["product"]
-    unit: Literal["g", "ml"]
-    quantity: str = Field(max_length=10000)
-    basis_quantity: str = Field(max_length=10000)
-    protein: str | None = Field(max_length=10000)
-    fat: str | None = Field(max_length=10000)
-    carbohydrate: str | None = Field(max_length=10000)
-    calories: str | None = Field(max_length=10000)
-    product_id: str
-    product_revision: int = Field(ge=1, le=9223372036854775806)
+    kind: Literal["product", "one_off"]
+    basis_quantity: str | None = Field(default=None, max_length=10000, validate_default=True)
+    quantity: str | None = Field(default=None, max_length=10000, validate_default=True)
+    unit: Literal["g", "ml"] | None = Field(default=None, validate_default=True)
+    protein: str | None = Field(default=None, max_length=10000)
+    fat: str | None = Field(default=None, max_length=10000)
+    carbohydrate: str | None = Field(default=None, max_length=10000)
+    calories: str | None = Field(default=None, max_length=10000)
+    product_id: str | None = Field(default=None, validate_default=True)
+    product_revision: int | None = Field(default=None, ge=1, le=9223372036854775806, validate_default=True)
     portion: PortionInput | None = None
 
     @field_validator("id", "product_id")
     @classmethod
-    def valid_uuid(cls, value: str) -> str:
-        return str(UUID(value))
+    def valid_uuid(cls, value: str | None) -> str | None:
+        return str(UUID(value)) if value is not None else None
 
-    @field_validator("quantity")
+    @field_validator("quantity", "basis_quantity")
     @classmethod
-    def amount(cls, value: str) -> str:
-        return PortionInput.positive_quantity(value)
+    def amount(cls, value: str | None) -> str | None:
+        return PortionInput.positive_quantity(value) if value is not None else None
 
     @field_validator("basis_quantity")
     @classmethod
-    def basis(cls, value: str) -> str:
-        if hundredths(value) != 10000:
+    def product_basis(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if info.data.get("kind") == "product" and value != "100.00":
             raise ValueError("Основа продукта — 100 г или мл.")
-        return "100.00"
+        return value
+
+    @field_validator("quantity")
+    @classmethod
+    def required_quantity(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None and (info.data.get("kind") == "product" or info.data.get("basis_quantity") is not None):
+            raise ValueError("При известной основе нужно съеденное количество.")
+        return value
+
+    @field_validator("unit")
+    @classmethod
+    def required_unit(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None and (info.data.get("kind") == "product" or info.data.get("quantity") is not None or info.data.get("basis_quantity") is not None):
+            raise ValueError("Для количества и основы выберите г или мл.")
+        return value
+
+    @field_validator("product_id", "product_revision", "portion")
+    @classmethod
+    def provenance(cls, value: str | int | PortionInput | None, info: ValidationInfo) -> str | int | PortionInput | None:
+        if info.data.get("kind") == "one_off" and value is not None:
+            raise ValueError("Разовая еда не имеет происхождения из каталога.")
+        if info.data.get("kind") == "product" and info.field_name != "portion" and value is None:
+            raise ValueError("Укажите происхождение продукта.")
+        return value
+
+    @model_validator(mode="after")
+    def coherent_basis(self) -> Self:
+        if self.kind == "one_off" and "basis_quantity" not in self.model_fields_set:
+            self.basis_quantity = self.quantity
+        return self
 
     @field_validator("protein", "fat", "carbohydrate", "calories")
     @classmethod
@@ -94,17 +123,17 @@ class MealLineRecord(BaseModel):
     meal_id: str
     id: str
     position: int
-    kind: Literal["product"]
+    kind: Literal["product", "one_off"]
     name: str
-    unit: Literal["g", "ml"]
-    quantity: int
-    basis_quantity: int
+    unit: Literal["g", "ml"] | None
+    quantity: int | None
+    basis_quantity: int | None
     protein: int | None
     fat: int | None
     carbohydrate: int | None
     calories: int | None
-    product_id: str
-    product_revision: int
+    product_id: str | None
+    product_revision: int | None
     portion_id: str | None
     portion_name: str | None
     portion_quantity: int | None
@@ -135,6 +164,28 @@ class MealLineOutput(MealLineInput):
     totals: NutrientValues
 
 
+class RepeatMealOutput(BaseModel):
+    occurred_at: str
+    category: Category | None
+    lines: list[MealLineInput]
+
+
+class MealProductPreviewInput(BaseModel):
+    line: MealLineInput
+    basis_quantity: str | None = Field(default=None, max_length=10000)
+    unit: Literal["g", "ml"]
+
+    @field_validator("basis_quantity")
+    @classmethod
+    def amount(cls, value: str | None) -> str | None:
+        return MealLineInput.amount(value)
+
+
+class MealProductPreview(NutrientValues):
+    name: str
+    unit: Literal["g", "ml"]
+
+
 class MealOutput(BaseModel):
     id: str
     occurred_at: str
@@ -158,11 +209,17 @@ def rounded(value: Fraction) -> str:
     return rate_string((2 * value.numerator + value.denominator) // (2 * value.denominator))
 
 
+def contribution(line: MealLineRecord, name: str) -> Fraction | None:
+    value = getattr(line, name)
+    if value is None:
+        return None
+    return Fraction(value * line.quantity, line.basis_quantity) if line.basis_quantity is not None and line.quantity is not None else Fraction(value)
+
+
 def nutrition_totals(lines: list[MealLineRecord]) -> NutritionTotals:
     result: dict[str, NutrientTotal] = {}
     for name in NUTRIENTS:
-        known = [Fraction(getattr(line, name) * line.quantity, line.basis_quantity)
-                 for line in lines if getattr(line, name) is not None]
+        known = [value for line in lines if (value := contribution(line, name)) is not None]
         result[name] = NutrientTotal(value=rounded(sum(known, Fraction())) if known else None,
                                     known_count=len(known), unknown_count=len(lines) - len(known),
                                     incomplete=len(known) < len(lines))
@@ -181,11 +238,10 @@ def meal_output(record: MealRecord, lines: list[MealLineRecord]) -> MealOutput:
         portion = PortionInput(id=line.portion_id, name=line.portion_name, quantity=rate_string(line.portion_quantity)) \
             if line.portion_id is not None and line.portion_name is not None and line.portion_quantity is not None else None
         outputs.append(MealLineOutput(
-            id=line.id, kind=line.kind, name=line.name, unit=line.unit, quantity=rate_string(line.quantity),
-            basis_quantity=rate_string(line.basis_quantity), product_id=line.product_id,
+            id=line.id, kind=line.kind, name=line.name, unit=line.unit, quantity=rate_string(line.quantity) if line.quantity is not None else None,
+            basis_quantity=rate_string(line.basis_quantity) if line.basis_quantity is not None else None, product_id=line.product_id,
             product_revision=line.product_revision, portion=portion, **values,
-            totals=NutrientValues(**{name: rounded(Fraction(getattr(line, name) * line.quantity, line.basis_quantity))
-                                    if getattr(line, name) is not None else None for name in NUTRIENTS}),
+            totals=NutrientValues(**{name: rounded(value) if (value := contribution(line, name)) is not None else None for name in NUTRIENTS}),
         ))
     return MealOutput(id=record.id, occurred_at=timestamp(record.occurred_at), category=record.category,
                       revision=record.revision, created_at=timestamp(record.created_at), updated_at=timestamp(record.updated_at),
@@ -195,6 +251,33 @@ def meal_output(record: MealRecord, lines: list[MealLineRecord]) -> MealOutput:
 
 def register_meals(app: FastAPI, engine: Engine) -> None:
     from diary.app import failure
+
+    @app.get("/api/meals/{meal_id}/repeat-form", response_model=RepeatMealOutput)
+    def repeat_meal(meal_id: UUID) -> RepeatMealOutput | JSONResponse:
+        with engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN")
+            row = connection.execute(select(meal).where(meal.c.id == str(meal_id), meal.c.deleted_at.is_(None))).mappings().first()
+            if row is None:
+                return failure("not_found", "Неудалённый приём пищи не найден.", 404)
+            source = meal_output(MealRecord.model_validate(row), meal_lines(connection, str(meal_id)))
+            return RepeatMealOutput(occurred_at=timestamp(now_ms()), category=source.category,
+                                    lines=[MealLineInput(**line.model_dump(exclude={"totals", "id"}), id=str(uuid4())) for line in source.lines])
+
+    @app.post("/api/meal-product-preview", response_model=MealProductPreview)
+    def preview_product(payload: MealProductPreviewInput) -> MealProductPreview | JSONResponse:
+        line = payload.line
+        basis = line.basis_quantity or payload.basis_quantity
+        if line.kind != "one_off":
+            return failure("validation", "Выберите разовую еду.", 422, "line.kind")
+        if basis is None:
+            return failure("validation", "Введите фактическое количество исходной порции или заполните новую карточку независимо.", 422, "basis_quantity")
+        if line.basis_quantity is not None and payload.unit != line.unit:
+            return failure("validation", "Единица должна совпадать с исходной основой.", 422, "unit")
+        values = {name: rounded(Fraction(hundredths(getattr(line, name)) * 10000, hundredths(basis)))
+                  if getattr(line, name) is not None else None for name in NUTRIENTS}
+        if any(Fraction(value) > Fraction(2147483647, 100) for value in values.values() if value is not None):
+            return failure("validation", "Значение на 100 превышает предел карточки. Заполните её независимо.", 422, "basis_quantity")
+        return MealProductPreview(name=line.name, unit=payload.unit, **values)
 
     @app.get("/api/meals/{meal_id}", response_model=MealOutput)
     def read_meal(meal_id: UUID) -> MealOutput | JSONResponse:
@@ -276,7 +359,8 @@ def register_meals(app: FastAPI, engine: Engine) -> None:
                 for position, line in enumerate(payload.lines):
                     values = MealLineRecord(
                         meal_id=result_id, id=line.id, position=position, kind=line.kind, name=line.name, unit=line.unit,
-                        quantity=hundredths(line.quantity), basis_quantity=hundredths(line.basis_quantity),
+                        quantity=hundredths(line.quantity) if line.quantity is not None else None,
+                        basis_quantity=hundredths(line.basis_quantity) if line.basis_quantity is not None else None,
                         **{name: hundredths(getattr(line, name)) if getattr(line, name) is not None else None for name in NUTRIENTS},
                         product_id=line.product_id, product_revision=line.product_revision,
                         portion_id=line.portion.id if line.portion else None, portion_name=line.portion.name if line.portion else None,

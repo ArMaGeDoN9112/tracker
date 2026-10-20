@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { privateFetch } from './access'
-import { ProductCatalog, nutrients, type Product, type Portion } from './ProductCatalog'
+import { ProductCatalog, nutrients, type Product, type Portion, type ProductSeed } from './ProductCatalog'
 import { localMinute, moscowLabel } from './time'
 
 type Nutrient = typeof nutrients[number][0]
 type Values = Record<Nutrient, string | null>
 type Total = { value: string | null; known_count: number; unknown_count: number; incomplete: boolean }
 type Totals = Record<Nutrient, Total>
-type Line = Values & { id: string; kind: 'product'; name: string; unit: 'g' | 'ml'; quantity: string; basis_quantity: string; product_id: string; product_revision: number; portion: Portion | null }
-type DraftLine = Line & { portions?: Portion[] }
+type Line = Values & { id: string; kind: 'product' | 'one_off'; name: string; unit: 'g' | 'ml' | null; quantity: string | null; basis_quantity: string | null; product_id: string | null; product_revision: number | null; portion: Portion | null }
+type DraftLine = Omit<Line, 'basis_quantity'> & { basis_quantity?: string | null; portions?: Portion[] }
 type Meal = { id: string; occurred_at: string; category: string | null; revision: number; deleted_at: string | null; lines: (Line & { totals: Values })[]; totals: Totals }
 type Day = { day: string; meals: Meal[]; totals: Totals }
 type Pending = { path: string; method: string; body: string; action: 'save' | 'delete' | 'restore' }
@@ -25,16 +25,31 @@ function hundredths(value: string): bigint {
   if (amount > 2147483647n) throw new Error()
   return amount
 }
-function rounded(numerator: bigint): string {
-  const result = (numerator + 5000n) / 10000n
+function rounded(numerator: bigint, denominator: bigint): string {
+  const result = (2n * numerator + denominator) / (2n * denominator)
   return `${result / 100n}.${(result % 100n).toString().padStart(2, '0')}`
 }
 function preview(lines: DraftLine[]): Totals | null {
   try {
-    for (const line of lines) if (hundredths(line.quantity) === 0n) return null
+    for (const line of lines) {
+      if (line.quantity !== null && hundredths(line.quantity) === 0n) return null
+      if (line.kind === 'product' && line.quantity === null) return null
+      if (line.basis_quantity && hundredths(line.basis_quantity) === 0n) return null
+    }
     return Object.fromEntries(nutrients.map(([key]) => {
       const known = lines.filter(line => line[key] !== null && line[key]!.trim() !== '')
-      return [key, { value: known.length ? rounded(known.reduce((sum, line) => sum + hundredths(line[key]!) * hundredths(line.quantity), 0n)) : null,
+      let numerator = 0n, denominator = 1n
+      for (const line of known) {
+        const basis = line.basis_quantity === undefined ? line.quantity : line.basis_quantity
+        const divisor = basis && line.quantity ? hundredths(basis) : 1n
+        const value = hundredths(line[key]!) * (basis && line.quantity ? hundredths(line.quantity) : 1n)
+        numerator = numerator * divisor + value * denominator
+        denominator *= divisor
+        let a = numerator, b = denominator
+        while (b) [a, b] = [b, a % b]
+        numerator /= a; denominator /= a
+      }
+      return [key, { value: known.length ? rounded(numerator, denominator) : null,
         known_count: known.length, unknown_count: lines.length - known.length, incomplete: known.length < lines.length }]
     })) as Totals
   } catch { return null }
@@ -46,12 +61,13 @@ function TotalsView({ totals }: { totals: Totals }) {
     <small>Известных строк: {totals[key].known_count}; неизвестных: {totals[key].unknown_count}</small>
   </dd></div>)}</dl>
 }
-function MealDetails({ meal }: { meal: Meal }) {
+function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; onProduct?: (line: Line) => void; productDisabled?: boolean }) {
   return <><p>{moscowLabel(meal.occurred_at)} · {categories.find(([key]) => key === meal.category)?.[1] ?? 'Без категории'} · редакция {meal.revision}{meal.deleted_at && ' · Удалён'}</p>
-    <ol>{meal.lines.map(line => <li key={line.id}><strong>{line.name}</strong> · {line.quantity} {line.unit === 'g' ? 'г' : 'мл'}
-      <p>Основа: {line.basis_quantity} {line.unit === 'g' ? 'г' : 'мл'} · {nutrients.map(([key, label, unit]) => `${label}: ${line[key] ?? 'неизвестно'}${line[key] === null ? '' : ` ${unit}`}`).join('; ')}</p>
+    <ol>{meal.lines.map((line, index) => <li key={line.id}><strong>{line.name}</strong> · {line.quantity === null ? 'Целая порция; количество неизвестно' : `${line.quantity} ${line.unit === 'g' ? 'г' : 'мл'}`}
+      <p>Основа: {line.basis_quantity === null ? 'исходная порция без известного количества' : `${line.basis_quantity} ${line.unit === 'g' ? 'г' : 'мл'}`} · {nutrients.map(([key, label, unit]) => `${label}: ${line[key] ?? 'неизвестно'}${line[key] === null ? '' : ` ${unit}`}`).join('; ')}</p>
       {line.portion && <p>Порция: {line.portion.name} · {line.portion.quantity} {line.unit === 'g' ? 'г' : 'мл'}</p>}
       <p>{nutrients.map(([key, label, unit]) => `${label}: ${line.totals[key] ?? 'неизвестно'}${line.totals[key] === null ? '' : ` ${unit}`}`).join('; ')}</p>
+      {line.kind === 'one_off' && onProduct && <button disabled={productDisabled} onClick={() => { const { totals, ...snapshot } = line; onProduct(snapshot) }}>Сохранить как продукт — строка {index + 1}</button>}
     </li>)}</ol><TotalsView totals={meal.totals} /></>
 }
 
@@ -74,6 +90,11 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
   const [conflict, setConflict] = useState<string | null>(null)
   const [latest, setLatest] = useState<Meal | null>(null)
   const [undo, setUndo] = useState<{ id: string; revision: number; until: number } | null>(null)
+  const [conversion, setConversion] = useState<DraftLine | null>(null)
+  const [conversionQuantity, setConversionQuantity] = useState('')
+  const [conversionUnit, setConversionUnit] = useState<'g' | 'ml'>('g')
+  const [productSeed, setProductSeed] = useState<ProductSeed | null>(null)
+  const [catalogEditing, setCatalogEditing] = useState(false)
   const sending = useRef(false)
   const generation = useRef(0)
   const selectedDay = useRef(day)
@@ -140,6 +161,37 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
     setLines(meal.lines.map(({ totals, ...line }) => line))
     setCandidates([]); setInstant(''); setConflict(null); setLatest(null); setError(''); setField(null); setNotice('')
     requestAnimationFrame(() => document.getElementById('meal-form-title')?.focus())
+  }
+  async function repeat(meal: Meal) {
+    if (sending.current || !authorized) return
+    sending.current = true; setBusy(true); setError('')
+    try {
+      const draft = await read<{ occurred_at: string; category: string | null; lines: Line[] }>(`/api/meals/${meal.id}/repeat-form`)
+      setEditing(null); setLines(draft.lines); setCategory(draft.category ?? '')
+      setLocalTime(localMinute(draft.occurred_at)); setInstant(draft.occurred_at); setCandidates([])
+      initialized.current = true; setConflict(null); setLatest(null); setField(null)
+      setNotice('Повтор открыт в новом черновике. Проверьте состав и время; запись появится после сохранения.')
+      requestAnimationFrame(() => document.getElementById('meal-form-title')?.focus())
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось открыть повтор. Попробуйте снова.') }
+    finally { sending.current = false; setBusy(false) }
+  }
+  function openProduct(line: DraftLine) {
+    const { portions, ...snapshot } = line
+    setConversion(snapshot); setConversionQuantity(''); setConversionUnit(line.unit ?? 'g'); setError('')
+    requestAnimationFrame(() => document.getElementById('conversion-title')?.focus())
+  }
+  async function convertProduct() {
+    if (!conversion || sending.current || catalogEditing || !authorized) return
+    sending.current = true; setBusy(true); setError(''); setField(null)
+    try {
+      const csrf = await csrfToken()
+      const response = await privateFetch('/api/meal-product-preview', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({ line: conversion, unit: conversionUnit, basis_quantity: conversionQuantity || null }) })
+      const result = await response.json()
+      if (!response.ok) { setField(result.field ?? null); throw new Error(result.message) }
+      setProductSeed(result); setConversion(null)
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось рассчитать карточку.') }
+    finally { sending.current = false; setBusy(false) }
   }
   function clear() {
     setLines([]); setCategory(''); setEditing(null); setCandidates([]); setInstant(''); setConflict(null); setLatest(null); setError(''); setField(null)
@@ -221,8 +273,8 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
     <div hidden={!authorized || !visible}>
       <div className="diary-layout nutrition-layout">
         <section aria-label="Форма приёма пищи">
-          <span className="eyebrow">ЕДА ИЗ КАТАЛОГА</span><h2 id="meal-form-title" tabIndex={-1}>{editing ? 'Изменение приёма пищи' : 'Новый приём пищи'}</h2>
-          <p className="muted">Найдите продукт в каталоге ниже и добавьте в состав. Недостающий продукт сохраните отдельно — состав останется в форме.</p>
+          <span className="eyebrow">СЪЕДЕННАЯ ЕДА</span><h2 id="meal-form-title" tabIndex={-1}>{editing ? 'Изменение приёма пищи' : 'Новый приём пищи'}</h2>
+          <p className="muted">Добавьте продукт из каталога или разовую еду. Карточку можно сохранить отдельно — состав останется в форме.</p>
           {error && <p id="meal-error" role="alert" tabIndex={-1} className="error">{error}</p>}
           {!localTime && <button onClick={() => void initialize().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение питания</button>}
           <form onSubmit={save} aria-busy={busy}>
@@ -230,20 +282,25 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
               <label htmlFor="meal-time">Время приёма — Москва</label><input id="meal-time" type="datetime-local" step="60" required value={localTime} onChange={e => { setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />{inlineError('occurred_at')}
               {candidates.length > 1 && <><label htmlFor="meal-offset">Смещение времени приёма</label><select id="meal-offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение UTC</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
               <label htmlFor="meal-category">Категория приёма</label><select id="meal-category" value={category} onChange={e => setCategory(e.target.value)} {...invalid('category')}><option value="">Без категории</option>{categories.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
-              <h3>Состав</h3>{!lines.length && <p>Добавьте продукт из каталога.</p>}
+              <h3>Состав</h3>{!lines.length && <p>Добавьте продукт из каталога или разовую еду.</p>}
+              <button type="button" onClick={() => setLines(current => [...current, { id: crypto.randomUUID(), kind: 'one_off', name: '', unit: null, quantity: null, protein: null, fat: null, carbohydrate: null, calories: null, product_id: null, product_revision: null, portion: null }])}>Добавить разовую еду</button>
               {lines.map((line, index) => {
-                const unit = line.unit === 'g' ? 'г' : 'мл'
+                const unit = line.unit === 'g' ? 'г' : line.unit === 'ml' ? 'мл' : 'г/мл'
                 const set = (changes: Partial<DraftLine>) => setLines(current => current.map(row => row.id === line.id ? { ...row, ...changes } : row))
                 const lineTotals = preview([line])
                 return <fieldset className="meal-line" key={line.id}><legend>Строка {index + 1}: {line.name}</legend>
                   <label htmlFor={`meal-name-${line.id}`}>Название строки {index + 1}</label><input id={`meal-name-${line.id}`} required maxLength={200} value={line.name} onChange={e => set({ name: e.target.value })} {...invalid(`lines.${index}.name`)} />{inlineError(`lines.${index}.name`)}
+                  {inlineError(`lines.${index}`)}
+                  {line.kind === 'one_off' && <><label htmlFor={`meal-unit-${line.id}`}>Единица строки {index + 1}</label><select id={`meal-unit-${line.id}`} required={!!line.quantity || !!line.basis_quantity} value={line.unit ?? ''} onChange={e => set({ unit: e.target.value as Line['unit'] || null })} disabled={!!line.basis_quantity} {...invalid(`lines.${index}.unit`)}><option value="">Количество неизвестно</option><option value="g">г</option><option value="ml">мл</option></select>{inlineError(`lines.${index}.unit`)}</>}
                   {!!line.portions?.length && <><label htmlFor={`meal-portion-${line.id}`}>Порция строки {index + 1}</label><select id={`meal-portion-${line.id}`} value={line.portion?.id ?? ''} onChange={e => { const portion = line.portions!.find(p => p.id === e.target.value) ?? null; set({ portion, ...(portion ? { quantity: portion.quantity } : {}) }) }}><option value="">Произвольное количество</option>{line.portions.map(p => <option key={p.id} value={p.id}>{p.name} · {p.quantity} {unit}</option>)}</select></>}
                   {line.portion && <p>Выбрана порция: {line.portion.name} · {line.portion.quantity} {unit}; съеденное количество можно изменить.</p>}
-                  <label htmlFor={`meal-quantity-${line.id}`}>Количество строки {index + 1}, {unit}</label><input id={`meal-quantity-${line.id}`} required inputMode="decimal" value={line.quantity} onChange={e => set({ quantity: e.target.value })} {...invalid(`lines.${index}.quantity`)} />{inlineError(`lines.${index}.quantity`)}
-                  <details><summary>Исходные значения на {line.basis_quantity} {unit}</summary>
-                    <p>Снимок продукта · редакция {line.product_revision}. Правка здесь меняет только этот приём.</p>
-                    {nutrients.map(([key, label, nutrientUnit]) => <div key={key}><label htmlFor={`meal-${key}-${line.id}`}>{label} строки {index + 1}, {nutrientUnit} на 100 {unit}</label><input id={`meal-${key}-${line.id}`} inputMode="decimal" value={line[key] ?? ''} onChange={e => set({ [key]: e.target.value })} {...invalid(`lines.${index}.${key}`)} />{inlineError(`lines.${index}.${key}`)}</div>)}
+                  <label htmlFor={`meal-quantity-${line.id}`}>Количество строки {index + 1}, {unit}</label><input id={`meal-quantity-${line.id}`} required={line.kind === 'product' || !!line.basis_quantity} inputMode="decimal" value={line.quantity ?? ''} onChange={e => set({ quantity: e.target.value || null })} {...invalid(`lines.${index}.quantity`)} />{inlineError(`lines.${index}.quantity`)}
+                  {line.kind === 'one_off' && <p>Значения за всю исходную порцию. {line.basis_quantity === undefined ? 'При первом сохранении количество станет исходной основой.' : line.basis_quantity === null ? 'Исходное количество неизвестно: новый вес сам по себе не пересчитывает ценность.' : `Сохранённая основа: ${line.basis_quantity} ${unit}; пересчёт без накопления округлений.`}</p>}
+                  <details open={line.kind === 'one_off'}><summary>{line.kind === 'product' ? `Исходные значения на ${line.basis_quantity} ${unit}` : 'Исходная порция и её ценность'}</summary>
+                    {line.kind === 'product' ? <p>Снимок продукта · редакция {line.product_revision}. Правка здесь меняет только этот приём.</p> : line.basis_quantity !== undefined && <><label htmlFor={`meal-basis-${line.id}`}>Фактическое количество исходной порции строки {index + 1}, {unit}</label><input id={`meal-basis-${line.id}`} inputMode="decimal" value={line.basis_quantity ?? ''} onChange={e => set({ basis_quantity: e.target.value || null })} {...invalid(`lines.${index}.basis_quantity`)} />{inlineError(`lines.${index}.basis_quantity`)}</>}
+                    {nutrients.map(([key, label, nutrientUnit]) => <div key={key}><label htmlFor={`meal-${key}-${line.id}`}>{label} строки {index + 1}, {nutrientUnit} {line.kind === 'product' ? `на 100 ${unit}` : 'за исходную порцию'}</label><input id={`meal-${key}-${line.id}`} inputMode="decimal" value={line[key] ?? ''} onChange={e => set({ [key]: e.target.value })} {...invalid(`lines.${index}.${key}`)} />{inlineError(`lines.${index}.${key}`)}</div>)}
                   </details>
+                  {line.kind === 'one_off' && <button type="button" disabled={catalogEditing} onClick={() => openProduct(line)}>Сохранить как продукт — строка {index + 1}</button>}
                   {lineTotals ? <TotalsView totals={lineTotals} /> : <p>Проверьте количество и исходные значения: до двух знаков после запятой, максимум 21474836,47.</p>}
                   <div className="catalog-actions"><button type="button" disabled={index === 0} onClick={() => { const reordered = [...lines]; [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]]; setLines(reordered) }}>Выше — строка {index + 1}</button><button type="button" onClick={() => setLines(current => current.filter(row => row.id !== line.id))}>Убрать строку {index + 1}</button></div>
                 </fieldset>
@@ -268,11 +325,21 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
           {loading && <p role="status">Загружаем день питания…</p>}
           {dayError && <p role="alert" className="error">{dayError}</p>}
           {!loading && !dayError && data?.day === day && <>{!data.meals.length ? <p>Нет записей еды</p> : <><h3>Итоги дня</h3><TotalsView totals={data.totals} />
-            {data.meals.map(row => <article className="meal-history" key={row.id} aria-label={`Приём ${moscowLabel(row.occurred_at)}`}><MealDetails meal={row} /><div className="catalog-actions"><button disabled={locked} onClick={() => edit(row)}>Изменить приём</button><button disabled={locked} onClick={() => void action(row, 'delete')}>Удалить приём</button></div></article>)}
+            {data.meals.map(row => <article className="meal-history" key={row.id} aria-label={`Приём ${moscowLabel(row.occurred_at)}`}><MealDetails meal={row} onProduct={openProduct} productDisabled={locked || catalogEditing} /><div className="catalog-actions"><button disabled={locked} onClick={() => edit(row)}>Изменить приём</button><button disabled={locked} onClick={() => void repeat(row)}>Повторить приём</button><button disabled={locked} onClick={() => void action(row, 'delete')}>Удалить приём</button></div></article>)}
           </>}</>}
         </section>
       </div>
-      <ProductCatalog authorized={authorized} visible={visible} csrfToken={csrfToken} onSelect={selectProduct} selectionDisabled={locked} />
+      {conversion && <section className="meal-conversion" aria-label="Создание продукта из еды">
+        <h2 id="conversion-title" tabIndex={-1}>Сохранить как продукт: {conversion.name}</h2>
+        <p>Пересчёт исходных значений на 100 г/мл; карточка округляется до сотых, половина вверх. Исходный приём не меняется.</p>
+        {!conversion.basis_quantity && conversion.basis_quantity !== undefined && <p>Введите фактическое количество исходной порции либо заполните новую карточку независимо. Новый съеденный вес не заменяет неизвестную основу.</p>}
+        {!conversion.basis_quantity && !(conversion.basis_quantity === undefined && conversion.quantity) && <><label htmlFor="conversion-quantity">Фактическое количество исходной порции</label><input id="conversion-quantity" inputMode="decimal" value={conversionQuantity} onChange={e => setConversionQuantity(e.target.value)} disabled={busy} {...invalid('basis_quantity')} />{inlineError('basis_quantity')}
+          <label htmlFor="conversion-unit">Единица исходной порции</label><select id="conversion-unit" value={conversionUnit} onChange={e => setConversionUnit(e.target.value as 'g' | 'ml')} disabled={busy}><option value="g">г</option><option value="ml">мл</option></select></>}
+        <button disabled={locked || catalogEditing} onClick={() => void convertProduct()}>Рассчитать карточку</button>
+        <button disabled={locked || catalogEditing} onClick={() => { setProductSeed({ name: conversion.name, unit: conversionUnit, protein: null, fat: null, carbohydrate: null, calories: null }); setConversion(null) }}>Заполнить карточку независимо</button>
+        <button disabled={busy} onClick={() => setConversion(null)}>Отменить создание карточки</button>
+      </section>}
+      <ProductCatalog authorized={authorized} visible={visible} csrfToken={csrfToken} onSelect={selectProduct} selectionDisabled={locked} seed={productSeed} onEditingChange={setCatalogEditing} />
     </div>
   </>
 }

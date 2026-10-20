@@ -137,7 +137,7 @@ def test_delete_restore_deadline_and_late_receipts(diary, monkeypatch, elapsed, 
 @pytest.mark.parametrize('field,value', [
     ('name', ' '), ('unit', 'kg'), ('quantity', '0'), ('quantity', '0.001'), ('quantity', 1),
     ('quantity', '21474836.48'), ('protein', True), ('protein', 'NaN'), ('fat', '-1'),
-    ('calories', '1e2'), ('basis_quantity', '30'), ('kind', 'one_off'), ('id', 'bad'),
+    ('calories', '1e2'), ('basis_quantity', '30'), ('kind', 'other'), ('id', 'bad'),
     ('product_revision', 0), ('product_id', 'bad'), ('carbohydrate', '0.001'),
 ])
 def test_invalid_line_is_identified_without_partial_meal(diary, field, value):
@@ -167,7 +167,8 @@ def test_unknown_partial_huge_results_normalization_and_invalid_header(diary):
 
 @pytest.mark.parametrize('fault', ['line', 'receipt', 'commit'])
 @pytest.mark.parametrize('editing', [False, True])
-def test_atomic_meal_rollback_and_retry(diary, fault, editing):
+@pytest.mark.parametrize('mixed', [False, True])
+def test_atomic_meal_rollback_and_retry(diary, fault, editing, mixed):
     from sqlalchemy import Engine, event
     from sqlalchemy.exc import OperationalError
     client, _ = diary
@@ -176,7 +177,8 @@ def test_atomic_meal_rollback_and_retry(diary, fault, editing):
     if editing:
         path += '/' + client.post(path, json=meal([source])).json()['result_id']
     before = client.get('/api/nutrition-day?day=2026-10-19').json()
-    payload = meal([source, {**source, 'id': str(uuid4())}], **({'expected_revision': 1} if editing else {}))
+    second = {'id': str(uuid4()), 'kind': 'one_off', 'name': 'Разовая еда', 'fat': '0'} if mixed else {**source, 'id': str(uuid4())}
+    payload = meal([source, second], **({'expected_revision': 1} if editing else {}))
 
     def fail_commit(connection):
         raise OperationalError('COMMIT', {}, Exception('synthetic failure'))

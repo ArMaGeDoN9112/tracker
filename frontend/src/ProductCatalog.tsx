@@ -6,10 +6,11 @@ export type Portion = { id: string; name: string; quantity: string }
 type Values = { name: string; unit: 'g' | 'ml'; protein: string | null; fat: string | null; carbohydrate: string | null; calories: string | null; portions: Portion[]; archived: boolean }
 export type Product = Values & { id: string; revision: number }
 type Draft = Values & { id?: string; revision?: number }
+export type ProductSeed = Pick<Values, 'name' | 'unit' | 'protein' | 'fat' | 'carbohydrate' | 'calories'>
 type Pending = { path: string; method: string; body: string }
 const empty = (): Draft => ({ name: '', unit: 'g', protein: '', fat: '', carbohydrate: '', calories: '', portions: [], archived: false })
 
-export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selectionDisabled = false }: { authorized: boolean; visible: boolean; csrfToken: () => Promise<string>; onSelect?: (product: Product) => void; selectionDisabled?: boolean }) {
+export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selectionDisabled = false, seed, onEditingChange }: { authorized: boolean; visible: boolean; csrfToken: () => Promise<string>; onSelect?: (product: Product) => void; selectionDisabled?: boolean; seed?: ProductSeed | null; onEditingChange?: (editing: boolean) => void }) {
   const [products, setProducts] = useState<Product[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
   const [original, setOriginal] = useState<Product | null>(null)
@@ -49,9 +50,13 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
   useEffect(() => {
     if (error && authorized && visible) document.getElementById('product-error')?.focus()
   }, [error, authorized, visible])
+  useEffect(() => {
+    if (seed) open(undefined, seed)
+  }, [seed])
+  useEffect(() => { onEditingChange?.(!!draft || busy || !!pending) }, [draft, busy, pending, onEditingChange])
 
-  function open(product?: Product) {
-    setDraft(product ?? empty()); setOriginal(product ?? null)
+  function open(product?: Product, values?: ProductSeed) {
+    setDraft(product ?? { ...empty(), ...values }); setOriginal(product ?? null)
     setError(''); setField(null); setNotice(''); setConflict(false); setLatest(null); setUnitConfirmed(false)
     requestAnimationFrame(() => document.getElementById('product-name')?.focus())
   }
@@ -122,6 +127,7 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
     </section>
     <section aria-label="Карточка продукта" hidden={!draft}>
       {draft && <><h2>{draft.id ? 'Изменение продукта' : 'Новый продукт'}</h2>
+        {seed && !draft.id && <p>Предпросмотр на 100 {unit}: значения округлены до сотых, половина вверх. Проверьте и явно сохраните карточку. Исходный приём не изменится.</p>}
         <p className="muted">Пустое значение — неизвестно, 0 — известный ноль. До двух знаков после запятой, максимум 21474836,47. Калории вводятся независимо от БЖУ.</p>
         {error && <p id="product-error" role="alert" tabIndex={-1} className="error">{error}</p>}
         <form onSubmit={save} aria-busy={busy}>

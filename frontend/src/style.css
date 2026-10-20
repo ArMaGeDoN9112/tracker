@@ -110,6 +110,7 @@ button[type=submit] { background:var(--accent); color:#102b22; border-color:var(
 .catalog-check input { width:24px; margin:0; }
 .catalog-portion { border-top:1px solid var(--border); padding-top:16px; }
 .nutrition-layout { margin-top:24px; }
+.meal-conversion { margin-top:24px; overflow-wrap:anywhere; }
 .meal-line { border-top:1px solid var(--border); padding-top:16px; min-width:0; }
 .meal-line legend,.meal-history p,.meal-history li { overflow-wrap:anywhere; }
 .meal-line details { margin:8px 0; }
