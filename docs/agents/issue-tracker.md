@@ -28,3 +28,13 @@ When fetching a ticket, read its referenced file.
 - Claim: save `Status: claimed` before starting work.
 - Resolve: append `## Answer`, set `Status: resolved`,
   then add a summary and link to Decisions-so-far in the map.
+
+## Completed features
+
+- Keep current behavior in `docs/diabetes-diary.md`, future requirements in
+  `docs/roadmap.md`, and operational commands in README / `docs/backup.md`.
+- Before removing a completed feature directory, move unfinished criteria to
+  an active effort, update dependencies and links, and verify the old files
+  are recoverable from a committed Git revision. Keep the revision reference.
+- Remove completed specs, maps, tickets and acceptance images from the working
+  tree after that transfer. Git history is the archive; no duplicate archive folder.
