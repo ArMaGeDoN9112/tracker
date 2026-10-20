@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
 import { Diary } from './Diary'
-import { ProductCatalog } from './ProductCatalog'
+import { Nutrition } from './Nutrition'
 import { BackupStatus, useBackupStatus } from './BackupStatus'
 import { privateFetch, setAccess } from './access'
 
@@ -157,7 +157,7 @@ function App() {
         <a href={routeUrl({ ...route, section: 'settings' })} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section: 'settings' }) } }}>Проверить резервирование</a>
       </aside>}
       <div id="global-undo" hidden={!login} />
-      {!loading && <ProductCatalog authorized={login !== null} visible={route.section === 'nutrition'} csrfToken={privateCsrfToken} />}
+      {!loading && <Nutrition authorized={login !== null} visible={route.section === 'nutrition'} day={route.day} onDay={day => navigate({ ...currentRoute.current, day }, !currentRoute.current.day)} csrfToken={privateCsrfToken} />}
       {!loading && <Diary active={login !== null} section={route.section} day={route.day} temporary={route.temporary} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'diary' : currentRoute.current.section }, !currentRoute.current.day)} onView={temporary => navigate({ ...route, temporary })} csrfToken={privateCsrfToken} />}
       {!loading && login && <section hidden={route.section !== 'settings'} className="settings" aria-labelledby="settings-title">
         <h2 id="settings-title" className="sr-only">Настройки</h2>

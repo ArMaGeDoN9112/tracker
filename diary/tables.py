@@ -85,3 +85,17 @@ product_portion = table(
     "product_portion", column("product_id", Text), column("id", Text), column("position", Integer),
     column("name", Text), column("quantity", Integer),
 )
+
+meal = table(
+    "meal", column("id", Text), column("occurred_at", BigInteger), column("category", Text),
+    column("revision", BigInteger), column("created_at", BigInteger),
+    column("updated_at", BigInteger), column("deleted_at", BigInteger),
+)
+meal_line = table(
+    "meal_line", column("meal_id", Text), column("id", Text), column("position", Integer),
+    column("kind", Text), column("name", Text), column("unit", Text),
+    column("quantity", Integer), column("basis_quantity", Integer),
+    column("protein", Integer), column("fat", Integer), column("carbohydrate", Integer),
+    column("calories", Integer), column("product_id", Text), column("product_revision", BigInteger),
+    column("portion_id", Text), column("portion_name", Text), column("portion_quantity", Integer),
+)

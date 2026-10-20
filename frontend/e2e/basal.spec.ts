@@ -78,6 +78,7 @@ test('acknowledged schedule stays saved when refresh fails and invalid intervals
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await expect(page.getByLabel('Начало расписания — Москва')).not.toHaveValue('')
   await page.getByLabel('Начало расписания — Москва').fill(`${day}T06:00`)
   await expect(page.getByLabel('Начало интервала 1')).toHaveValue('00:00')
   await expect(page.getByLabel('Начало интервала 1')).toHaveAttribute('readonly', '')

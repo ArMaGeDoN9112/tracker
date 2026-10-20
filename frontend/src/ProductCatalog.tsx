@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { privateFetch } from './access'
 
-const nutrients = [['protein', 'Белки', 'г'], ['fat', 'Жиры', 'г'], ['carbohydrate', 'Углеводы', 'г'], ['calories', 'Калории', 'ккал']] as const
-type Portion = { id: string; name: string; quantity: string }
+export const nutrients = [['protein', 'Белки', 'г'], ['fat', 'Жиры', 'г'], ['carbohydrate', 'Углеводы', 'г'], ['calories', 'Калории', 'ккал']] as const
+export type Portion = { id: string; name: string; quantity: string }
 type Values = { name: string; unit: 'g' | 'ml'; protein: string | null; fat: string | null; carbohydrate: string | null; calories: string | null; portions: Portion[]; archived: boolean }
-type Product = Values & { id: string; revision: number }
+export type Product = Values & { id: string; revision: number }
 type Draft = Values & { id?: string; revision?: number }
 type Pending = { path: string; method: string; body: string }
 const empty = (): Draft => ({ name: '', unit: 'g', protein: '', fat: '', carbohydrate: '', calories: '', portions: [], archived: false })
 
-export function ProductCatalog({ authorized, visible, csrfToken }: { authorized: boolean; visible: boolean; csrfToken: () => Promise<string> }) {
+export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selectionDisabled = false }: { authorized: boolean; visible: boolean; csrfToken: () => Promise<string>; onSelect?: (product: Product) => void; selectionDisabled?: boolean }) {
   const [products, setProducts] = useState<Product[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
   const [original, setOriginal] = useState<Product | null>(null)
@@ -114,6 +114,7 @@ export function ProductCatalog({ authorized, visible, csrfToken }: { authorized:
       {!loading && !loadError && rows.length === 0 && <p>{search ? 'Продукты не найдены.' : archive ? 'Архив пуст.' : 'Каталог пуст.'}</p>}
       <div hidden={loading || !!loadError}>{rows.map(product => <article key={product.id}>
         <h3>{product.name}</h3><p>На 100 {product.unit === 'g' ? 'г' : 'мл'} · редакция {product.revision}</p>
+        {onSelect && !product.archived && <button disabled={selectionDisabled || busy || !!pending} onClick={() => onSelect(product)}>Добавить в приём</button>}
         {nutrients.map(([key, label, nutrientUnit]) => <p key={key}>{label}: {product[key] === null ? 'неизвестно' : `${product[key]} ${nutrientUnit}`}</p>)}
         <ul>{product.portions.map(portion => <li key={portion.id}>{portion.name}: {portion.quantity} {product.unit === 'g' ? 'г' : 'мл'}</li>)}</ul>
         <button disabled={!!draft || busy || !!pending} onClick={() => open(product)}>Изменить</button>

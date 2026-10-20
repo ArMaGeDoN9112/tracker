@@ -8,6 +8,10 @@ Reason = Literal["food", "correction", "food_and_correction"]
 
 
 class OperationAction(StrEnum):
+    CREATE_MEAL = "create_meal"
+    EDIT_MEAL = "edit_meal"
+    DELETE_MEAL = "delete_meal"
+    RESTORE_MEAL = "restore_meal"
     CREATE_PRODUCT = "create_product"
     EDIT_PRODUCT = "edit_product"
     CREATE_ENTRY = "create_entry"

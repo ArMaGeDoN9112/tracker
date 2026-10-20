@@ -21,6 +21,7 @@ from diary.entries import register_entries
 from diary.basal import register_basal
 from diary.glucose import register_glucose
 from diary.products import register_products
+from diary.meals import register_meals
 from diary.export import register_export
 from diary.backup import register_backup_status
 from diary.security import (
@@ -116,7 +117,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
         location = error.errors()[0]["loc"]
         field = str(location[-1]) if location and location[-1] != "body" else None
         message = "Проверьте введённые данные."
-        if request.url.path.startswith("/api/products"):
+        if request.url.path.startswith(("/api/products", "/api/meals")):
             field = ".".join(str(part) for part in location[1:]) or None
             leaf = str(location[-1]) if location else ""
             message = {
@@ -130,6 +131,17 @@ def create_app(database: Path, origin: str) -> FastAPI:
                 "id": "Укажите уникальный UUID порции.",
                 "portions": "Проверьте список порций и уникальность их UUID.",
             }.get(leaf, message)
+            if request.url.path.startswith("/api/meals"):
+                message = {
+                    "quantity": "Количество: положительное десятичное число до 21474836,47, точность до сотых.",
+                    "basis_quantity": "Основа продукта — 100 г или 100 мл.",
+                    "lines": "Добавьте хотя бы одну строку; UUID строк не должны повторяться.",
+                    "occurred_at": "Укажите дату RFC 3339 с явным смещением и точностью до миллисекунд.",
+                    "category": "Выберите завтрак, обед, ужин, перекус либо оставьте пустой.",
+                    "id": "Укажите уникальный UUID строки или порции.",
+                    "product_id": "Укажите UUID исходного продукта.",
+                    "product_revision": "Укажите положительную редакцию исходного продукта.",
+                }.get(leaf, message)
         if request.url.path == "/api/temporary-basals":
             message = {
                 "starts_at": "Укажите существующую дату RFC 3339 с явным смещением, с точностью до миллисекунд.",
@@ -229,6 +241,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
 
     register_entries(app, engine)
     register_products(app, engine)
+    register_meals(app, engine)
     register_basal(app, engine)
     register_glucose(app, engine)
     register_export(app, engine)

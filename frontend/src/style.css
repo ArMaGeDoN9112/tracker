@@ -109,6 +109,17 @@ button[type=submit] { background:var(--accent); color:#102b22; border-color:var(
 .catalog-check { display:flex; align-items:center; gap:12px; }
 .catalog-check input { width:24px; margin:0; }
 .catalog-portion { border-top:1px solid var(--border); padding-top:16px; }
+.nutrition-layout { margin-top:24px; }
+.meal-line { border-top:1px solid var(--border); padding-top:16px; min-width:0; }
+.meal-line legend,.meal-history p,.meal-history li { overflow-wrap:anywhere; }
+.meal-line details { margin:8px 0; }
+.meal-line summary { cursor:pointer; min-height:44px; padding:8px 0; }
+.meal-history { border-top:1px solid var(--border); padding:16px 0; }
+.meal-history ol { padding-left:24px; }
+.meal-totals { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; font-variant-numeric:tabular-nums; }
+.meal-totals dt { color:var(--muted); }
+.meal-totals dd { margin:4px 0; overflow-wrap:anywhere; }
+.meal-totals small { display:block; color:var(--muted); }
 @media(min-width:1100px) { .product-catalog { grid-template-columns:minmax(0,1fr) minmax(0,1fr); } }
 /* Diary A: the draft stays first in DOM and the full timeline can grow freely. */
 .diary-layout { display:grid; gap:24px; align-items:start; }
