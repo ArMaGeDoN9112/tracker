@@ -2,13 +2,14 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { privateFetch } from './access'
 import { Water } from './Water'
+import { NutritionSummary } from './NutritionSummary'
 import { ProductCatalog, nutrients, type Product, type Portion, type ProductSeed } from './ProductCatalog'
 import { localMinute, moscowLabel } from './time'
 
 type Nutrient = typeof nutrients[number][0]
 type Values = Record<Nutrient, string | null>
 type Total = { value: string | null; known_count: number; unknown_count: number; incomplete: boolean }
-type Totals = Record<Nutrient, Total>
+export type Totals = Record<Nutrient, Total>
 type Line = Values & { id: string; kind: 'product' | 'one_off'; name: string; unit: 'g' | 'ml' | null; quantity: string | null; basis_quantity: string | null; product_id: string | null; product_revision: number | null; portion: Portion | null }
 type DraftLine = Omit<Line, 'basis_quantity'> & { basis_quantity?: string | null; portions?: Portion[] }
 type Meal = { id: string; occurred_at: string; category: string | null; revision: number; deleted_at: string | null; lines: (Line & { totals: Values })[]; totals: Totals }
@@ -96,6 +97,7 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
   const [conversionUnit, setConversionUnit] = useState<'g' | 'ml'>('g')
   const [productSeed, setProductSeed] = useState<ProductSeed | null>(null)
   const [catalogEditing, setCatalogEditing] = useState(false)
+  const [summaryGeneration, setSummaryGeneration] = useState(0)
   const sending = useRef(false)
   const generation = useRef(0)
   const selectedDay = useRef(day)
@@ -214,6 +216,7 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
         throw new Error(result.message)
       }
       committed = true; setConfirmed(true)
+      setSummaryGeneration(value => value + 1)
       const current = await read<Meal>(`/api/meals/${result.result_id}`)
       if (request.action === 'delete') {
         const until = started + result.undo_remaining_ms
@@ -331,6 +334,10 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
           <Water authorized={authorized} visible={visible} day={day} csrfToken={csrfToken} />
         </section>
       </div>
+      <NutritionSummary active={authorized && visible} generation={summaryGeneration} onDay={selected => {
+        onDay(selected)
+        requestAnimationFrame(() => document.getElementById('nutrition-history')?.focus())
+      }} />
       {conversion && <section className="meal-conversion" aria-label="Создание продукта из еды">
         <h2 id="conversion-title" tabIndex={-1}>Сохранить как продукт: {conversion.name}</h2>
         <p>Пересчёт исходных значений на 100 г/мл; карточка округляется до сотых, половина вверх. Исходный приём не меняется.</p>

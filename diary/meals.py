@@ -12,7 +12,8 @@ from sqlalchemy import Connection, Engine, delete, insert, select, update
 
 from diary.basal import hundredths, rate_string
 from diary.dto import OperationAction, ReceiptRecord
-from diary.entries import MOSCOW, EntryInput, OperationInput, ReceiptOutput, RevisionInput, milliseconds, receipt_output, timestamp
+from diary.entries import EPOCH, MOSCOW, EntryInput, OperationInput, ReceiptOutput, RevisionInput, milliseconds, receipt_output, timestamp
+from diary.glucose import Period
 from diary.products import NamedInput, PortionInput, ProductInput
 from diary.security import now_ms
 from diary.tables import meal, meal_line, operation_receipt
@@ -207,6 +208,35 @@ class NutritionDayOutput(BaseModel):
     totals: NutritionTotals
 
 
+class NutritionSummaryDay(BaseModel):
+    day: date
+    meal_count: int
+    totals: NutritionTotals
+
+
+class NutrientAverage(BaseModel):
+    value: str | None
+    known_days: int
+    incomplete_days: int
+    incomplete: bool
+
+
+class NutritionAverages(BaseModel):
+    protein: NutrientAverage
+    fat: NutrientAverage
+    carbohydrate: NutrientAverage
+    calories: NutrientAverage
+
+
+class NutritionSummaryOutput(BaseModel):
+    start: date
+    end: date
+    food_days: int
+    meal_count: int
+    averages: NutritionAverages
+    days: list[NutritionSummaryDay]
+
+
 def rounded(value: Fraction) -> str:
     # Values are nonnegative hundredths; round half-up without a Decimal context limit.
     return rate_string((2 * value.numerator + value.denominator) // (2 * value.denominator))
@@ -254,6 +284,48 @@ def meal_output(record: MealRecord, lines: list[MealLineRecord]) -> MealOutput:
 
 def register_meals(app: FastAPI, engine: Engine) -> None:
     from diary.app import failure
+
+    @app.get("/api/nutrition-summary", response_model=NutritionSummaryOutput)
+    def read_summary(period: Period = Period.WEEK, start: date | None = None,
+                     end: date | None = None) -> NutritionSummaryOutput | JSONResponse:
+        end = end or (EPOCH + timedelta(milliseconds=now_ms())).astimezone(MOSCOW).date()
+        try:
+            if period != Period.CUSTOM:
+                start = end - timedelta(days=6 if period == Period.WEEK else 29)
+            if start is None or start > end:
+                return failure("validation", "Укажите начало периода не позже окончания.", 422, "start")
+            lower = milliseconds(datetime.combine(start, time(), MOSCOW))
+            upper = milliseconds(datetime.combine(end + timedelta(days=1), time(), MOSCOW))
+        except (ValueError, OverflowError):
+            return failure("validation", "Границы периода за пределами календаря.", 422, "end")
+        days: dict[date, list[MealLineRecord]] = {
+            date.fromordinal(ordinal): [] for ordinal in range(start.toordinal(), end.toordinal() + 1)}
+        meals: dict[date, set[str]] = {day: set() for day in days}
+        with engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN")
+            rows = connection.execute(select(meal_line, meal.c.occurred_at).join(meal, meal_line.c.meal_id == meal.c.id).where(
+                meal.c.deleted_at.is_(None), meal.c.occurred_at >= lower, meal.c.occurred_at < upper)).mappings()
+            for row in rows:
+                day = (EPOCH + timedelta(milliseconds=row.occurred_at)).astimezone(MOSCOW).date()
+                line = MealLineRecord.model_validate(row)
+                days[day].append(line)
+                meals[day].add(line.meal_id)
+        averages: dict[str, NutrientAverage] = {}
+        for name in NUTRIENTS:
+            total = Fraction()
+            known_days = incomplete_days = 0
+            for lines in days.values():
+                known = [value for line in lines if (value := contribution(line, name)) is not None]
+                total += sum(known, Fraction())
+                known_days += bool(known)
+                incomplete_days += len(known) < len(lines)
+            averages[name] = NutrientAverage(value=rounded(total / known_days) if known_days else None,
+                                             known_days=known_days, incomplete_days=incomplete_days,
+                                             incomplete=incomplete_days > 0)
+        return NutritionSummaryOutput(start=start, end=end, food_days=sum(bool(ids) for ids in meals.values()),
+                                      meal_count=sum(len(ids) for ids in meals.values()), averages=NutritionAverages(**averages),
+                                      days=[NutritionSummaryDay(day=day, meal_count=len(meals[day]), totals=nutrition_totals(lines))
+                                            for day, lines in days.items()])
 
     @app.get("/api/meals/{meal_id}/repeat-form", response_model=RepeatMealOutput)
     def repeat_meal(meal_id: UUID) -> RepeatMealOutput | JSONResponse:
