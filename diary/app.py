@@ -20,6 +20,7 @@ from diary.dto import CsrfOutput, ErrorOutput, LoginOutput, SessionOutput
 from diary.entries import register_entries
 from diary.basal import register_basal
 from diary.glucose import register_glucose
+from diary.products import register_products
 from diary.export import register_export
 from diary.backup import register_backup_status
 from diary.security import (
@@ -115,6 +116,20 @@ def create_app(database: Path, origin: str) -> FastAPI:
         location = error.errors()[0]["loc"]
         field = str(location[-1]) if location and location[-1] != "body" else None
         message = "Проверьте введённые данные."
+        if request.url.path.startswith("/api/products"):
+            field = ".".join(str(part) for part in location[1:]) or None
+            leaf = str(location[-1]) if location else ""
+            message = {
+                "name": "Название: от 1 до 200 символов без крайних пробелов.",
+                "unit": "Выберите основу 100 г или 100 мл.",
+                "quantity": "Количество порции: положительное десятичное число до 21474836,47, точность до сотых.",
+                "protein": "Белки: десятичная строка от 0 до 21474836,47, точность до сотых; пустое — неизвестно.",
+                "fat": "Жиры: десятичная строка от 0 до 21474836,47, точность до сотых; пустое — неизвестно.",
+                "carbohydrate": "Углеводы: десятичная строка от 0 до 21474836,47, точность до сотых; пустое — неизвестно.",
+                "calories": "Калории: десятичная строка от 0 до 21474836,47, точность до сотых; пустое — неизвестно.",
+                "id": "Укажите уникальный UUID порции.",
+                "portions": "Проверьте список порций и уникальность их UUID.",
+            }.get(leaf, message)
         if request.url.path == "/api/temporary-basals":
             message = {
                 "starts_at": "Укажите существующую дату RFC 3339 с явным смещением, с точностью до миллисекунд.",
@@ -213,6 +228,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
         return response
 
     register_entries(app, engine)
+    register_products(app, engine)
     register_basal(app, engine)
     register_glucose(app, engine)
     register_export(app, engine)

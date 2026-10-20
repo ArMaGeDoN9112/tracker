@@ -1,0 +1,195 @@
+import { test, expect, type Page } from '@playwright/test'
+
+async function signIn(page: Page) {
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+}
+
+async function newDraft(page: Page) {
+  await page.goto('/?section=nutrition')
+  await signIn(page)
+  await page.getByRole('button', { name: 'Новый продукт', exact: true }).click()
+  const name = `Продукт ${crypto.randomUUID()}`
+  await page.getByLabel('Название продукта', { exact: true }).fill(name)
+  return name
+}
+
+test('catalog, Cyrillic search, portions, archive and drafts survive navigation and login', async ({ page }) => {
+  await page.goto('/?section=nutrition')
+  await signIn(page)
+  await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Новый продукт', exact: true }).click()
+  const name = `ТВОРОГ ${crypto.randomUUID()}`
+  await page.getByLabel('Название продукта', { exact: true }).fill(name)
+  await page.getByLabel('Белки, г на 100 г').fill('10,00')
+  await page.getByLabel('Углеводы, г на 100 г').fill('0')
+  await page.getByRole('button', { name: 'Добавить порцию', exact: true }).click()
+  await page.getByLabel('Название порции 1', { exact: true }).fill('Упаковка')
+  await page.getByLabel('Количество порции 1, г', { exact: true }).fill('180')
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.goBack()
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name)
+  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
+  await expect(page.getByLabel('Название продукта', { exact: true })).toBeHidden()
+  await signIn(page)
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name)
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Продукт сохранён' })).toBeVisible()
+  await page.getByLabel('Поиск продуктов', { exact: true }).fill(name.toLocaleLowerCase('ru'))
+  const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
+  await expect(card).toContainText('Углеводы: 0.00')
+  await expect(card).toContainText('Калории: неизвестно')
+  await expect(card).toContainText('Упаковка: 180.00 г')
+  expect(page.url()).not.toContain(encodeURIComponent('творог'))
+  await card.getByRole('button', { name: 'Изменить', exact: true }).click()
+  await page.getByLabel('В архиве', { exact: true }).check()
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(card).toHaveCount(0)
+  await page.getByRole('button', { name: 'Архив', exact: true }).click()
+  await card.getByRole('button', { name: 'Изменить', exact: true }).click()
+  await page.getByLabel('В архиве', { exact: true }).uncheck()
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await page.getByRole('button', { name: 'Каталог', exact: true }).click()
+  await expect(card).toBeVisible()
+})
+
+test('lost response after commit keeps exact request through navigation and login, explicit replay creates no duplicate', async ({ page }) => {
+  const name = await newDraft(page)
+  await expect(page.getByRole('button', { name: 'Обновить каталог', exact: true })).toBeEnabled()
+  const bodies: string[] = []
+  page.on('request', request => { if (request.url().endsWith('/api/products') && request.method() === 'POST') bodies.push(request.postData()!) })
+  await page.route('**/api/products', async route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    const response = await route.fetch()
+    expect(response.ok()).toBeTruthy()
+    await route.abort()
+  }, { times: 1 })
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Повторить сохранение', exact: true })).toBeEnabled()
+  await expect(page.getByLabel('Название продукта', { exact: true })).toBeDisabled()
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.goBack()
+  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
+  await expect(page.getByText(name, { exact: true })).toBeHidden()
+  await signIn(page)
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name)
+  expect(bodies).toHaveLength(1)
+  await page.getByRole('button', { name: 'Повторить сохранение', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Продукт сохранён' })).toBeVisible()
+  expect(bodies).toHaveLength(2)
+  expect(bodies[0]).toBe(bodies[1])
+  const rows = await (await page.request.get('/api/products')).json()
+  expect(rows.filter((row: { name: string }) => row.name === name)).toHaveLength(1)
+})
+
+test('confirmed commit and failed refresh differ, validation identifies portion field, unit change clears values and requires confirmation', async ({ page }) => {
+  const name = await newDraft(page)
+  await page.getByLabel('Калории, ккал на 100 г').fill('180')
+  await page.getByRole('button', { name: 'Добавить порцию', exact: true }).click()
+  await page.getByLabel('Название порции 1', { exact: true }).fill('Ломтик')
+  await page.getByLabel('Количество порции 1, г', { exact: true }).fill('0')
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(page.getByLabel('Количество порции 1, г', { exact: true })).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.locator('#product-error')).toBeFocused()
+  await page.getByLabel('Количество порции 1, г', { exact: true }).fill('30')
+  await page.route('**/api/products', route => route.request().method() === 'GET' ? route.abort() : route.continue())
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(page.locator('#product-error')).toContainText('Продукт сохранён, но обновление каталога не удалось')
+  await page.unroute('**/api/products')
+  await page.getByRole('button', { name: 'Повторить сохранение', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Продукт сохранён' })).toBeVisible()
+  const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
+  await card.getByRole('button', { name: 'Изменить', exact: true }).click()
+  await page.getByLabel('Основа продукта', { exact: true }).selectOption('ml')
+  await expect(page.getByLabel('Калории, ккал на 100 мл')).toHaveValue('')
+  await expect(page.getByLabel('Название порции 1', { exact: true })).toHaveCount(0)
+  await page.getByLabel('Калории, ккал на 100 мл').fill('50,50')
+  await page.getByRole('button', { name: 'Добавить порцию', exact: true }).click()
+  await page.getByLabel('Название порции 1', { exact: true }).fill('Стакан')
+  await page.getByLabel('Количество порции 1, мл', { exact: true }).fill('200')
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(page.getByLabel('Подтверждаю новые значения и набор порций')).toBeVisible()
+  await page.getByLabel('Подтверждаю новые значения и набор порций').check()
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(card).toContainText('На 100 мл')
+  await expect(card).toContainText('Калории: 50.50 ккал')
+  await expect(card).toContainText('Стакан: 200.00 мл')
+})
+
+test('stale editor compares a real peer revision and explicitly continues its draft', async ({ page }) => {
+  const name = await newDraft(page)
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
+  await card.getByRole('button', { name: 'Изменить', exact: true }).click()
+  await page.getByLabel('Название продукта', { exact: true }).fill(name + ' мой')
+  const rows = await (await page.request.get('/api/products')).json()
+  const row = rows.find((row: { name: string }) => row.name === name)
+  const csrf = (await (await page.request.get('/api/auth/csrf')).json()).csrf_token
+  const { id, revision, created_at, updated_at, ...values } = row
+  const response = await page.request.put(`/api/products/${id}`, { headers: { Origin: 'https://localhost:5173', 'X-CSRF-Token': csrf }, data: { ...values, name: name + ' другой', operation_id: crypto.randomUUID(), expected_revision: revision } })
+  expect(response.ok()).toBeTruthy()
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(page.locator('#product-error')).toContainText('Карточка изменена на другом устройстве')
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name + ' мой')
+  await page.getByRole('button', { name: 'Загрузить актуальную карточку', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Актуальная карточка' })).toContainText(name + ' другой')
+  await page.getByRole('button', { name: 'Продолжить с моими значениями', exact: true }).click()
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await expect(page.getByRole('heading', { name: name + ' мой', exact: true })).toBeVisible()
+})
+
+test('save paused at CSRF cannot automatically continue under a new session', async ({ page, context }) => {
+  await page.clock.install()
+  const name = await newDraft(page)
+  let release!: () => void
+  let reached!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const captured = new Promise<void>(resolve => { reached = resolve })
+  await page.route('**/api/auth/csrf', async route => {
+    const response = await route.fetch()
+    reached()
+    await gate
+    await route.fulfill({ response })
+  }, { times: 1 })
+  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await captured
+  await context.clearCookies()
+  await page.clock.fastForward(60001)
+  await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
+  await signIn(page)
+  let writes = 0
+  page.on('request', request => { if (request.url().endsWith('/api/products') && request.method() === 'POST') writes++ })
+  release()
+  await expect(page.getByRole('button', { name: 'Повторить сохранение', exact: true })).toBeEnabled()
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name)
+  expect(writes).toBe(0)
+})
+
+test('five navigation items, long Cyrillic names and keyboard form fit A at all specified widths', async ({ page }, testInfo) => {
+  await newDraft(page)
+  await page.getByLabel('Название продукта', { exact: true }).fill('Длинное название продукта '.repeat(8))
+  for (const width of [375, 390, 768, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    const navigation = page.getByRole('navigation', { name: 'Разделы', exact: true })
+    await expect(navigation.getByRole('link')).toHaveCount(5)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+    for (const link of await navigation.getByRole('link').all()) {
+      const box = await link.boundingBox()
+      expect(box!.width).toBeGreaterThanOrEqual(44)
+      expect(box!.height).toBeGreaterThanOrEqual(44)
+      if (width < 768) expect(box!.height).toBeLessThanOrEqual(48)
+    }
+    await page.getByLabel('Название продукта', { exact: true }).focus()
+    await page.keyboard.press('Tab')
+    await expect(page.getByLabel('Основа продукта', { exact: true })).toBeFocused()
+    const save = page.getByRole('button', { name: 'Сохранить продукт', exact: true })
+    await save.focus()
+    await expect(save).toBeFocused()
+    const box = (await save.boundingBox())!
+    const navBox = (await navigation.boundingBox())!
+    if (width < 768) expect(box.y + box.height).toBeLessThanOrEqual(navBox.y)
+    if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/catalog-${testInfo.project.name}-${width}.png`, fullPage: true })
+  }
+})

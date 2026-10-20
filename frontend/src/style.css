@@ -95,10 +95,21 @@ button[type=submit] { background:var(--accent); color:#102b22; border-color:var(
   .app-shell { padding:24px 16px calc(112px + env(safe-area-inset-bottom)); }
   .app-shell>.eyebrow { position:static; width:auto; }
   .workspace { padding:20px; }
-  .main-nav { left:0; right:0; top:auto; bottom:0; width:auto; display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); background:var(--surface); border-top:1px solid var(--border); z-index:10; }
-  .main-nav a { padding:10px 4px; justify-content:center; font-size:.8125rem; }
+  .main-nav { left:0; right:0; top:auto; bottom:0; width:auto; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); background:var(--surface); border-top:1px solid var(--border); z-index:10; }
+  .main-nav a { padding:10px 2px; justify-content:center; font-size:.75rem; }
   .main-nav a[aria-current] { box-shadow:inset 0 3px var(--accent); }
 }
+.product-catalog { display:grid; gap:24px; margin-top:24px; align-items:start; }
+.product-catalog>section { min-width:0; padding:16px; }
+.product-catalog article { border-top:1px solid var(--border); margin-top:16px; padding-top:8px; overflow-wrap:anywhere; }
+.product-catalog h2 { font-size:1.35rem; }
+.product-catalog p,.product-catalog li { overflow-wrap:anywhere; }
+.catalog-actions { display:flex; gap:8px; margin-bottom:16px; }
+.catalog-actions button { flex:1; min-width:0; }
+.catalog-check { display:flex; align-items:center; gap:12px; }
+.catalog-check input { width:24px; margin:0; }
+.catalog-portion { border-top:1px solid var(--border); padding-top:16px; }
+@media(min-width:1100px) { .product-catalog { grid-template-columns:minmax(0,1fr) minmax(0,1fr); } }
 /* Diary A: the draft stays first in DOM and the full timeline can grow freely. */
 .diary-layout { display:grid; gap:24px; align-items:start; }
 .diary-layout>section { min-width:0; padding:24px; }
