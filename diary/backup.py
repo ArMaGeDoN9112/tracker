@@ -23,10 +23,9 @@ from alembic.script import ScriptDirectory
 from pydantic import AwareDatetime, BaseModel, Field
 from sqlalchemy import delete, select, column, table
 
-from diary.basal import schedules, temporary_basals
 from diary.db import database_engine
-from diary.dto import EntryRecord
-from diary.tables import entry, pre_session, session
+from diary.export import full_export
+from diary.tables import pre_session, session
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -122,16 +121,14 @@ def validate_database(database: Path) -> str:
     engine = database_engine(database)
     try:
         with engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN")
             version = str(connection.execute(select(column("version_num")).select_from(table("alembic_version"))).scalar_one())
             config = Config()
             config.set_main_option("script_location", str(ROOT / "migrations"))
             if version != ScriptDirectory.from_config(config).get_current_head():
                 raise ValueError("Для схемы снимка нужен совместимый релиз.")
             # Read using the application's serializers, so incompatible schemas fail here.
-            schedules(connection)
-            temporary_basals(connection)
-            for row in connection.execute(select(entry)).mappings():
-                EntryRecord.model_validate(row)
+            full_export(connection)
             return version
     finally:
         engine.dispose()

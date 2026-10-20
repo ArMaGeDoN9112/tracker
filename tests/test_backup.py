@@ -3,6 +3,8 @@ import os
 import subprocess
 import sys
 import fcntl
+import pytest
+from sqlalchemy import column, delete, table, update
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -16,6 +18,7 @@ from test_access import ORIGIN, login
 from test_entries import diary, entry
 from test_basal import schedule
 from test_temporary_basal import temporary
+from test_export import nutrition_history
 
 
 def points(env):
@@ -43,6 +46,7 @@ def repository(tmp_path):
 
 def test_encrypted_point_restores_snapshot_and_revokes_sessions(diary, tmp_path):
     client, database = diary
+    nutrition_history(client)
     client.post("/api/entries", json=entry(comment="Снимок 😀"))
     assert client.post("/api/basal-schedules", json=schedule()).status_code == 200
     assert client.post("/api/temporary-basals", json=temporary()).status_code == 200
@@ -51,9 +55,13 @@ def test_encrypted_point_restores_snapshot_and_revokes_sessions(diary, tmp_path)
     expected = client.get("/api/export").json()
     summary = client.get("/api/glucose-summary?period=week&end=2026-10-19").json()
     day = client.get("/api/day?day=2026-10-19").json()
+    nutrition_days = [client.get(f"/api/nutrition-day?day=2026-10-{day}").json() for day in [19, 20]]
+    nutrition_summary = client.get("/api/nutrition-summary?period=week&end=2026-10-20").json()
     env = repository(tmp_path)
     command(database, "backup", env=env)
     client.post("/api/entries", json=entry(comment="Позже"))
+    from test_water import water
+    assert client.post("/api/water", json=water()).status_code == 200
     destination = tmp_path / "recovered"
     command(database, "restore", "--snapshot", "latest", "--target", str(destination), env=env)
     with TestClient(create_app(destination / "diary.sqlite3", ORIGIN), base_url=ORIGIN) as restored:
@@ -67,12 +75,16 @@ def test_encrypted_point_restores_snapshot_and_revokes_sessions(diary, tmp_path)
         assert actual == expected
         assert restored.get("/api/glucose-summary?period=week&end=2026-10-19").json() == summary
         assert restored.get("/api/day?day=2026-10-19").json() == day
+        assert [restored.get(f"/api/nutrition-day?day=2026-10-{day}").json() for day in [19, 20]] == nutrition_days
+        assert restored.get("/api/nutrition-summary?period=week&end=2026-10-20").json() == nutrition_summary
+        assert restored.get("/api/water-settings").json() == {"volumes_ml": [330, 125], "revision": 2}
     assert (destination / "recovery.env").read_text() == "DIARY_ORIGIN=https://diary.test\n"
     manifest = json.loads((destination / "manifest.json").read_text())
     assert manifest["release"] == "synthetic-release"
     assert manifest["schema_version"] == "008_water"
     assert "uv.lock" in manifest["files"]
     assert len(client.get("/api/export").json()["entries"]) == 3
+    assert len(client.get("/api/export").json()["water"]) == 3
     command(database, "verify", env=env)
     status = client.get("/api/backup-status").json()
     assert status["last_external_success"] is None
@@ -143,11 +155,17 @@ def test_interrupted_upload_and_no_space_do_not_rotate(diary, tmp_path):
 def test_backup_while_writing_restores_a_consistent_point(diary, tmp_path):
     client, database = diary
     env = repository(tmp_path)
+    from test_meals import meal
+    def composition(number):
+        return [{"id": str(uuid4()), "kind": "one_off", "name": f"Состав {number}", "carbohydrate": str(number)} for _ in range(2)]
+    identifier = client.post("/api/meals", json=meal(composition(0))).json()["result_id"]
     stopped = Event()
     def write():
         count = 0
         while not stopped.is_set():
             assert client.post("/api/entries", json=entry(comment=f"История {count}")).status_code == 200
+            assert client.put("/api/meals/" + identifier, json=meal(
+                composition(count + 1), expected_revision=count + 1)).status_code == 200
             count += 1
         return count
     with ThreadPoolExecutor() as pool:
@@ -164,6 +182,68 @@ def test_backup_while_writing_restores_a_consistent_point(diary, tmp_path):
         rows = recovered.get("/api/export").json()["entries"]
         assert 0 < len(rows) <= total
         assert {row["comment"] for row in rows} == {f"История {i}" for i in range(len(rows))}
+        saved = recovered.get("/api/meals/" + identifier).json()
+        number = saved["revision"] - 1
+        assert len(saved["lines"]) == 2
+        assert [line["name"] for line in saved["lines"]] == [f"Состав {number}"] * 2
+        assert saved["totals"]["carbohydrate"]["value"] == f"{number * 2}.00"
+    assert len(client.get("/api/export").json()["entries"]) == total
+    assert client.get("/api/meals/" + identifier).json()["revision"] == total + 1
+
+
+@pytest.mark.parametrize("fault", ["product", "portion", "line", "basis", "relation", "empty_meal", "water", "settings", "schema"])
+def test_invalid_nutrition_snapshot_cannot_advance_verification(diary, tmp_path, fault):
+    from diary.backup import GROUP, checksum, make_bundle
+    from diary.db import database_engine
+    from diary.tables import meal_line, product, product_portion, water, water_settings
+    client, database = diary
+    historical = nutrition_history(client)
+    env = repository(tmp_path)
+    command(database, "backup", env=env)
+    command(database, "verify", env=env)
+    before = client.get("/api/backup-status").json()
+    bundle = tmp_path / "bad-bundle"
+    with pytest.MonkeyPatch.context() as patch:
+        for key in ["DIARY_RECOVERY_CONFIG", "DIARY_RELEASE"]:
+            patch.setenv(key, env[key])
+        manifest = make_bundle(database, bundle, datetime.now(timezone.utc))
+    engine = database_engine(bundle / "diary.sqlite3")
+    try:
+        with engine.begin() as connection:
+            if fault == "product":
+                connection.exec_driver_sql("PRAGMA defer_foreign_keys=ON")
+                connection.execute(update(product).values(id="invalid-uuid"))
+                connection.execute(update(product_portion).values(product_id="invalid-uuid"))
+            elif fault == "portion":
+                connection.execute(update(product_portion).values(id="invalid-uuid"))
+            elif fault == "line":
+                connection.execute(update(meal_line).where(meal_line.c.kind == "product").values(product_id="invalid-uuid"))
+            elif fault == "basis":
+                connection.exec_driver_sql("PRAGMA ignore_check_constraints=ON")
+                connection.execute(update(meal_line).values(basis_quantity=0))
+            elif fault == "relation":
+                connection.exec_driver_sql("PRAGMA defer_foreign_keys=ON")
+                connection.execute(update(meal_line).where(meal_line.c.meal_id == historical["id"]).values(meal_id=str(uuid4())))
+                connection.exec_driver_sql("PRAGMA defer_foreign_keys=OFF")
+            elif fault == "empty_meal":
+                connection.execute(delete(meal_line))
+            elif fault == "water":
+                connection.execute(update(water).where(water.c.deleted_at.is_not(None)).values(id="invalid-uuid"))
+            elif fault == "settings":
+                connection.execute(update(water_settings).values(volumes_ml="[250,250]"))
+            else:
+                connection.execute(update(table("alembic_version", column("version_num"))).values(version_num="future-schema"))
+    finally:
+        engine.dispose()
+    manifest.files["diary.sqlite3"] = checksum(bundle / "diary.sqlite3")
+    (bundle / "manifest.json").write_text(manifest.model_dump_json(indent=2))
+    subprocess.run(["restic", "backup", ".", "--tag", GROUP], cwd=bundle, env=env, check=True, capture_output=True)
+    command(database, "verify", env=env, ok=False)
+    after = client.get("/api/backup-status").json()
+    assert after["last_verification"] == before["last_verification"]
+    assert after["verification_snapshot"] == before["verification_snapshot"]
+    assert after["verification_error"] is not None
+    assert client.get("/api/export").status_code == 200
 
 
 def test_status_is_private_and_marks_external_copy_overdue(diary):
