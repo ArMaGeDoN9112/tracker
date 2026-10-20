@@ -99,3 +99,12 @@ meal_line = table(
     column("calories", Integer), column("product_id", Text), column("product_revision", BigInteger),
     column("portion_id", Text), column("portion_name", Text), column("portion_quantity", Integer),
 )
+
+water = table(
+    "water", column("id", Text), column("volume_ml", Integer), column("occurred_at", BigInteger),
+    column("revision", BigInteger), column("created_at", BigInteger),
+    column("updated_at", BigInteger), column("deleted_at", BigInteger),
+)
+water_settings = table(
+    "water_settings", column("id", Text), column("volumes_ml", Text), column("revision", BigInteger),
+)

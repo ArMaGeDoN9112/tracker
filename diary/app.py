@@ -22,6 +22,7 @@ from diary.basal import register_basal
 from diary.glucose import register_glucose
 from diary.products import register_products
 from diary.meals import register_meals
+from diary.water import register_water
 from diary.export import register_export
 from diary.backup import register_backup_status
 from diary.security import (
@@ -117,6 +118,14 @@ def create_app(database: Path, origin: str) -> FastAPI:
         location = error.errors()[0]["loc"]
         field = str(location[-1]) if location and location[-1] != "body" else None
         message = "Проверьте введённые данные."
+        if request.url.path.startswith("/api/water"):
+            field = ".".join(str(part) for part in location[1:]) or None
+            name = str(location[1]) if len(location) > 1 else ""
+            message = {
+                "volume_ml": "Объём воды: целые мл от 1 до 2147483647.",
+                "volumes_ml": "Кнопки: уникальные целые объёмы от 1 до 2147483647 мл; пустой набор допустим.",
+                "occurred_at": "Укажите дату RFC 3339 с явным смещением и точностью до миллисекунд.",
+            }.get(name, message)
         if request.url.path.startswith(("/api/products", "/api/meals")):
             field = ".".join(str(part) for part in location[1:]) or None
             leaf = str(location[-1]) if location else ""
@@ -242,6 +251,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
     register_entries(app, engine)
     register_products(app, engine)
     register_meals(app, engine)
+    register_water(app, engine)
     register_basal(app, engine)
     register_glucose(app, engine)
     register_export(app, engine)

@@ -188,10 +188,14 @@ def test_upgrade_preserves_catalog_meals_deletions_receipts_and_session(tmp_path
         path = '/api/meals/' + receipt['result_id']
         deleted_path = '/api/meals/' + client.post('/api/meals', json=meal([source])).json()['result_id']
         assert client.post(deleted_path + '/delete', json={'operation_id': str(uuid4()), 'expected_revision': 1}).status_code == 200
-        routes = [path, deleted_path, '/api/day?day=2026-10-19', '/api/products', '/api/nutrition-day?day=2026-10-19']
+        routes = [path, deleted_path, '/api/day?day=2026-10-19', '/api/products']
         before = [client.get(route).json() for route in routes]
         migrate(database)
         migrate(database)
         assert [client.get(route).json() for route in routes] == before
+        day = client.get('/api/nutrition-day?day=2026-10-19').json()
+        assert day['meals'] == [before[0]]
+        assert day['water'] == []
+        assert day['water_total_ml'] is None
         assert client.post('/api/meals', json=payload).json()['replayed'] is True
         assert client.post('/api/meals', json=meal([source, one_off()])).status_code == 200

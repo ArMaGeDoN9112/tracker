@@ -16,6 +16,7 @@ from diary.entries import MOSCOW, EntryInput, OperationInput, ReceiptOutput, Rev
 from diary.products import NamedInput, PortionInput, ProductInput
 from diary.security import now_ms
 from diary.tables import meal, meal_line, operation_receipt
+from diary.water import WaterOutput, day_water
 
 NUTRIENTS = ("protein", "fat", "carbohydrate", "calories")
 Category = Literal["breakfast", "lunch", "dinner", "snack"]
@@ -201,6 +202,8 @@ class MealOutput(BaseModel):
 class NutritionDayOutput(BaseModel):
     day: date
     meals: list[MealOutput]
+    water: list[WaterOutput]
+    water_total_ml: int | None
     totals: NutritionTotals
 
 
@@ -299,7 +302,8 @@ def register_meals(app: FastAPI, engine: Engine) -> None:
                 meal.c.deleted_at.is_(None), meal.c.occurred_at >= start, meal.c.occurred_at < end
             ).order_by(meal.c.occurred_at, meal.c.created_at, meal.c.id)).mappings()]
             lines = [meal_lines(connection, record.id) for record in records]
-            return NutritionDayOutput(day=day, meals=[meal_output(record, items) for record, items in zip(records, lines)],
+            events = day_water(connection, start, end)
+            return NutritionDayOutput(day=day, water=events, water_total_ml=sum(event.volume_ml for event in events) if events else None, meals=[meal_output(record, items) for record, items in zip(records, lines)],
                                       totals=nutrition_totals([line for items in lines for line in items]))
 
     @app.post("/api/meals", response_model=ReceiptOutput)

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { privateFetch } from './access'
+import { Water } from './Water'
 import { ProductCatalog, nutrients, type Product, type Portion, type ProductSeed } from './ProductCatalog'
 import { localMinute, moscowLabel } from './time'
 
@@ -327,6 +328,7 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
           {!loading && !dayError && data?.day === day && <>{!data.meals.length ? <p>Нет записей еды</p> : <><h3>Итоги дня</h3><TotalsView totals={data.totals} />
             {data.meals.map(row => <article className="meal-history" key={row.id} aria-label={`Приём ${moscowLabel(row.occurred_at)}`}><MealDetails meal={row} onProduct={openProduct} productDisabled={locked || catalogEditing} /><div className="catalog-actions"><button disabled={locked} onClick={() => edit(row)}>Изменить приём</button><button disabled={locked} onClick={() => void repeat(row)}>Повторить приём</button><button disabled={locked} onClick={() => void action(row, 'delete')}>Удалить приём</button></div></article>)}
           </>}</>}
+          <Water authorized={authorized} visible={visible} day={day} csrfToken={csrfToken} />
         </section>
       </div>
       {conversion && <section className="meal-conversion" aria-label="Создание продукта из еды">

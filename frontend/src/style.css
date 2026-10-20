@@ -52,6 +52,10 @@ a { color:var(--accent); }
 button { border:1px solid #74808b; background:var(--raised); color:var(--text); font-weight:500; cursor: pointer; margin-top: 8px; }
 button:disabled { opacity: .65; cursor: wait; }
 :focus-visible { outline: 3px solid #e9be70; outline-offset: 4px; }
+.water-panel { margin-top:24px; padding:16px; min-width:0; overflow-wrap:anywhere; }
+.water-panel>section { padding:16px; margin-top:24px; }
+.water-buttons { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.water-buttons button { width:auto; flex:1 1 auto; }
 .error { color: #ffb6b6; overflow-wrap: anywhere; }
 .glucose-charts { --chart-minimum:#a9c9ff; --chart-maximum:#e9be70; margin-top: 24px; padding: 0; border: 0; border-radius: 0; background: transparent; min-width:0; }
 .glucose-charts h2 { margin:8px 0 24px; font-size:1.5rem; font-weight:600; }
