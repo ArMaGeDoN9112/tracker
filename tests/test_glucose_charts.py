@@ -41,7 +41,7 @@ def test_rounding_uses_all_measurements_without_rounding_days(diary):
 @pytest.mark.parametrize("period,start,length", [("week", "2026-09-29", 7), ("month", "2026-09-06", 30)])
 def test_presets_include_end_and_default_to_moscow_today(diary, monkeypatch, period, start, length):
     client, _ = diary
-    monkeypatch.setattr("diary.glucose.now_ms", lambda: int(datetime(2026, 10, 4, 21, 30, tzinfo=UTC).timestamp() * 1000))
+    monkeypatch.setattr("diary.bootstrap.now_ms", lambda: int(datetime(2026, 10, 4, 21, 30, tzinfo=UTC).timestamp() * 1000))
     for suffix in ["", "&end=2026-10-05"]:
         response = client.get(f"/api/glucose-summary?period={period}{suffix}")
         assert response.status_code == 200

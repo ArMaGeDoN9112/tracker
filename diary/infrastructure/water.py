@@ -35,7 +35,6 @@ class SqliteWater:
         return WaterRecord.model_validate(row) if row is not None else None
 
     def day(self, start: int, end: int) -> list[WaterRecord]:
-        # This reader also runs inside the legacy nutrition-day transaction.
         try:
             return [WaterRecord.model_validate(row) for row in self.connection.execute(select(water).where(
                 water.c.deleted_at.is_(None), water.c.occurred_at >= start, water.c.occurred_at < end

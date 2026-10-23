@@ -1,14 +1,14 @@
 from uuid import uuid4
 
 from fastapi import FastAPI
-from sqlalchemy import Connection, Engine
+from sqlalchemy import Engine
 
 from diary.application.water import (
-    CreateWater, DeleteWater, EditWater, EditWaterSettings, GetDayWater, GetWater,
-    GetWaterSettings, RestoreWater, WaterOperations, WaterPeriod,
+    CreateWater, DeleteWater, EditWater, EditWaterSettings, GetWater,
+    GetWaterSettings, RestoreWater, WaterOperations,
 )
-from diary.infrastructure.water import SqliteWater, water_uow
-from diary.interfaces.http.water import WaterUseCases, WaterOutput, register_water, water_output
+from diary.infrastructure.water import water_uow
+from diary.interfaces.http.water import WaterUseCases, register_water
 from diary.security import now_ms
 from diary.application.basal import (
     BasalOperations, CreateSchedule, CreateTemporaryBasal, DeleteTemporaryBasal,
@@ -32,12 +32,6 @@ def register_water_http(app: FastAPI, engine: Engine) -> None:
         restore=RestoreWater(operations), edit_settings=EditWaterSettings(operations),
     )
     register_water(app, cases, lambda: now_ms())
-
-
-def day_water(connection: Connection, start: int, end: int) -> list[WaterOutput]:
-    # shortcut: nutrition-day owns the shared snapshot, move its UoW in stage 06.
-    records = GetDayWater(SqliteWater(connection)).execute(WaterPeriod(start=start, end=end))
-    return [water_output(record) for record in records]
 
 
 def register_diary_http(app: FastAPI, engine: Engine) -> None:
@@ -82,3 +76,16 @@ def register_nutrition_http(app: FastAPI, engine: Engine) -> None:
         get=GetMeal(reads), repeat=RepeatMeal(reads, clock, new_id), preview=PreviewMealProduct(),
         create=CreateMeal(meals), edit=EditMeal(meals), delete=DeleteMeal(meals), restore=RestoreMeal(meals),
     ), clock)
+
+
+def register_reads_http(app: FastAPI, engine: Engine) -> None:
+    from diary.application.reads import GetGlucoseSummary, GetNutritionDay, GetNutritionSummary
+    from diary.infrastructure.reads import read_uow
+    from diary.interfaces.http.reads import ReadUseCases, register_reads
+
+    reads = lambda: read_uow(engine)
+    clock = lambda: now_ms()
+    register_reads(app, ReadUseCases(
+        glucose=GetGlucoseSummary(reads, clock), nutrition=GetNutritionSummary(reads, clock),
+        nutrition_day=GetNutritionDay(reads),
+    ))

@@ -20,9 +20,7 @@ from diary.dto import CsrfOutput, ErrorOutput, LoginOutput, SessionOutput
 from diary.bootstrap import register_diary_http, register_water_http
 from diary.interfaces.http.errors import register_application_errors
 from diary.body_limit import BodyLimit
-from diary.glucose import register_glucose
-from diary.bootstrap import register_nutrition_http
-from diary.meals import register_nutrition_reads
+from diary.bootstrap import register_nutrition_http, register_reads_http
 from diary.export import register_export
 from diary.backup import register_backup_status
 from diary.security import (
@@ -252,9 +250,8 @@ def create_app(database: Path, origin: str) -> FastAPI:
 
     register_diary_http(app, engine)
     register_nutrition_http(app, engine)
-    register_nutrition_reads(app, engine)
+    register_reads_http(app, engine)
     register_water_http(app, engine)
-    register_glucose(app, engine)
     register_export(app, engine)
     register_backup_status(app, database)
     return app

@@ -1,11 +1,16 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date
 from threading import Event
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import Engine, event
+from sqlalchemy.exc import OperationalError
 
-from diary.db import database_engine
+from diary.application.errors import Unavailable
+from diary.application.reads import GetNutritionSummary, SummaryQuery
+from diary.db import database_engine, migrate
+from diary.infrastructure.reads import read_uow
 from test_basal import schedule
 from test_entries import diary, entry
 from test_meals import meal
@@ -58,3 +63,30 @@ def test_composite_reads_keep_one_snapshot_during_writes(diary, route, first_sel
     assert response.status_code == 200
     assert response.json() == before
     assert client.get(route).json() != before
+
+
+@pytest.mark.parametrize('statement_prefix', ['BEGIN', 'SELECT'])
+def test_read_failure_preserves_cause_and_releases_connection(tmp_path, statement_prefix):
+    database = tmp_path / 'reads.sqlite3'
+    migrate(database)
+    engine = database_engine(database)
+    fault = OperationalError('synthetic SQL', {}, Exception('private details'))
+
+    def fail(connection, cursor, statement, parameters, context, many):
+        if statement.startswith(statement_prefix):
+            raise fault
+
+    case = GetNutritionSummary(lambda: read_uow(engine), lambda: 0)
+    query = SummaryQuery(end=date(2026, 10, 19))
+    try:
+        event.listen(engine, 'before_cursor_execute', fail)
+        try:
+            with pytest.raises(Unavailable) as caught:
+                case.execute(query)
+            assert caught.value.__cause__ is fault
+            assert str(caught.value) == 'Операция не сохранена. Повторите позже.'
+        finally:
+            event.remove(engine, 'before_cursor_execute', fail)
+        assert case.execute(query).meal_count == 0
+    finally:
+        engine.dispose()

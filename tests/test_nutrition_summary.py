@@ -73,7 +73,7 @@ def test_summary_periods_moscow_midnight_and_old_history(diary, monkeypatch):
     from datetime import datetime
     from diary.domain.time import milliseconds
     client, _ = diary
-    monkeypatch.setattr('diary.meals.now_ms', lambda: milliseconds(datetime.fromisoformat('2026-10-19T21:00:00+00:00')))
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: milliseconds(datetime.fromisoformat('2026-10-19T21:00:00+00:00')))
     for at in ['2026-10-19T20:59:59.999Z', '2026-10-19T21:00:00Z', '2026-10-20T20:59:59.999Z', '2026-10-20T21:00:00Z']:
         assert client.post('/api/meals', json=meal([food(protein='2')], occurred_at=at)).status_code == 200
     week = client.get('/api/nutrition-summary').json()
