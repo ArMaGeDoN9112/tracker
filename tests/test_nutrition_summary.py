@@ -71,7 +71,7 @@ def test_summary_rounds_exact_contributions_independently_of_days(diary):
 
 def test_summary_periods_moscow_midnight_and_old_history(diary, monkeypatch):
     from datetime import datetime
-    from diary.entries import milliseconds
+    from diary.domain.time import milliseconds
     client, _ = diary
     monkeypatch.setattr('diary.meals.now_ms', lambda: milliseconds(datetime.fromisoformat('2026-10-19T21:00:00+00:00')))
     for at in ['2026-10-19T20:59:59.999Z', '2026-10-19T21:00:00Z', '2026-10-20T20:59:59.999Z', '2026-10-20T21:00:00Z']:

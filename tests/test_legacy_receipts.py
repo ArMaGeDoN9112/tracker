@@ -7,7 +7,7 @@ from sqlalchemy import insert
 
 from diary.app import create_app
 from diary.db import database_engine, migrate
-from diary.dto import OperationAction
+from diary.application.operations import OperationAction
 from diary.tables import operation_receipt
 from test_access import ORIGIN
 from test_entries import diary

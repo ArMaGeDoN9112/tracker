@@ -6,7 +6,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import Engine, select
 
-from diary.entries import EPOCH, MOSCOW, decimal_string, milliseconds
+from diary.domain.precision import decimal_string
+from diary.domain.time import EPOCH, MOSCOW, milliseconds
 from diary.security import now_ms
 from diary.tables import entry
 

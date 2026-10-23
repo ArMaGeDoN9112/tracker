@@ -7,7 +7,8 @@ from sqlalchemy import delete, insert, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from diary.db import database_engine, migrate
-from diary.security import now_ms, password_hash, validate_login, validate_password
+from diary.domain.access import validate_login, validate_password
+from diary.security import now_ms, password_hash
 from diary.tables import account, session
 
 

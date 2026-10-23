@@ -1,64 +1,23 @@
 import hashlib
 import json
-import re
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field
 from sqlalchemy import Connection, Engine, insert, select, update
 
-from diary.dto import OperationAction, BasalInterval, BasalSchedule, ReceiptRecord, ScheduleConflictOutput, TemporaryBasalPeriod
-from diary.entries import EPOCH, MOSCOW, BasalChangeOutput, EntryInput, OperationInput, ReceiptOutput, RevisionInput, TemporaryBasalOutput, milliseconds, receipt_output, timestamp
+from diary.application.basal import EditTemporaryBasalInput, IntervalInput, ScheduleInput, TemporaryBasalInput
+from diary.application.entries import EntryInput
+from diary.application.operations import OperationAction, ReceiptRecord, RevisionInput
+from diary.domain.basal import BasalInterval, BasalSchedule, TemporaryBasalPeriod, basal_at
+from diary.domain.precision import hundredths, rate_string
+from diary.domain.time import milliseconds
+from diary.dto import ScheduleConflictOutput
+from diary.entries import ReceiptOutput, TemporaryBasalOutput, receipt_output, timestamp
 from diary.security import now_ms
 from diary.tables import basal_interval, basal_schedule, operation_receipt, temporary_basal
-
-
-def hundredths(value: str) -> int:
-    value = value.strip().replace(",", ".")
-    if not re.fullmatch(r"\+?[0-9]+(?:\.[0-9]+)?", value):
-        raise ValueError("Введите неотрицательное десятичное число.")
-    whole, _, fraction = value.lstrip("+").partition(".")
-    if fraction[2:].strip("0") or len(whole.lstrip("0")) > 8:
-        raise ValueError("Допустимы сотые, максимум 21474836,47 ед/ч.")
-    result = int(whole.lstrip("0") or "0") * 100 + int((fraction + "00")[:2])
-    if result > 2147483647:
-        raise ValueError("Превышен технический предел 21474836,47 ед/ч.")
-    return result
-
-
-def rate_string(value: int) -> str:
-    return f"{value // 100}.{value % 100:02}"
-
-
-class IntervalInput(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    minute: int = Field(ge=0, le=1439, description="Минута от московской полуночи")
-    rate: str = Field(max_length=10000, description="От 0 до 21474836.47 ед/ч; сотые, точка или запятая; завершающие нули допустимы")
-
-    @field_validator("rate")
-    @classmethod
-    def rate_value(cls, value: str) -> str:
-        return rate_string(hundredths(value))
-
-
-class ScheduleInput(OperationInput):
-    starts_at: str = Field(json_schema_extra={"format": "date-time"}, description="RFC 3339 со смещением, до миллисекунд")
-    intervals: list[IntervalInput] = Field(min_length=1, max_length=1440)
-
-    @field_validator("starts_at")
-    @classmethod
-    def start_time(cls, value: str) -> str:
-        return EntryInput.event_time(value)
-
-    @field_validator("intervals")
-    @classmethod
-    def ordered_intervals(cls, value: list[IntervalInput]) -> list[IntervalInput]:
-        minutes = [interval.minute for interval in value]
-        if minutes[0] != 0 or any(a >= b for a, b in zip(minutes, minutes[1:])):
-            raise ValueError("Начните с 00:00; интервалы должны идти строго по возрастанию без повторов.")
-        return value
 
 
 class ScheduleOutput(BaseModel):
@@ -85,88 +44,6 @@ def schedules(connection: Connection) -> list[BasalSchedule]:
             versions.append(BasalSchedule(id=row["id"], starts_at=row["starts_at"], created_at=row["created_at"], intervals=[]))
         versions[-1].intervals.append(BasalInterval(minute=row["minute"], rate=row["rate"]))
     return versions
-
-
-def basal_at(versions: list[BasalSchedule], instant: int, temporary: list[TemporaryBasalPeriod]) -> str | None:
-    version = next((version for version in reversed(versions) if version.starts_at <= instant), None)
-    if version is None:
-        return None
-    local = (EPOCH + timedelta(milliseconds=instant)).astimezone(MOSCOW)
-    minute = local.hour * 60 + local.minute
-    interval = next(interval for interval in reversed(version.intervals) if interval.minute <= minute)
-    period = next((row for row in reversed(temporary) if row.starts_at <= instant < row.effective_ends_at), None)
-    return rate_string((interval.rate * period.percent + 50) // 100 if period else interval.rate)
-
-
-def basal_changes(versions: list[BasalSchedule], start: int, end: int, temporary: list[TemporaryBasalPeriod]) -> list[BasalChangeOutput]:
-    day = (EPOCH + timedelta(milliseconds=start)).astimezone(MOSCOW).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
-    boundaries = {version.starts_at for version in versions if start < version.starts_at < end}
-    temporary_boundaries = {instant for row in temporary for instant in (row.starts_at, row.effective_ends_at) if start < instant < end}
-    boundaries.update(temporary_boundaries)
-    for version in versions:
-        for interval in version.intervals:
-            local = day + timedelta(minutes=interval.minute)
-            for fold in (0, 1):
-                candidate = local.replace(tzinfo=MOSCOW, fold=fold)
-                if candidate.astimezone(UTC).astimezone(MOSCOW).replace(tzinfo=None) == local:
-                    instant = milliseconds(candidate)
-                    if start < instant < end:
-                        boundaries.add(instant)
-    # A clock rollback can select an earlier interval without crossing its start.
-    cursor = start
-    while cursor < end:
-        next_cursor = min(cursor + 3600000, end)
-        offset = (EPOCH + timedelta(milliseconds=cursor)).astimezone(MOSCOW).utcoffset()
-        if (EPOCH + timedelta(milliseconds=next_cursor)).astimezone(MOSCOW).utcoffset() != offset:
-            low, high = cursor, next_cursor
-            while high - low > 1:
-                middle = (low + high) // 2
-                if (EPOCH + timedelta(milliseconds=middle)).astimezone(MOSCOW).utcoffset() == offset:
-                    low = middle
-                else:
-                    high = middle
-            if start < high < end:
-                boundaries.add(high)
-        cursor = next_cursor
-    return [BasalChangeOutput(occurred_at=timestamp(instant), basal=basal_at(versions, instant, temporary)) for instant in sorted(boundaries)
-            if instant in temporary_boundaries or basal_at(versions, instant, temporary) != basal_at(versions, instant - 1, temporary)]
-
-
-class TemporaryBasalInput(OperationInput):
-    starts_at: str = Field(json_schema_extra={"format": "date-time"})
-    duration_minutes: int = Field(ge=1, le=2147483647)
-    percent: int = Field(ge=0, le=2147483647)
-
-    @field_validator("starts_at")
-    @classmethod
-    def start_time(cls, value: str) -> str:
-        return EntryInput.event_time(value)
-
-    @model_validator(mode="after")
-    def representable_end(self) -> "TemporaryBasalInput":
-        try:
-            end = datetime.fromisoformat(self.starts_at) + timedelta(minutes=self.duration_minutes)
-            end.astimezone(MOSCOW)
-        except (ValueError, OverflowError) as error:
-            raise ValueError("Окончание за пределами календаря.") from error
-        return self
-
-
-class EditTemporaryBasalInput(RevisionInput):
-    starts_at: str = Field(json_schema_extra={"format": "date-time"})
-    ends_at: str = Field(json_schema_extra={"format": "date-time"})
-    percent: int = Field(ge=0, le=2147483647)
-
-    @field_validator("starts_at", "ends_at")
-    @classmethod
-    def event_time(cls, value: str) -> str:
-        return EntryInput.event_time(value)
-
-    @model_validator(mode="after")
-    def ordered_period(self) -> "EditTemporaryBasalInput":
-        if self.ends_at < self.starts_at:
-            raise ValueError("Окончание не может быть раньше начала.")
-        return self
 
 
 def temporary_basals(connection: Connection) -> list[TemporaryBasalPeriod]:

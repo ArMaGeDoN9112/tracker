@@ -9,10 +9,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Connection, Engine, insert, select, update
 
-from diary.dto import OperationAction, ReceiptRecord
-from diary.entries import EntryInput, OperationInput, ReceiptOutput, RevisionInput, milliseconds, receipt_output, timestamp
+from diary.application.entries import EntryInput
+from diary.application.operations import OperationAction, OperationInput, ReceiptRecord, RevisionInput
+from diary.domain.time import milliseconds
+from diary.entries import ReceiptOutput, receipt_output, timestamp
 from diary.security import now_ms
 from diary.tables import operation_receipt, water, water_settings
+
 
 Volume = Annotated[int, Field(strict=True, ge=1, le=2147483647)]
 

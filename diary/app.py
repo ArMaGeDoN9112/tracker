@@ -15,10 +15,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.concurrency import run_in_threadpool
 
 from diary.db import database_engine
-from diary.body_limit import BodyLimit
+from diary.domain.access import validate_login
 from diary.dto import CsrfOutput, ErrorOutput, LoginOutput, SessionOutput
 from diary.entries import register_entries
 from diary.basal import register_basal
+from diary.body_limit import BodyLimit
 from diary.glucose import register_glucose
 from diary.products import register_products
 from diary.meals import register_meals
@@ -27,7 +28,7 @@ from diary.export import register_export
 from diary.backup import register_backup_status
 from diary.security import (
     PRE_COOKIE, PRE_SECONDS, SESSION_COOKIE, SESSION_SECONDS,
-    csrf_token, digest, now_ms, password_hash, validate_login,
+    csrf_token, digest, now_ms, password_hash,
 )
 from diary.tables import account as account_table, login_failure, pre_session, session as session_table
 

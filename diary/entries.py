@@ -3,107 +3,24 @@ import json
 import re
 from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID, uuid4
-from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field
 from sqlalchemy import Engine, insert, select, update
 
-from diary.dto import OperationAction, EntryFormOutput, EntryRecord, EntryValues, MoscowTimeOutput, Reason, ReceiptRecord
+from diary.application.entries import EditEntryInput, EntryInput
+from diary.application.operations import OperationAction, ReceiptRecord, RevisionInput
+from diary.domain.entries import EntryRecord, EntryValues, Reason
+from diary.domain.precision import decimal_string, tenths
+from diary.domain.time import EPOCH, MOSCOW, milliseconds
+from diary.dto import EntryFormOutput, MoscowTimeOutput
 from diary.security import now_ms
 from diary.tables import entry, operation_receipt
-
-MOSCOW = ZoneInfo("Europe/Moscow")
-EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
-
-
-def milliseconds(value: datetime) -> int:
-    delta = value.astimezone(UTC) - EPOCH
-    return delta.days * 86400000 + delta.seconds * 1000 + delta.microseconds // 1000
 
 
 def timestamp(value: int) -> str:
     return (EPOCH + timedelta(milliseconds=value)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def tenths(value: str) -> int:
-    value = value.strip().replace(",", ".")
-    if not re.fullmatch(r"\+?[0-9]+(?:\.[0-9]+)?", value):
-        raise ValueError("Введите десятичное число.")
-    whole, _, fraction = value.lstrip("+").partition(".")
-    if fraction[1:].strip("0") or len(whole.lstrip("0")) > 9:
-        raise ValueError("Допустим один значащий знак после запятой и значение до 214748364,7.")
-    result = int(whole.lstrip("0") or "0") * 10 + int((fraction + "0")[0])
-    if result > 2147483647:
-        raise ValueError("Превышен технический предел 214748364,7.")
-    return result
-
-
-def decimal_string(value: int) -> str:
-    return f"{value // 10}.{value % 10}"
-
-
-class OperationInput(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    operation_id: str = Field(json_schema_extra={"format": "uuid"})
-
-    @field_validator("operation_id")
-    @classmethod
-    def operation_uuid(cls, value: str) -> str:
-        return str(UUID(value))
-
-
-class RevisionInput(OperationInput):
-    expected_revision: int = Field(ge=1, le=9223372036854775806)
-
-
-class EntryInput(OperationInput):
-    occurred_at: str = Field(json_schema_extra={"format": "date-time"}, description="RFC 3339 с явным смещением; точность до миллисекунд")
-    glucose: str | None = Field(default=None, max_length=10000, description="Положительное десятичное число, до 214748364.7; точка или запятая, десятые без скрытого округления; завершающие нули допустимы")
-    bolus: str = Field(default="0.0", max_length=10000, description="От 0 до 214748364.7, точность до десятых, точка или запятая; пустая строка равна нулю")
-    reason: Reason | None = None
-    comment: str = Field(default="", max_length=10000)
-
-    @field_validator("occurred_at")
-    @classmethod
-    def event_time(cls, value: str) -> str:
-        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,3})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])", value):
-            raise ValueError("Нужна дата RFC 3339 со смещением и точностью до миллисекунд.")
-        try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            # Ensure both UTC and the calendar display can represent the instant.
-            parsed.astimezone(MOSCOW)
-            return timestamp(milliseconds(parsed))
-        except OverflowError as error:
-            raise ValueError("Дата за пределами календаря.") from error
-
-    @field_validator("glucose")
-    @classmethod
-    def glucose_value(cls, value: str | None) -> str | None:
-        if value is None or not value.strip():
-            return None
-        result = tenths(value)
-        if result == 0:
-            raise ValueError("Сахар должен быть положительным.")
-        return decimal_string(result)
-
-    @field_validator("bolus")
-    @classmethod
-    def bolus_value(cls, value: str) -> str:
-        return decimal_string(tenths(value) if value.strip() else 0)
-
-    @model_validator(mode="after")
-    def meaningful(self) -> "EntryInput":
-        if self.bolus == "0.0":
-            self.reason = None
-        if self.glucose is None and self.bolus == "0.0" and not self.comment.strip():
-            raise ValueError("Укажите сахар, ненулевую подколку или комментарий.")
-        return self
-
-
-class EditEntryInput(EntryInput, RevisionInput):
-    pass
 
 
 class EntryOutput(BaseModel):
@@ -180,7 +97,8 @@ def entry_output(row: EntryRecord, basal: str | None) -> EntryOutput:
 
 def register_entries(app: FastAPI, engine: Engine) -> None:
     from diary.app import failure
-    from diary.basal import basal_at, basal_changes, schedules, temporary_basals, temporary_output
+    from diary.domain.basal import basal_at, basal_changes
+    from diary.basal import schedules, temporary_basals, temporary_output
 
     @app.get("/api/entry-form")
     def entry_form() -> EntryFormOutput:
@@ -307,7 +225,8 @@ def register_entries(app: FastAPI, engine: Engine) -> None:
         return DayOutput(
             day=day, basal=basal_at(versions, start, temporary),
             entries=[entry_output(row, basal_at(versions, row.occurred_at, temporary)) for row in records],
-            basal_changes=basal_changes(versions, start, end, temporary),
+            basal_changes=[BasalChangeOutput(occurred_at=timestamp(change.occurred_at), basal=change.basal)
+                           for change in basal_changes(versions, start, end, temporary)],
             temporary_percent=next((row.percent for row in temporary if row.starts_at <= start < row.effective_ends_at), None),
             temporary_basals=[temporary_output(row) for row in temporary if row.starts_at < end and row.effective_ends_at > start],
         )

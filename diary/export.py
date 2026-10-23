@@ -6,14 +6,19 @@ from fastapi import FastAPI, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import Connection, Engine, select
 
-from diary.basal import IntervalInput, ScheduleOutput, rate_string, schedules, temporary_basals, temporary_output
-from diary.dto import EntryRecord, Reason, TemporaryBasalPeriod
+from diary.application.basal import IntervalInput
+from diary.basal import ScheduleOutput, schedules, temporary_basals, temporary_output
+from diary.domain.basal import TemporaryBasalPeriod
+from diary.domain.entries import EntryRecord, Reason
+from diary.domain.nutrition import MealRecord
+from diary.domain.precision import rate_string
+from diary.domain.products import ProductRecord
 from diary.entries import entry_output, timestamp
-from diary.meals import MealLineOutput, MealOutput, MealRecord, meal_lines, meal_output
-from diary.products import ProductOutput, ProductRecord, product_output
+from diary.meals import MealLineOutput, MealOutput, meal_lines, meal_output
+from diary.products import ProductOutput, product_output
 from diary.security import now_ms
 from diary.tables import account, entry, meal, product, temporary_basal, water, water_settings
-from diary.water import WaterOutput, WaterRecord, WaterSettingsOutput, WaterSettingsInput, water_output
+from diary.water import WaterOutput, WaterRecord, WaterSettingsInput, WaterSettingsOutput, water_output
 
 
 Timestamp = Annotated[str, Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$", json_schema_extra={"format": "date-time"})]
