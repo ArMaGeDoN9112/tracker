@@ -1,0 +1,636 @@
+[
+  {
+    "method": "POST",
+    "path": "/api/entries",
+    "request": {
+      "occurred_at": "2026-10-19T12:34:56.789+03:00",
+      "glucose": "5,60",
+      "bolus": "1,20",
+      "reason": "food",
+      "comment": "Еда 😀",
+      "operation_id": "00000000-0000-0000-0000-000000000001"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000001",
+      "action": "create_entry",
+      "request_hash": "2ebd6c237db90e681a180a085848c0ede1c9c8d83caed40d78ff2b93846a4ca5",
+      "result_id": "0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+      "revision": 1,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000001",
+      "action": "create_entry",
+      "request_hash": "2ebd6c237db90e681a180a085848c0ede1c9c8d83caed40d78ff2b93846a4ca5",
+      "result_id": "0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+      "revision": 1,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/entries/0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+    "request": {
+      "occurred_at": "2026-10-19T12:34:56.789+03:00",
+      "glucose": "7.0",
+      "bolus": "1,20",
+      "reason": "food",
+      "comment": "Еда 😀",
+      "expected_revision": 1,
+      "operation_id": "00000000-0000-0000-0000-000000000002"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000002",
+      "action": "edit_entry",
+      "request_hash": "99a63fa5733e3195cb03db922870ba9ce13d6a0ed202be7e8ac591b1be07b07b",
+      "result_id": "0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+      "revision": 2,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000002",
+      "action": "edit_entry",
+      "request_hash": "99a63fa5733e3195cb03db922870ba9ce13d6a0ed202be7e8ac591b1be07b07b",
+      "result_id": "0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+      "revision": 2,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/entries/0ec536f1-980d-43a0-94f8-fe8295c3b20b/delete",
+    "request": {
+      "expected_revision": 2,
+      "operation_id": "00000000-0000-0000-0000-000000000003"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000003",
+      "action": "delete_entry",
+      "request_hash": "42e19d4fc428fbd7704ae5c546d6193edbb6f31eca8e038f1a71aeae87bb9155",
+      "result_id": "0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+      "revision": 3,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 30000
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000003",
+      "action": "delete_entry",
+      "request_hash": "42e19d4fc428fbd7704ae5c546d6193edbb6f31eca8e038f1a71aeae87bb9155",
+      "result_id": "0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+      "revision": 3,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/entries/0ec536f1-980d-43a0-94f8-fe8295c3b20b/restore",
+    "request": {
+      "expected_revision": 3,
+      "operation_id": "00000000-0000-0000-0000-000000000004"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000004",
+      "action": "restore_entry",
+      "request_hash": "a84f1060ea4f71e0685c04acc777421200200bc87fab754e6c24fedac5028624",
+      "result_id": "0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+      "revision": 4,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000004",
+      "action": "restore_entry",
+      "request_hash": "a84f1060ea4f71e0685c04acc777421200200bc87fab754e6c24fedac5028624",
+      "result_id": "0ec536f1-980d-43a0-94f8-fe8295c3b20b",
+      "revision": 4,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/basal-schedules",
+    "request": {
+      "starts_at": "2026-10-19T00:00:00+03:00",
+      "intervals": [
+        {
+          "minute": 0,
+          "rate": "0,5500"
+        },
+        {
+          "minute": 720,
+          "rate": "1"
+        }
+      ],
+      "operation_id": "00000000-0000-0000-0000-000000000005"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000005",
+      "action": "create_basal_schedule",
+      "request_hash": "c9664023bad699d5f8187fa036708bf0aa0f425aedd9da0ba86d75e371056e92",
+      "result_id": "6c53c96c-262b-4b7b-8977-2209cdd35eed",
+      "revision": 1,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000005",
+      "action": "create_basal_schedule",
+      "request_hash": "c9664023bad699d5f8187fa036708bf0aa0f425aedd9da0ba86d75e371056e92",
+      "result_id": "6c53c96c-262b-4b7b-8977-2209cdd35eed",
+      "revision": 1,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/temporary-basals",
+    "request": {
+      "starts_at": "2026-10-19T12:00:00+03:00",
+      "duration_minutes": 60,
+      "percent": 110,
+      "operation_id": "00000000-0000-0000-0000-000000000006"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000006",
+      "action": "create_temporary_basal",
+      "request_hash": "0475eee01443b883b63d1123d57f3925270612cddcd2aab4cfb3f70f06aa6543",
+      "result_id": "523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+      "revision": 1,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000006",
+      "action": "create_temporary_basal",
+      "request_hash": "0475eee01443b883b63d1123d57f3925270612cddcd2aab4cfb3f70f06aa6543",
+      "result_id": "523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+      "revision": 1,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/temporary-basals/523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+    "request": {
+      "expected_revision": 1,
+      "starts_at": "2026-10-19T12:00:00+03:00",
+      "ends_at": "2026-10-19T13:30:00+03:00",
+      "percent": 120,
+      "operation_id": "00000000-0000-0000-0000-000000000007"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000007",
+      "action": "edit_temporary_basal",
+      "request_hash": "5fd9d458c779d023bb4b9e7144e6b1967e9a0c5ba146dcab5fc6a2aeac712192",
+      "result_id": "523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+      "revision": 2,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000007",
+      "action": "edit_temporary_basal",
+      "request_hash": "5fd9d458c779d023bb4b9e7144e6b1967e9a0c5ba146dcab5fc6a2aeac712192",
+      "result_id": "523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+      "revision": 2,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/temporary-basals/523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e/delete",
+    "request": {
+      "expected_revision": 2,
+      "operation_id": "00000000-0000-0000-0000-000000000008"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000008",
+      "action": "delete_temporary_basal",
+      "request_hash": "63c9e7ad365f2816d143cd14d358741a5c3ae71ae36e6dc28879c3938baa3fb4",
+      "result_id": "523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+      "revision": 3,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 30000
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000008",
+      "action": "delete_temporary_basal",
+      "request_hash": "63c9e7ad365f2816d143cd14d358741a5c3ae71ae36e6dc28879c3938baa3fb4",
+      "result_id": "523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+      "revision": 3,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/temporary-basals/523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e/restore",
+    "request": {
+      "expected_revision": 3,
+      "operation_id": "00000000-0000-0000-0000-000000000009"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000009",
+      "action": "restore_temporary_basal",
+      "request_hash": "eb66d232fc386cb071ac2f0b1740ccfecec53a6c289a708d93508b2219fc5f95",
+      "result_id": "523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+      "revision": 4,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000009",
+      "action": "restore_temporary_basal",
+      "request_hash": "eb66d232fc386cb071ac2f0b1740ccfecec53a6c289a708d93508b2219fc5f95",
+      "result_id": "523e9b20-b6a2-44b6-aa6c-4e57fb22bc8e",
+      "revision": 4,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/products",
+    "request": {
+      "name": " Творог 😀 ",
+      "unit": "g",
+      "protein": "10,00",
+      "fat": "0",
+      "carbohydrate": null,
+      "calories": "123.45",
+      "portions": [
+        {
+          "id": "00000000-0000-0000-0000-000000000065",
+          "name": " Ложка ",
+          "quantity": "30,000"
+        }
+      ],
+      "operation_id": "00000000-0000-0000-0000-00000000000a"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-00000000000a",
+      "action": "create_product",
+      "request_hash": "1e3d76f5c54b4291b421a7e2c616ad176497ebee92115d4139153a6b35201d90",
+      "result_id": "50554662-0a00-40bf-8ae1-aec5f6177e66",
+      "revision": 1,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-00000000000a",
+      "action": "create_product",
+      "request_hash": "1e3d76f5c54b4291b421a7e2c616ad176497ebee92115d4139153a6b35201d90",
+      "result_id": "50554662-0a00-40bf-8ae1-aec5f6177e66",
+      "revision": 1,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/products/50554662-0a00-40bf-8ae1-aec5f6177e66",
+    "request": {
+      "name": "Творог новый",
+      "unit": "g",
+      "protein": "10,00",
+      "fat": "0",
+      "carbohydrate": null,
+      "calories": "123.45",
+      "portions": [
+        {
+          "id": "00000000-0000-0000-0000-000000000065",
+          "name": " Ложка ",
+          "quantity": "30,000"
+        }
+      ],
+      "expected_revision": 1,
+      "operation_id": "00000000-0000-0000-0000-00000000000b"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-00000000000b",
+      "action": "edit_product",
+      "request_hash": "a123dbd9ccd22571e84176bac1450b2936d3ec0e43ef914a3bdb3015ab9826b2",
+      "result_id": "50554662-0a00-40bf-8ae1-aec5f6177e66",
+      "revision": 2,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-00000000000b",
+      "action": "edit_product",
+      "request_hash": "a123dbd9ccd22571e84176bac1450b2936d3ec0e43ef914a3bdb3015ab9826b2",
+      "result_id": "50554662-0a00-40bf-8ae1-aec5f6177e66",
+      "revision": 2,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/meals",
+    "request": {
+      "occurred_at": "2026-10-19T12:34:56.789+03:00",
+      "category": "lunch",
+      "lines": [
+        {
+          "id": "00000000-0000-0000-0000-000000000066",
+          "kind": "product",
+          "name": "Творог",
+          "unit": "g",
+          "quantity": "30,00",
+          "basis_quantity": "100",
+          "protein": "10",
+          "fat": "0",
+          "carbohydrate": null,
+          "calories": "123.45",
+          "product_id": "50554662-0a00-40bf-8ae1-aec5f6177e66",
+          "product_revision": 1,
+          "portion": {
+            "id": "00000000-0000-0000-0000-000000000065",
+            "name": " Ложка ",
+            "quantity": "30,000"
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000067",
+          "kind": "one_off",
+          "name": " Суп ",
+          "protein": "0",
+          "calories": null
+        }
+      ],
+      "operation_id": "00000000-0000-0000-0000-00000000000c"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-00000000000c",
+      "action": "create_meal",
+      "request_hash": "1a38823fb82678e7923f62a298fad9bcb6fefb6039286c5096f089368597d77a",
+      "result_id": "5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+      "revision": 1,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-00000000000c",
+      "action": "create_meal",
+      "request_hash": "1a38823fb82678e7923f62a298fad9bcb6fefb6039286c5096f089368597d77a",
+      "result_id": "5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+      "revision": 1,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/meals/5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+    "request": {
+      "occurred_at": "2026-10-19T12:34:56.789+03:00",
+      "category": null,
+      "lines": [
+        {
+          "id": "00000000-0000-0000-0000-000000000066",
+          "kind": "product",
+          "name": "Творог",
+          "unit": "g",
+          "quantity": "30,00",
+          "basis_quantity": "100",
+          "protein": "10",
+          "fat": "0",
+          "carbohydrate": null,
+          "calories": "123.45",
+          "product_id": "50554662-0a00-40bf-8ae1-aec5f6177e66",
+          "product_revision": 1,
+          "portion": {
+            "id": "00000000-0000-0000-0000-000000000065",
+            "name": " Ложка ",
+            "quantity": "30,000"
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000067",
+          "kind": "one_off",
+          "name": " Суп ",
+          "protein": "0",
+          "calories": null
+        }
+      ],
+      "expected_revision": 1,
+      "operation_id": "00000000-0000-0000-0000-00000000000d"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-00000000000d",
+      "action": "edit_meal",
+      "request_hash": "4ce41c663dd417592e11e593719d6864eb1fd9b29a70d29c555b0c6c0d30cefc",
+      "result_id": "5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+      "revision": 2,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-00000000000d",
+      "action": "edit_meal",
+      "request_hash": "4ce41c663dd417592e11e593719d6864eb1fd9b29a70d29c555b0c6c0d30cefc",
+      "result_id": "5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+      "revision": 2,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/meals/5072c5c2-2f55-4471-8b5a-b2ffb4271a8e/delete",
+    "request": {
+      "expected_revision": 2,
+      "operation_id": "00000000-0000-0000-0000-00000000000e"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-00000000000e",
+      "action": "delete_meal",
+      "request_hash": "9e8ea81b84fa2112d5c715bcefce05ff7a142d9e356e4d1e509da7ccaa5035a3",
+      "result_id": "5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+      "revision": 3,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 30000
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-00000000000e",
+      "action": "delete_meal",
+      "request_hash": "9e8ea81b84fa2112d5c715bcefce05ff7a142d9e356e4d1e509da7ccaa5035a3",
+      "result_id": "5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+      "revision": 3,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/meals/5072c5c2-2f55-4471-8b5a-b2ffb4271a8e/restore",
+    "request": {
+      "expected_revision": 3,
+      "operation_id": "00000000-0000-0000-0000-00000000000f"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-00000000000f",
+      "action": "restore_meal",
+      "request_hash": "a9ea306fc9316a3c7aed2144511484e78fd7cd72e94720a422e96b1d82f08755",
+      "result_id": "5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+      "revision": 4,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-00000000000f",
+      "action": "restore_meal",
+      "request_hash": "a9ea306fc9316a3c7aed2144511484e78fd7cd72e94720a422e96b1d82f08755",
+      "result_id": "5072c5c2-2f55-4471-8b5a-b2ffb4271a8e",
+      "revision": 4,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/water",
+    "request": {
+      "volume_ml": 250,
+      "operation_id": "00000000-0000-0000-0000-000000000010"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000010",
+      "action": "create_water",
+      "request_hash": "a1845eaae2cddb17d577c66612fca4375fe2888bbc8d5e03098ce5de2830ab7e",
+      "result_id": "bce9e128-e58c-4252-845e-8ef7546453a8",
+      "revision": 1,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000010",
+      "action": "create_water",
+      "request_hash": "a1845eaae2cddb17d577c66612fca4375fe2888bbc8d5e03098ce5de2830ab7e",
+      "result_id": "bce9e128-e58c-4252-845e-8ef7546453a8",
+      "revision": 1,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/water/bce9e128-e58c-4252-845e-8ef7546453a8",
+    "request": {
+      "expected_revision": 1,
+      "volume_ml": 500,
+      "occurred_at": "2026-10-19T00:00:00+03:00",
+      "operation_id": "00000000-0000-0000-0000-000000000011"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000011",
+      "action": "edit_water",
+      "request_hash": "09a306eb0cd9439f7e622889bde9635e5af133b0e524f923f5c4a82c24fe35db",
+      "result_id": "bce9e128-e58c-4252-845e-8ef7546453a8",
+      "revision": 2,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000011",
+      "action": "edit_water",
+      "request_hash": "09a306eb0cd9439f7e622889bde9635e5af133b0e524f923f5c4a82c24fe35db",
+      "result_id": "bce9e128-e58c-4252-845e-8ef7546453a8",
+      "revision": 2,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/water/bce9e128-e58c-4252-845e-8ef7546453a8/delete",
+    "request": {
+      "expected_revision": 2,
+      "operation_id": "00000000-0000-0000-0000-000000000012"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000012",
+      "action": "delete_water",
+      "request_hash": "bdea6390436947da1a66b993d83a0a6b24581a4ac8026e50e4009b68006a9376",
+      "result_id": "bce9e128-e58c-4252-845e-8ef7546453a8",
+      "revision": 3,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 30000
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000012",
+      "action": "delete_water",
+      "request_hash": "bdea6390436947da1a66b993d83a0a6b24581a4ac8026e50e4009b68006a9376",
+      "result_id": "bce9e128-e58c-4252-845e-8ef7546453a8",
+      "revision": 3,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/water/bce9e128-e58c-4252-845e-8ef7546453a8/restore",
+    "request": {
+      "expected_revision": 3,
+      "operation_id": "00000000-0000-0000-0000-000000000013"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000013",
+      "action": "restore_water",
+      "request_hash": "e594f33a05ffdf5d289619ee61683eced955ac3bf1af6279a4e0689f3cd2ebdd",
+      "result_id": "bce9e128-e58c-4252-845e-8ef7546453a8",
+      "revision": 4,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000013",
+      "action": "restore_water",
+      "request_hash": "e594f33a05ffdf5d289619ee61683eced955ac3bf1af6279a4e0689f3cd2ebdd",
+      "result_id": "bce9e128-e58c-4252-845e-8ef7546453a8",
+      "revision": 4,
+      "completed_at": 1792400000000
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/water-settings",
+    "request": {
+      "expected_revision": 1,
+      "volumes_ml": [
+        500,
+        100
+      ],
+      "operation_id": "00000000-0000-0000-0000-000000000014"
+    },
+    "response": {
+      "operation_id": "00000000-0000-0000-0000-000000000014",
+      "action": "edit_water_settings",
+      "request_hash": "315bc0bf49330d02acf42e5591164428e039fe4af5e70884929830b0d1dc9c92",
+      "result_id": "00000000-0000-0000-0000-000000000001",
+      "revision": 2,
+      "completed_at": "2026-10-19T08:53:20.000Z",
+      "replayed": false,
+      "undo_remaining_ms": 0
+    },
+    "stored_receipt": {
+      "operation_id": "00000000-0000-0000-0000-000000000014",
+      "action": "edit_water_settings",
+      "request_hash": "315bc0bf49330d02acf42e5591164428e039fe4af5e70884929830b0d1dc9c92",
+      "result_id": "00000000-0000-0000-0000-000000000001",
+      "revision": 2,
+      "completed_at": 1792400000000
+    }
+  }
+]
