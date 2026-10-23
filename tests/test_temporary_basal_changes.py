@@ -35,8 +35,7 @@ def test_historical_edit_recalculates_neighbors_and_event_basal(diary):
 def test_delete_b_undo_deadline_and_preserved_history(diary, monkeypatch, elapsed, allowed):
     client, database = diary
     clock = [1800000000000]
-    monkeypatch.setattr('diary.basal.now_ms', lambda: clock[0])
-    monkeypatch.setattr('diary.entries.now_ms', lambda: clock[0])
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: clock[0])
     client.post('/api/temporary-basals', json=temporary())
     original_payload = temporary(starts_at='2026-10-19T11:00:00+03:00', duration_minutes=60, percent=0)
     b = client.post('/api/temporary-basals', json=original_payload).json()['result_id']

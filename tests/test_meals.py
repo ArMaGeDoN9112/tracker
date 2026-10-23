@@ -110,7 +110,7 @@ def test_delete_restore_deadline_and_late_receipts(diary, monkeypatch, elapsed, 
     client, _ = diary
     clock = 1792400000000
     monkeypatch.setattr('diary.meals.now_ms', lambda: clock)
-    monkeypatch.setattr('diary.entries.now_ms', lambda: clock)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: clock)
     payload = meal([line(client)])
     path = '/api/meals/' + client.post('/api/meals', json=payload).json()['result_id']
     before = client.get(path).json()

@@ -10,6 +10,20 @@ from diary.application.water import (
 from diary.infrastructure.water import SqliteWater, water_uow
 from diary.interfaces.http.water import WaterUseCases, WaterOutput, register_water, water_output
 from diary.security import now_ms
+from diary.application.basal import (
+    BasalOperations, CreateSchedule, CreateTemporaryBasal, DeleteTemporaryBasal,
+    EditTemporaryBasal, GetBasal, GetSchedules, GetTemporaryBasal, GetTemporaryBasals,
+    RestoreTemporaryBasal,
+)
+from diary.application.entries import (
+    CreateEntry, DeleteEntry, EditEntry, EntryOperations, GetDay, GetEntry,
+    GetEntryForm, GetMoscowTime, RestoreEntry,
+)
+from diary.application.operations import ReceiptRecord
+from diary.infrastructure.diary import diary_uow
+from diary.interfaces.http.entries import EntryUseCases, register_entries
+from diary.interfaces.http.basal import BasalUseCases, register_basal
+from diary.interfaces.http.outputs import ReceiptOutput, receipt_output as format_receipt
 
 
 def register_water_http(app: FastAPI, engine: Engine) -> None:
@@ -26,3 +40,28 @@ def day_water(connection: Connection, start: int, end: int) -> list[WaterOutput]
     # shortcut: nutrition-day owns the shared snapshot, move its UoW in stage 06.
     records = GetDayWater(SqliteWater(connection)).execute(WaterPeriod(start=start, end=end))
     return [water_output(record) for record in records]
+
+
+def register_diary_http(app: FastAPI, engine: Engine) -> None:
+    reads = lambda: diary_uow(engine)
+    writes = lambda: diary_uow(engine, write=True)
+    clock = lambda: now_ms()
+    new_id = lambda: str(uuid4())
+    entries = EntryOperations(writes, clock, new_id)
+    basal = BasalOperations(writes, clock, new_id)
+    register_entries(app, EntryUseCases(
+        create=CreateEntry(entries), edit=EditEntry(entries), delete=DeleteEntry(entries),
+        restore=RestoreEntry(entries), get=GetEntry(reads), day=GetDay(reads),
+        form=GetEntryForm(reads, clock), moscow_time=GetMoscowTime(),
+    ), clock)
+    register_basal(app, BasalUseCases(
+        schedules=GetSchedules(reads), basal=GetBasal(reads), temporary=GetTemporaryBasals(reads),
+        get_temporary=GetTemporaryBasal(reads), create_schedule=CreateSchedule(basal),
+        create_temporary=CreateTemporaryBasal(basal), edit_temporary=EditTemporaryBasal(basal),
+        delete_temporary=DeleteTemporaryBasal(basal), restore_temporary=RestoreTemporaryBasal(basal),
+    ), clock)
+
+
+def receipt_output(receipt: ReceiptRecord, replayed: bool) -> ReceiptOutput:
+    # shortcut: products/meals still own their operations until stage 05.
+    return format_receipt(receipt, replayed, now_ms())

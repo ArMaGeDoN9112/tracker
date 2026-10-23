@@ -28,7 +28,7 @@ from diary.domain.nutrition import (
 )
 from diary.domain.precision import hundredths, rate_string
 from diary.domain.time import EPOCH, MOSCOW, milliseconds
-from diary.entries import receipt_output
+from diary.bootstrap import receipt_output
 from diary.interfaces.http.outputs import ReceiptOutput, timestamp
 from diary.glucose import Period
 from diary.security import now_ms

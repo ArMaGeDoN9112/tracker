@@ -36,6 +36,13 @@ class BasalChange(BaseModel):
     basal: str | None
 
 
+def effective_periods(periods: list[TemporaryBasalPeriod]) -> list[TemporaryBasalPeriod]:
+    return [row.model_copy(update={
+        "effective_ends_at": min(row.ends_at, periods[index + 1].starts_at)
+        if index + 1 < len(periods) else row.ends_at,
+    }) for index, row in enumerate(periods)]
+
+
 def basal_at(versions: list[BasalSchedule], instant: int, temporary: list[TemporaryBasalPeriod]) -> str | None:
     version = next((version for version in reversed(versions) if version.starts_at <= instant), None)
     if version is None:

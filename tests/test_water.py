@@ -70,7 +70,6 @@ def test_move_delete_restore_and_old_receipts(diary, monkeypatch, elapsed, statu
     client, _ = diary
     clock = 1792400000000
     monkeypatch.setattr('diary.bootstrap.now_ms', lambda: clock)
-    monkeypatch.setattr('diary.entries.now_ms', lambda: clock)
     payload = water(occurred_at='2026-10-19T23:59:59.999+03:00')
     path = '/api/water/' + client.post('/api/water', json=payload).json()['result_id']
     edit = water(volume_ml=500, occurred_at='2026-10-20T00:00:00+03:00', expected_revision=1)

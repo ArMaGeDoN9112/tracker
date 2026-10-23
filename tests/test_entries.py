@@ -133,7 +133,7 @@ def test_upgrade_previous_schema_preserves_account_and_session(tmp_path):
 def test_historical_moscow_times_and_server_clock(diary, monkeypatch):
     client, _ = diary
     monkeypatch.setenv("TZ", "America/Los_Angeles")
-    monkeypatch.setattr("diary.entries.now_ms", lambda: 1792357200000)
+    monkeypatch.setattr("diary.bootstrap.now_ms", lambda: 1792357200000)
     assert client.get("/api/entry-form").json()["local_time"] == "2026-10-19T00:00"
     candidates = client.get("/api/moscow-time", params={"local_time": "2014-10-26T01:30"}).json()["candidates"]
     assert candidates == ["2014-10-26T01:30:00+03:00", "2014-10-26T01:30:00+04:00"]
@@ -146,7 +146,7 @@ def test_historical_moscow_times_and_server_clock(diary, monkeypatch):
 
 def test_large_day_and_stable_tie_order(diary, monkeypatch):
     client, _ = diary
-    monkeypatch.setattr("diary.entries.now_ms", lambda: 1800000000000)
+    monkeypatch.setattr("diary.bootstrap.now_ms", lambda: 1800000000000)
     for _ in range(105):
         assert client.post("/api/entries", json=entry()).status_code == 200
     rows = client.get("/api/day?day=2026-10-19").json()["entries"]

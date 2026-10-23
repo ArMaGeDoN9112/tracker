@@ -17,13 +17,12 @@ from starlette.concurrency import run_in_threadpool
 from diary.db import database_engine
 from diary.domain.access import validate_login
 from diary.dto import CsrfOutput, ErrorOutput, LoginOutput, SessionOutput
-from diary.entries import register_entries
-from diary.basal import register_basal
+from diary.bootstrap import register_diary_http, register_water_http
+from diary.interfaces.http.errors import register_application_errors
 from diary.body_limit import BodyLimit
 from diary.glucose import register_glucose
 from diary.products import register_products
 from diary.meals import register_meals
-from diary.bootstrap import register_water_http
 from diary.export import register_export
 from diary.backup import register_backup_status
 from diary.security import (
@@ -71,6 +70,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
         engine.dispose()
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    register_application_errors(app)
     app.add_middleware(BodyLimit)
 
     def authorize(request: Request) -> Response | None:
@@ -250,11 +250,10 @@ def create_app(database: Path, origin: str) -> FastAPI:
         clear_cookie(response, SESSION_COOKIE)
         return response
 
-    register_entries(app, engine)
+    register_diary_http(app, engine)
     register_products(app, engine)
     register_meals(app, engine)
     register_water_http(app, engine)
-    register_basal(app, engine)
     register_glucose(app, engine)
     register_export(app, engine)
     register_backup_status(app, database)

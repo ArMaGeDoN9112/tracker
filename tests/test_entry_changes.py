@@ -33,7 +33,7 @@ def test_edit_and_move_preserve_creation_and_untouched_time(diary):
 def test_delete_and_undo_server_deadline(diary, monkeypatch, elapsed, allowed):
     client, _ = diary
     clock = [1800000000000]
-    monkeypatch.setattr('diary.entries.now_ms', lambda: clock[0])
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: clock[0])
     payload = entry()
     created = client.post('/api/entries', json=payload).json()
     path = '/api/entries/' + created['result_id']
@@ -93,7 +93,7 @@ def test_concurrent_changes_accept_only_one_revision(diary, actions):
 def test_old_receipts_do_not_overwrite_later_edits_or_deletions(diary, monkeypatch):
     client, database = diary
     clock = [1800000000000]
-    monkeypatch.setattr('diary.entries.now_ms', lambda: clock[0])
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: clock[0])
     created = client.post('/api/entries', json=entry()).json()
     path = '/api/entries/' + created['result_id']
     edit = entry(expected_revision=1, comment='First edit')

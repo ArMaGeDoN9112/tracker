@@ -7,13 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import Connection, Engine, select
 
 from diary.application.basal import IntervalInput
-from diary.basal import ScheduleOutput, schedules, temporary_basals, temporary_output
+from diary.interfaces.http.basal import ScheduleOutput, temporary_output
+from diary.infrastructure.diary import schedules, temporary_basals
 from diary.domain.basal import TemporaryBasalPeriod
 from diary.domain.entries import EntryRecord, Reason
 from diary.domain.nutrition import MealRecord
 from diary.domain.precision import rate_string
 from diary.domain.products import ProductRecord
-from diary.entries import entry_output
+from diary.interfaces.http.entries import entry_output
 from diary.interfaces.http.outputs import timestamp
 from diary.meals import MealLineOutput, MealOutput, meal_lines, meal_output
 from diary.products import ProductOutput, product_output

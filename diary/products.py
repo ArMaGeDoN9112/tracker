@@ -12,7 +12,7 @@ from diary.application.operations import OperationAction, ReceiptRecord
 from diary.application.products import EditProductInput, PortionInput, ProductInput
 from diary.domain.precision import hundredths, rate_string
 from diary.domain.products import ProductRecord
-from diary.entries import receipt_output
+from diary.bootstrap import receipt_output
 from diary.interfaces.http.outputs import ReceiptOutput, timestamp
 from diary.security import now_ms
 from diary.tables import operation_receipt, product, product_portion
