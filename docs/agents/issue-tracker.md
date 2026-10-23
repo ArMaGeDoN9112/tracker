@@ -36,5 +36,8 @@ When fetching a ticket, read its referenced file.
 - Before removing a completed feature directory, move unfinished criteria to
   an active effort, update dependencies and links, and verify the old files
   are recoverable from a committed Git revision. Keep the revision reference.
-- Remove completed specs, maps, tickets and acceptance images from the working
-  tree after that transfer. Git history is the archive; no duplicate archive folder.
+- Preserve the overall interview specification and decision map in
+  `.scratch/tracker/spec.md` and `.scratch/tracker/map.md`. They retain product
+  context across stages; a shortened roadmap does not replace them.
+- Remove feature-specific completed specs, maps, tickets and acceptance images
+  after that transfer. Git history is their archive; no duplicate archive folder.
