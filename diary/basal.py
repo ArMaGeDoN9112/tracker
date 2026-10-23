@@ -15,7 +15,8 @@ from diary.domain.basal import BasalInterval, BasalSchedule, TemporaryBasalPerio
 from diary.domain.precision import hundredths, rate_string
 from diary.domain.time import milliseconds
 from diary.dto import ScheduleConflictOutput
-from diary.entries import ReceiptOutput, TemporaryBasalOutput, receipt_output, timestamp
+from diary.entries import TemporaryBasalOutput, receipt_output
+from diary.interfaces.http.outputs import ReceiptOutput, timestamp
 from diary.security import now_ms
 from diary.tables import basal_interval, basal_schedule, operation_receipt, temporary_basal
 

@@ -13,12 +13,15 @@ from diary.domain.entries import EntryRecord, Reason
 from diary.domain.nutrition import MealRecord
 from diary.domain.precision import rate_string
 from diary.domain.products import ProductRecord
-from diary.entries import entry_output, timestamp
+from diary.entries import entry_output
+from diary.interfaces.http.outputs import timestamp
 from diary.meals import MealLineOutput, MealOutput, meal_lines, meal_output
 from diary.products import ProductOutput, product_output
 from diary.security import now_ms
 from diary.tables import account, entry, meal, product, temporary_basal, water, water_settings
-from diary.water import WaterOutput, WaterRecord, WaterSettingsInput, WaterSettingsOutput, water_output
+from diary.application.water import WaterSettingsInput, WaterSettingsOutput
+from diary.domain.water import WaterRecord
+from diary.interfaces.http.water import WaterOutput, water_output
 
 
 Timestamp = Annotated[str, Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$", json_schema_extra={"format": "date-time"})]

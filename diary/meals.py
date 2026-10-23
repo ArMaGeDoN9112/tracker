@@ -28,11 +28,13 @@ from diary.domain.nutrition import (
 )
 from diary.domain.precision import hundredths, rate_string
 from diary.domain.time import EPOCH, MOSCOW, milliseconds
-from diary.entries import ReceiptOutput, receipt_output, timestamp
+from diary.entries import receipt_output
+from diary.interfaces.http.outputs import ReceiptOutput, timestamp
 from diary.glucose import Period
 from diary.security import now_ms
 from diary.tables import meal, meal_line, operation_receipt, water
-from diary.water import WaterOutput, day_water
+from diary.interfaces.http.water import WaterOutput
+from diary.bootstrap import day_water
 
 
 class MealLineOutput(MealLineInput):

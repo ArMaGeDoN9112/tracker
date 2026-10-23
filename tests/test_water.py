@@ -9,13 +9,13 @@ def water(**changes):
 
 def test_quick_water_uses_server_time_and_replays_without_duplicates(diary, monkeypatch):
     client, _ = diary
-    monkeypatch.setattr('diary.water.now_ms', lambda: 1792400000000)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: 1792400000000)
     payload = water()
     first = client.post('/api/water', json=payload)
     assert first.status_code == 200
     saved = client.get('/api/water/' + first.json()['result_id']).json()
     assert saved['occurred_at'] == saved['created_at'] == '2026-10-19T08:53:20.000Z'
-    monkeypatch.setattr('diary.water.now_ms', lambda: 1792486400000)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: 1792486400000)
     assert client.post('/api/water', json=payload).json()['replayed'] is True
     second = client.post('/api/water', json=water(occurred_at=saved['occurred_at'])).json()
     assert second['result_id'] != first.json()['result_id']
@@ -69,7 +69,7 @@ def test_unique_buttons_and_maximum_volume(diary):
 def test_move_delete_restore_and_old_receipts(diary, monkeypatch, elapsed, status):
     client, _ = diary
     clock = 1792400000000
-    monkeypatch.setattr('diary.water.now_ms', lambda: clock)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: clock)
     monkeypatch.setattr('diary.entries.now_ms', lambda: clock)
     payload = water(occurred_at='2026-10-19T23:59:59.999+03:00')
     path = '/api/water/' + client.post('/api/water', json=payload).json()['result_id']
@@ -93,7 +93,7 @@ def test_move_delete_restore_and_old_receipts(diary, monkeypatch, elapsed, statu
 def test_moscow_boundaries_and_stable_order_and_no_implicit_water(diary, monkeypatch):
     from test_meals import meal
     client, _ = diary
-    monkeypatch.setattr('diary.water.now_ms', lambda: 1792400000000)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: 1792400000000)
     for at in ['2026-10-18T23:59:59.999+03:00', '2026-10-19T00:00:00+03:00', '2026-10-19T00:00:00+03:00', '2026-10-20T00:00:00+03:00']:
         assert client.post('/api/water', json=water(occurred_at=at)).status_code == 200
     day = client.get('/api/nutrition-day?day=2026-10-19').json()
@@ -122,7 +122,9 @@ def test_rollback_and_retry(diary, settings, fault):
     hook, listener = ('commit', fail_commit) if fault == 'commit' else ('before_cursor_execute', fail_write)
     event.listen(Engine, hook, listener)
     try:
-        assert client.request(method, path, json=payload).status_code == 503
+        response = client.request(method, path, json=payload)
+        assert response.status_code == 503
+        assert response.json() == {'code': 'unavailable', 'message': 'Операция не сохранена. Повторите позже.', 'field': None}
     finally:
         event.remove(Engine, hook, listener)
     after = client.get('/api/water-settings').json() if settings else client.get('/api/nutrition-day?day=2026-10-19').json()

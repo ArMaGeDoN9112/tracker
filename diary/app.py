@@ -23,7 +23,7 @@ from diary.body_limit import BodyLimit
 from diary.glucose import register_glucose
 from diary.products import register_products
 from diary.meals import register_meals
-from diary.water import register_water
+from diary.bootstrap import register_water_http
 from diary.export import register_export
 from diary.backup import register_backup_status
 from diary.security import (
@@ -253,7 +253,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
     register_entries(app, engine)
     register_products(app, engine)
     register_meals(app, engine)
-    register_water(app, engine)
+    register_water_http(app, engine)
     register_basal(app, engine)
     register_glucose(app, engine)
     register_export(app, engine)

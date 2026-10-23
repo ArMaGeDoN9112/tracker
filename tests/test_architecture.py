@@ -8,7 +8,7 @@ import pytest
 # Explicit pure dependencies: new I/O libraries must stay in adapters.
 PURE_IMPORTS = {
     "__future__", "base64", "binascii", "datetime", "enum", "fractions",
-    "re", "typing", "uuid", "zoneinfo", "pydantic",
+    "re", "typing", "uuid", "zoneinfo", "pydantic", "dataclasses", "hashlib", "json",
 }
 
 

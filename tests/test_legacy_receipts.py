@@ -32,6 +32,7 @@ def test_saved_receipts_replay_after_migration_and_restart_without_writes(diary,
     migrate(database)
     migrate(database)
     monkeypatch.setattr('diary.entries.now_ms', lambda: 1792400000000 + elapsed)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: 1792400000000 + elapsed)
     with TestClient(create_app(database, ORIGIN), base_url=ORIGIN) as restarted:
         restarted.cookies.update(client.cookies)
         restarted.headers.update(client.headers)

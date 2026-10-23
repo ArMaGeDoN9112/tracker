@@ -17,10 +17,7 @@ from diary.domain.time import EPOCH, MOSCOW, milliseconds
 from diary.dto import EntryFormOutput, MoscowTimeOutput
 from diary.security import now_ms
 from diary.tables import entry, operation_receipt
-
-
-def timestamp(value: int) -> str:
-    return (EPOCH + timedelta(milliseconds=value)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+from diary.interfaces.http.outputs import ReceiptOutput, timestamp, receipt_output as format_receipt
 
 
 class EntryOutput(BaseModel):
@@ -64,25 +61,8 @@ class BasalChangeOutput(BaseModel):
     basal: str | None
 
 
-class ReceiptOutput(BaseModel):
-    operation_id: UUID
-    action: OperationAction
-    request_hash: str
-    result_id: UUID
-    revision: int
-    completed_at: str = Field(json_schema_extra={"format": "date-time"})
-    replayed: bool
-    undo_remaining_ms: int = 0
-
-
 def receipt_output(receipt: ReceiptRecord, replayed: bool) -> ReceiptOutput:
-    return ReceiptOutput(
-        operation_id=UUID(receipt.operation_id), action=receipt.action, request_hash=receipt.request_hash,
-        result_id=UUID(receipt.result_id), revision=receipt.revision, completed_at=timestamp(receipt.completed_at),
-        replayed=replayed,
-        undo_remaining_ms=max(0, min(30000, receipt.completed_at + 30000 - now_ms()))
-        if receipt.action in (OperationAction.DELETE_ENTRY, OperationAction.DELETE_TEMPORARY_BASAL, OperationAction.DELETE_MEAL, OperationAction.DELETE_WATER) else 0,
-    )
+    return format_receipt(receipt, replayed, now_ms())
 
 
 def entry_output(row: EntryRecord, basal: str | None) -> EntryOutput:

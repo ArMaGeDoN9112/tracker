@@ -1,7 +1,12 @@
+import hashlib
+import json
 from enum import StrEnum
+from typing import Protocol
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from diary.application.errors import OperationConflict
 
 
 class OperationAction(StrEnum):
@@ -48,3 +53,33 @@ class OperationInput(BaseModel):
 
 class RevisionInput(OperationInput):
     expected_revision: int = Field(ge=1, le=9223372036854775806)
+
+
+class ReceiptResult(BaseModel):
+    receipt: ReceiptRecord
+    replayed: bool
+
+
+class ReceiptStore(Protocol):
+    def get(self, operation_id: str) -> ReceiptRecord | None: ...
+    def add(self, receipt: ReceiptRecord) -> None: ...
+
+
+def request_hash(normalized: dict[str, object]) -> str:
+    return hashlib.sha256(json.dumps(normalized, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
+
+
+def replay_receipt(store: ReceiptStore, action: OperationAction, operation_id: str,
+                   normalized: dict[str, object]) -> ReceiptRecord | None:
+    receipt = store.get(operation_id)
+    if receipt is not None and (receipt.action != action or receipt.request_hash != request_hash(normalized)):
+        raise OperationConflict()
+    return receipt
+
+
+def save_receipt(store: ReceiptStore, action: OperationAction, operation_id: str,
+                 normalized: dict[str, object], result_id: str, revision: int, now: int) -> ReceiptRecord:
+    receipt = ReceiptRecord(operation_id=operation_id, action=action, request_hash=request_hash(normalized),
+                            result_id=result_id, revision=revision, completed_at=now)
+    store.add(receipt)
+    return receipt
