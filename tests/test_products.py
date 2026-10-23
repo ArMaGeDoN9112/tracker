@@ -11,6 +11,30 @@ def product(**changes):
             "portions": [{"id": str(uuid4()), "name": "Пачка", "quantity": "180"}], **changes}
 
 
+def legacy_product(database):
+    from sqlalchemy import insert
+    from diary.db import database_engine
+    from diary.tables import product as product_table, product_portion
+    identifier, portion_id = str(uuid4()), str(uuid4())
+    engine = database_engine(database)
+    try:
+        with engine.begin() as connection:
+            connection.execute(insert(product_table).values(
+                id=identifier, name='Творог', unit='g', protein=1000, fat=500,
+                carbohydrate=2000, calories=18000, archived=False, revision=1, created_at=0, updated_at=0))
+            connection.execute(insert(product_portion).values(
+                product_id=identifier, id=portion_id, position=0, name='Пачка', quantity=18000))
+    finally:
+        engine.dispose()
+    portion = {'id': portion_id, 'name': 'Пачка', 'quantity': '180.00'}
+    values = {'name': 'Творог', 'unit': 'g', 'protein': '10.00', 'fat': '5.00', 'carbohydrate': '20.00', 'calories': '180.00'}
+    source = {**values, 'id': str(uuid4()), 'kind': 'product', 'quantity': '30', 'basis_quantity': '100',
+              'product_id': identifier, 'product_revision': 1, 'portion': portion}
+    catalog = [{**values, 'id': identifier, 'photo': None, 'portions': [portion], 'archived': False,
+                'revision': 1, 'created_at': '1970-01-01T00:00:00.000Z', 'updated_at': '1970-01-01T00:00:00.000Z'}]
+    return source, catalog
+
+
 def test_catalog_create_read_and_replay(diary):
     client, _ = diary
     assert client.get('/api/products').json() == []
@@ -26,6 +50,37 @@ def test_catalog_create_read_and_replay(diary):
     assert (saved['name'], saved['protein'], saved['fat'], saved['carbohydrate'], saved['calories']) == ('Творог', '10.00', '5.00', '0.00', None)
     assert saved['portions'] == [{**payload['portions'][0], 'quantity': '180.00'}]
     assert client.post('/api/products', json={**payload, 'name': 'Другое'}).status_code == 409
+
+
+@pytest.mark.parametrize('photo', [
+    'https://example.com/food.jpg', 'data:image/svg+xml;base64,PHN2Zz4=',
+    'data:image/jpeg;base64,not base64', 'data:image/jpeg;base64,aGVsbG8=',
+    'data:image/jpeg;base64,' + 'A' * 45000,
+])
+def test_invalid_photo_does_not_create_product(diary, photo):
+    client, _ = diary
+    response = client.post('/api/products', json=product(photo=photo))
+    assert response.status_code == 422
+    assert response.json()['field'] == 'photo'
+    assert client.get('/api/products').json() == []
+
+
+def test_photo_is_preserved_for_older_clients_and_can_be_removed(diary):
+    client, database = diary
+    photo = 'data:image/jpeg;base64,/9j/2Q=='
+    payload = product(photo=photo)
+    created = client.post('/api/products', json=payload)
+    assert created.status_code == 200
+    path = '/api/products/' + created.json()['result_id']
+    assert client.get(path).json()['photo'] == photo
+    assert client.post('/api/products', json=payload).json()['replayed'] is True
+    assert client.put(path, json=product(expected_revision=1)).status_code == 200
+    assert client.get(path).json()['photo'] == photo
+    from diary.db import migrate
+    migrate(database)
+    assert client.get('/api/export').json()['products'][0]['photo'] == photo
+    assert client.put(path, json=product(expected_revision=2, photo=None)).status_code == 200
+    assert client.get(path).json()['photo'] is None
 
 
 def test_edit_portions_archive_restore_and_old_receipts(diary):

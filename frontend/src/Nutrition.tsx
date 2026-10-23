@@ -73,7 +73,7 @@ function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; onProdu
     </li>)}</ol><TotalsView totals={meal.totals} /></>
 }
 
-export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { authorized: boolean; visible: boolean; day: string; onDay: (day: string) => void; csrfToken: () => Promise<string> }) {
+export function Nutrition({ authorized, visible, catalogVisible, day, onDay, csrfToken }: { authorized: boolean; visible: boolean; catalogVisible: boolean; day: string; onDay: (day: string) => void; csrfToken: () => Promise<string> }) {
   const [lines, setLines] = useState<DraftLine[]>([])
   const [localTime, setLocalTime] = useState('')
   const [category, setCategory] = useState('')
@@ -97,6 +97,7 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
   const [conversionUnit, setConversionUnit] = useState<'g' | 'ml'>('g')
   const [productSeed, setProductSeed] = useState<ProductSeed | null>(null)
   const [catalogEditing, setCatalogEditing] = useState(false)
+  const [choosingProduct, setChoosingProduct] = useState(false)
   const [summaryGeneration, setSummaryGeneration] = useState(0)
   const sending = useRef(false)
   const generation = useRef(0)
@@ -155,6 +156,7 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
       setLines(rows => [...rows, { id: crypto.randomUUID(), kind: 'product', name, unit, quantity: '100', basis_quantity: '100.00',
         protein, fat, carbohydrate, calories, product_id: id, product_revision: revision, portion: null, portions }])
       setNotice('Продукт добавлен в состав.')
+      setChoosingProduct(false)
       requestAnimationFrame(() => document.getElementById('meal-form-title')?.focus())
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось загрузить продукт. Повторите выбор.') }
     finally { sending.current = false; setBusy(false) }
@@ -192,7 +194,7 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
         body: JSON.stringify({ line: conversion, unit: conversionUnit, basis_quantity: conversionQuantity || null }) })
       const result = await response.json()
       if (!response.ok) { setField(result.field ?? null); throw new Error(result.message) }
-      setProductSeed(result); setConversion(null)
+      setProductSeed(result); setConversion(null); setChoosingProduct(true)
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось рассчитать карточку.') }
     finally { sending.current = false; setBusy(false) }
   }
@@ -274,11 +276,12 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
       {undo && <><p role="status">Приём пищи удалён. Отмена доступна до 30 секунд по серверу.</p><button disabled={locked} onClick={() => void action(undo, 'restore')}>Отменить удаление приёма</button></>}
       {pending && pending.action !== 'save' && <><p role="status">{confirmed ? 'Операция подтверждена.' : 'Результат операции неизвестен.'}</p><button disabled={busy} onClick={() => void retry()}>Повторить операцию с приёмом</button>{error && <p role="alert">{error}</p>}</>}
     </div>, undoTarget)}
-    <div hidden={!authorized || !visible}>
+    <div hidden={!authorized || !visible || choosingProduct}>
       <div className="diary-layout nutrition-layout">
         <section aria-label="Форма приёма пищи">
           <span className="eyebrow">СЪЕДЕННАЯ ЕДА</span><h2 id="meal-form-title" tabIndex={-1}>{editing ? 'Изменение приёма пищи' : 'Новый приём пищи'}</h2>
-          <p className="muted">Добавьте продукт из каталога или разовую еду. Карточку можно сохранить отдельно — состав останется в форме.</p>
+          <p className="muted">Выберите еду по карточкам из каталога или добавьте разовую еду.</p>
+          <button id="choose-product" disabled={locked} onClick={() => { setChoosingProduct(true); requestAnimationFrame(() => document.getElementById('catalog-title')?.focus()) }}>Выбрать из каталога</button>
           {error && <p id="meal-error" role="alert" tabIndex={-1} className="error">{error}</p>}
           {!localTime && <button onClick={() => void initialize().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение питания</button>}
           <form onSubmit={save} aria-busy={busy}>
@@ -345,10 +348,17 @@ export function Nutrition({ authorized, visible, day, onDay, csrfToken }: { auth
         {!conversion.basis_quantity && !(conversion.basis_quantity === undefined && conversion.quantity) && <><label htmlFor="conversion-quantity">Фактическое количество исходной порции</label><input id="conversion-quantity" inputMode="decimal" value={conversionQuantity} onChange={e => setConversionQuantity(e.target.value)} disabled={busy} {...invalid('basis_quantity')} />{inlineError('basis_quantity')}
           <label htmlFor="conversion-unit">Единица исходной порции</label><select id="conversion-unit" value={conversionUnit} onChange={e => setConversionUnit(e.target.value as 'g' | 'ml')} disabled={busy}><option value="g">г</option><option value="ml">мл</option></select></>}
         <button disabled={locked || catalogEditing} onClick={() => void convertProduct()}>Рассчитать карточку</button>
-        <button disabled={locked || catalogEditing} onClick={() => { setProductSeed({ name: conversion.name, unit: conversionUnit, protein: null, fat: null, carbohydrate: null, calories: null }); setConversion(null) }}>Заполнить карточку независимо</button>
+        <button disabled={locked || catalogEditing} onClick={() => { setProductSeed({ name: conversion.name, unit: conversionUnit, protein: null, fat: null, carbohydrate: null, calories: null }); setConversion(null); setChoosingProduct(true) }}>Заполнить карточку независимо</button>
         <button disabled={busy} onClick={() => setConversion(null)}>Отменить создание карточки</button>
       </section>}
-      <ProductCatalog authorized={authorized} visible={visible} csrfToken={csrfToken} onSelect={selectProduct} selectionDisabled={locked} seed={productSeed} onEditingChange={setCatalogEditing} />
+    </div>
+    <div hidden={!authorized || !(catalogVisible || (visible && choosingProduct))}>
+      {visible && choosingProduct && <>
+        <button disabled={locked} onClick={() => { setChoosingProduct(false); requestAnimationFrame(() => document.getElementById('choose-product')?.focus()) }}>Вернуться к приёму пищи</button>
+        <p className="muted">Откройте карточку и нажмите «Добавить в приём». Состав и время приёма сохранятся.</p>
+        {error && <p role="alert" className="error">{error}</p>}
+      </>}
+      <ProductCatalog authorized={authorized} visible={catalogVisible || (visible && choosingProduct)} csrfToken={csrfToken} onSelect={visible && choosingProduct ? selectProduct : undefined} selectionDisabled={locked || catalogEditing} seed={productSeed} onEditingChange={setCatalogEditing} />
     </div>
   </>
 }

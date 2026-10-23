@@ -169,6 +169,7 @@ def test_upgrade_preserves_catalog_meals_deletions_receipts_and_session(tmp_path
     from diary.db import database_engine, migrate
     from test_access import ORIGIN, PASSWORD, login
     from test_entries import entry
+    from test_products import legacy_product
     database = tmp_path / 'previous.sqlite3'
     config = Config()
     config.set_main_option('script_location', str(Path(__file__).resolve().parents[1] / 'migrations'))
@@ -182,17 +183,18 @@ def test_upgrade_preserves_catalog_meals_deletions_receipts_and_session(tmp_path
         login(client)
         client.headers.update({'Origin': ORIGIN, 'X-CSRF-Token': client.get('/api/auth/csrf').json()['csrf_token']})
         assert client.post('/api/entries', json=entry(comment='Прежний дневник')).status_code == 200
-        source = line(client)
+        source, catalog = legacy_product(database)
         payload = meal([source])
         receipt = client.post('/api/meals', json=payload).json()
         path = '/api/meals/' + receipt['result_id']
         deleted_path = '/api/meals/' + client.post('/api/meals', json=meal([source])).json()['result_id']
         assert client.post(deleted_path + '/delete', json={'operation_id': str(uuid4()), 'expected_revision': 1}).status_code == 200
-        routes = [path, deleted_path, '/api/day?day=2026-10-19', '/api/products']
+        routes = [path, deleted_path, '/api/day?day=2026-10-19']
         before = [client.get(route).json() for route in routes]
         migrate(database)
         migrate(database)
         assert [client.get(route).json() for route in routes] == before
+        assert client.get('/api/products').json() == catalog
         day = client.get('/api/nutrition-day?day=2026-10-19').json()
         assert day['meals'] == [before[0]]
         assert day['water'] == []

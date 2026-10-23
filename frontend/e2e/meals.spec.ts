@@ -11,6 +11,7 @@ async function start(page: Page) {
   await expect(page.getByLabel('Время приёма — Москва')).not.toHaveValue('')
 }
 async function createProduct(page: Page, name = `ТВОРОГ ${crypto.randomUUID()}`) {
+  await page.getByRole('button', { name: 'Выбрать из каталога', exact: true }).click()
   await page.getByRole('button', { name: 'Новый продукт', exact: true }).click()
   await page.getByLabel('Название продукта', { exact: true }).fill(name)
   await page.getByLabel('Белки, г на 100 г', { exact: true }).fill('10')
@@ -23,10 +24,16 @@ async function createProduct(page: Page, name = `ТВОРОГ ${crypto.randomUUI
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Продукт сохранён' })).toBeVisible()
   await page.getByLabel('Поиск продуктов', { exact: true }).fill(name.toLocaleLowerCase('ru'))
+  await page.getByRole('button', { name: 'Вернуться к приёму пищи', exact: true }).click()
   return name
 }
 async function choose(page: Page, name: string) {
+  const loaded = page.waitForResponse(response => response.url().endsWith('/api/products') && response.request().method() === 'GET')
+  await page.getByRole('button', { name: 'Выбрать из каталога', exact: true }).click()
+  await loaded
   const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
+  await expect(card).toBeVisible()
+  if (!await card.getByRole('button', { name: 'Добавить в приём', exact: true }).isVisible()) await card.locator('summary').click()
   await card.getByRole('button', { name: 'Добавить в приём', exact: true }).click()
 }
 const form = (page: Page) => page.getByRole('region', { name: 'Форма приёма пищи', exact: true })
@@ -41,9 +48,11 @@ test('catalog composition, independent product creation, frozen draft, calculato
   await expect(form(page)).toContainText('162.00 ккал')
   // Editing the card cannot rewrite a product already picked into the meal.
   const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
+  await page.getByRole('link', { name: 'Каталог', exact: true }).click()
   await card.getByRole('button', { name: 'Изменить', exact: true }).click()
   await page.getByLabel('Калории, ккал на 100 г', { exact: true }).fill('200')
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
+  await page.getByRole('link', { name: 'Питание', exact: true }).click()
   await expect(form(page)).toContainText('162.00 ккал')
   const second = await createProduct(page)
   await expect(page.getByLabel('Количество строки 1, г')).toHaveValue('90')
@@ -75,6 +84,7 @@ test('catalog composition, independent product creation, frozen draft, calculato
   await choose(page, second)
   await page.getByRole('button', { name: 'Отменить приём', exact: true }).click()
   await expect(page.getByLabel('Количество строки 1, г')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Каталог', exact: true }).click()
   await expect(page.getByRole('heading', { name: second, exact: true })).toBeVisible()
 })
 
@@ -251,10 +261,17 @@ test('explicit new selection reads current card while earlier snapshot stays fro
   const fields = form(page).locator('.meal-line')
   await expect(fields.nth(0)).toContainText('180.00 ккал')
   await expect(fields.nth(1)).toContainText('200.00 ккал')
+  const loaded = page.waitForResponse(response => response.url().endsWith('/api/products') && response.request().method() === 'GET')
+  await page.getByRole('button', { name: 'Выбрать из каталога', exact: true }).click()
+  await loaded
+  const staleCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
+  await expect(page.getByRole('status').filter({ hasText: 'Загружаем каталог' })).toHaveCount(0)
+  if (!await staleCard.getByRole('button', { name: 'Добавить в приём', exact: true }).isVisible()) await staleCard.locator('summary').click()
   expect((await page.request.put(`/api/products/${id}`, { headers, data: {
     ...values, calories: '200', archived: true, operation_id: crypto.randomUUID(), expected_revision: revision + 1,
   } })).ok()).toBeTruthy()
-  await choose(page, name)
-  await expect(page.locator('#meal-error')).toContainText('Продукт в архиве')
+  await staleCard.getByRole('button', { name: 'Добавить в приём', exact: true }).click()
+  await expect(page.getByRole('alert').filter({ hasText: 'Продукт в архиве' })).toBeVisible()
+  await page.getByRole('button', { name: 'Вернуться к приёму пищи', exact: true }).click()
   await expect(fields).toHaveCount(2)
 })

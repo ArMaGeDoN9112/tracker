@@ -1,3 +1,5 @@
+import base64
+import binascii
 import hashlib
 import json
 from typing import Literal
@@ -54,6 +56,22 @@ class ProductInput(NamedInput, OperationInput):
     calories: str | None = Field(max_length=10000)
     portions: list[PortionInput]
     archived: bool = False
+    photo: str | None = Field(default=None, max_length=45000)
+
+    @field_validator("photo")
+    @classmethod
+    def photo_thumbnail(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.startswith("data:image/jpeg;base64,"):
+            raise ValueError("Фото должно быть JPEG-миниатюрой.")
+        try:
+            image = base64.b64decode(value.removeprefix("data:image/jpeg;base64,"), validate=True)
+        except binascii.Error as error:
+            raise ValueError("Некорректное фото.") from error
+        if not image.startswith(b"\xff\xd8\xff") or not image.endswith(b"\xff\xd9"):
+            raise ValueError("Некорректное JPEG-фото.")
+        return value
 
     @field_validator("protein", "fat", "carbohydrate", "calories")
     @classmethod
@@ -76,6 +94,7 @@ class ProductRecord(BaseModel):
     id: str
     name: str
     unit: Literal["g", "ml"]
+    photo: str | None
     protein: int | None
     fat: int | None
     carbohydrate: int | None
@@ -90,6 +109,7 @@ class ProductOutput(BaseModel):
     id: str
     name: str
     unit: Literal["g", "ml"]
+    photo: str | None = None
     protein: str | None
     fat: str | None
     carbohydrate: str | None
@@ -143,6 +163,8 @@ def register_products(app: FastAPI, engine: Engine) -> None:
     def save_product(payload: ProductInput, product_id: str | None = None) -> ReceiptOutput | JSONResponse:
         action = OperationAction.EDIT_PRODUCT if product_id else OperationAction.CREATE_PRODUCT
         normalized = payload.model_dump(exclude={"operation_id"})
+        if "photo" not in payload.model_fields_set:
+            normalized.pop("photo")
         normalized["product_id"] = product_id
         request_hash = hashlib.sha256(json.dumps(normalized, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
         with engine.connect() as connection:
@@ -155,7 +177,7 @@ def register_products(app: FastAPI, engine: Engine) -> None:
                 return receipt_output(receipt, True)
             now = now_ms()
             record = ProductRecord(
-                id=product_id or str(uuid4()), name=payload.name, unit=payload.unit,
+                id=product_id or str(uuid4()), name=payload.name, unit=payload.unit, photo=payload.photo,
                 protein=hundredths(payload.protein) if payload.protein is not None else None,
                 fat=hundredths(payload.fat) if payload.fat is not None else None,
                 carbohydrate=hundredths(payload.carbohydrate) if payload.carbohydrate is not None else None,
@@ -168,6 +190,8 @@ def register_products(app: FastAPI, engine: Engine) -> None:
                 if row is None:
                     return failure("not_found", "Продукт не найден.", 404)
                 current = ProductRecord.model_validate(row)
+                if "photo" not in payload.model_fields_set:
+                    record.photo = current.photo
                 if current.revision != payload.expected_revision:
                     return failure("revision_conflict", "Карточка изменена на другом устройстве. Загрузите актуальную для сравнения.", 409, "expected_revision")
                 if current.unit != payload.unit:

@@ -257,6 +257,7 @@ def test_upgrade_catalog_and_diary_preserves_history_and_session(tmp_path):
     from diary.db import database_engine, migrate
     from test_access import ORIGIN, PASSWORD, login
     from test_entries import entry
+    from test_products import legacy_product
     database = tmp_path / 'catalog.sqlite3'
     config = Config()
     config.set_main_option('script_location', str(Path(__file__).resolve().parents[1] / 'migrations'))
@@ -270,9 +271,8 @@ def test_upgrade_catalog_and_diary_preserves_history_and_session(tmp_path):
         login(client)
         client.headers.update({'Origin': ORIGIN, 'X-CSRF-Token': client.get('/api/auth/csrf').json()['csrf_token']})
         assert client.post('/api/entries', json=entry(comment='Прежняя история')).status_code == 200
-        source = line(client)
+        source, catalog = legacy_product(database)
         before = client.get('/api/day?day=2026-10-19').json()
-        catalog = client.get('/api/products').json()
         migrate(database)
         migrate(database)
         assert client.get('/api/day?day=2026-10-19').json() == before
