@@ -13,7 +13,7 @@ export type Totals = Record<Nutrient, Total>
 type Line = Values & { id: string; kind: 'product' | 'one_off'; name: string; unit: 'g' | 'ml' | null; quantity: string | null; basis_quantity: string | null; product_id: string | null; product_revision: number | null; portion: Portion | null }
 type DraftLine = Omit<Line, 'basis_quantity'> & { basis_quantity?: string | null; portions?: Portion[] }
 type Meal = { id: string; occurred_at: string; category: string | null; revision: number; deleted_at: string | null; lines: (Line & { totals: Values })[]; totals: Totals }
-type Day = { day: string; meals: Meal[]; totals: Totals }
+export type Day = { day: string; meals: Meal[]; totals: Totals; water: { id: string; occurred_at: string; volume_ml: number }[]; water_total_ml: number | null }
 type Pending = { path: string; method: string; body: string; action: 'save' | 'delete' | 'restore' }
 const categories = [['breakfast', 'Завтрак'], ['lunch', 'Обед'], ['dinner', 'Ужин'], ['snack', 'Перекус']]
 
@@ -56,14 +56,14 @@ function preview(lines: DraftLine[]): Totals | null {
     })) as Totals
   } catch { return null }
 }
-function TotalsView({ totals }: { totals: Totals }) {
+export function TotalsView({ totals }: { totals: Totals }) {
   return <dl className="meal-totals">{nutrients.map(([key, label, unit]) => <div key={key}><dt>{label}</dt><dd>
     {totals[key].value === null ? 'Неизвестно' : `${totals[key].incomplete ? 'Известно ' : ''}${totals[key].value} ${unit}`}
     {totals[key].incomplete && '; данные неполные'}
     <small>Известных строк: {totals[key].known_count}; неизвестных: {totals[key].unknown_count}</small>
   </dd></div>)}</dl>
 }
-function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; onProduct?: (line: Line) => void; productDisabled?: boolean }) {
+export function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; onProduct?: (line: Line) => void; productDisabled?: boolean }) {
   return <><p>{moscowLabel(meal.occurred_at)} · {categories.find(([key]) => key === meal.category)?.[1] ?? 'Без категории'} · редакция {meal.revision}{meal.deleted_at && ' · Удалён'}</p>
     <ol>{meal.lines.map((line, index) => <li key={line.id}><strong>{line.name}</strong> · {line.quantity === null ? 'Целая порция; количество неизвестно' : `${line.quantity} ${line.unit === 'g' ? 'г' : 'мл'}`}
       <p>Основа: {line.basis_quantity === null ? 'исходная порция без известного количества' : `${line.basis_quantity} ${line.unit === 'g' ? 'г' : 'мл'}`} · {nutrients.map(([key, label, unit]) => `${label}: ${line[key] ?? 'неизвестно'}${line[key] === null ? '' : ` ${unit}`}`).join('; ')}</p>

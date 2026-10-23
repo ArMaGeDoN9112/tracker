@@ -10,6 +10,24 @@ def food(**values):
     return {'id': str(uuid4()), 'kind': 'one_off', 'name': 'Еда', **values}
 
 
+def test_summary_water_uses_moscow_days_and_excludes_deleted_events(diary):
+    client, _ = diary
+    ids = []
+    for at, volume in [('2026-02-01T20:59:59.999Z', 200), ('2026-02-01T21:00:00Z', 250),
+                       ('2026-02-02T20:59:59.999Z', 500), ('2026-02-02T21:00:00Z', 100)]:
+        response = client.post('/api/water', json={'operation_id': str(uuid4()), 'volume_ml': volume, 'occurred_at': at})
+        assert response.status_code == 200
+        ids.append(response.json()['result_id'])
+    path = '/api/nutrition-summary?period=custom&start=2026-02-01&end=2026-02-28'
+    summary = client.get(path).json()
+    assert len(summary['days']) == 28
+    assert [day['water_total_ml'] for day in summary['days'][:4]] == [200, 750, 100, None]
+    assert summary['food_days'] == 0
+    assert client.post(f'/api/water/{ids[1]}/delete', json={
+        'operation_id': str(uuid4()), 'expected_revision': 1}).status_code == 200
+    assert client.get(path).json()['days'][1]['water_total_ml'] == 500
+
+
 def test_summary_known_days_incomplete_days_and_zero(diary):
     client, _ = diary
     for day, lines in [('2026-10-17', [food(carbohydrate='10', protein='0'), food()]),

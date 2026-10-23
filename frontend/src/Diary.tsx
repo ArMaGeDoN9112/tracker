@@ -3,6 +3,7 @@ import { privateFetch } from './access'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { BasalSchedules } from './BasalSchedules'
 import { GlucoseCharts } from './GlucoseCharts'
+import { DayCalendar } from './DayCalendar'
 import { TemporaryBasal, type TemporaryPeriod } from './TemporaryBasal'
 import { localMinute, basalText, moscowLabel } from './time'
 
@@ -256,6 +257,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? `${name}-error` : undefined })
   const fieldError = (name: string) => field === name && error ? <p id={`${name}-error`} role="alert" className="error field-error">{error}</p> : null
   return <div hidden={!active}>
+    <div hidden={section !== 'diary'}><DayCalendar active={active && section === 'diary'} day={day} generation={entryGeneration + basalGeneration} onDay={onDay} /></div>
     <div hidden={section !== 'diary'} className="diary-layout">
     <section className="diary-composer" aria-label="Ввод записи">
     <span className="eyebrow">БЫСТРЫЙ ВВОД</span>
@@ -264,7 +266,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       <fieldset aria-label="Данные записи" {...invalid('entry-fields')} disabled={busy || pending !== null || pendingAction !== null}>
         <div className="entry-numbers"><div className="glucose-field">
         <label htmlFor="glucose">Сахар, ммоль/л</label>
-        <input id="glucose" inputMode="decimal" autoFocus value={glucose} onChange={e => setGlucose(e.target.value)} {...invalid('glucose')} />
+        <input id="glucose" inputMode="decimal" value={glucose} onChange={e => setGlucose(e.target.value)} {...invalid('glucose')} />
         {fieldError('glucose')}
         </div><div>
         <label htmlFor="bolus">Подколка, ед.</label>

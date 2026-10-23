@@ -16,7 +16,7 @@ from diary.entries import EPOCH, MOSCOW, EntryInput, OperationInput, ReceiptOutp
 from diary.glucose import Period
 from diary.products import NamedInput, PortionInput, ProductInput
 from diary.security import now_ms
-from diary.tables import meal, meal_line, operation_receipt
+from diary.tables import meal, meal_line, operation_receipt, water
 from diary.water import WaterOutput, day_water
 
 NUTRIENTS = ("protein", "fat", "carbohydrate", "calories")
@@ -212,6 +212,7 @@ class NutritionSummaryDay(BaseModel):
     day: date
     meal_count: int
     totals: NutritionTotals
+    water_total_ml: int | None
 
 
 class NutrientAverage(BaseModel):
@@ -301,8 +302,13 @@ def register_meals(app: FastAPI, engine: Engine) -> None:
         days: dict[date, list[MealLineRecord]] = {
             date.fromordinal(ordinal): [] for ordinal in range(start.toordinal(), end.toordinal() + 1)}
         meals: dict[date, set[str]] = {day: set() for day in days}
+        water_totals: dict[date, int] = {}
         with engine.connect() as connection:
             connection.exec_driver_sql("BEGIN")
+            for event in connection.execute(select(water.c.occurred_at, water.c.volume_ml).where(
+                water.c.deleted_at.is_(None), water.c.occurred_at >= lower, water.c.occurred_at < upper)):
+                day = (EPOCH + timedelta(milliseconds=event.occurred_at)).astimezone(MOSCOW).date()
+                water_totals[day] = water_totals.get(day, 0) + event.volume_ml
             rows = connection.execute(select(meal_line, meal.c.occurred_at).join(meal, meal_line.c.meal_id == meal.c.id).where(
                 meal.c.deleted_at.is_(None), meal.c.occurred_at >= lower, meal.c.occurred_at < upper)).mappings()
             for row in rows:
@@ -324,7 +330,8 @@ def register_meals(app: FastAPI, engine: Engine) -> None:
                                              incomplete=incomplete_days > 0)
         return NutritionSummaryOutput(start=start, end=end, food_days=sum(bool(ids) for ids in meals.values()),
                                       meal_count=sum(len(ids) for ids in meals.values()), averages=NutritionAverages(**averages),
-                                      days=[NutritionSummaryDay(day=day, meal_count=len(meals[day]), totals=nutrition_totals(lines))
+                                      days=[NutritionSummaryDay(day=day, meal_count=len(meals[day]), totals=nutrition_totals(lines),
+                                                                water_total_ml=water_totals.get(day))
                                             for day, lines in days.items()])
 
     @app.get("/api/meals/{meal_id}/repeat-form", response_model=RepeatMealOutput)

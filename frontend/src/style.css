@@ -57,6 +57,35 @@ button:disabled { opacity: .65; cursor: wait; }
 .water-buttons { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
 .water-buttons button { width:auto; flex:1 1 auto; }
 .error { color: #ffb6b6; overflow-wrap: anywhere; }
+.day-calendar { min-width:0; margin-bottom:24px; padding:20px; }
+.day-calendar h2 { margin:8px 0 20px; }
+.calendar-navigation { display:flex; gap:12px; align-items:end; }
+.calendar-navigation>div { flex:1; min-width:0; }
+.calendar-navigation label { display:block; margin-bottom:8px; }
+.calendar-navigation button { width:48px; flex:none; margin:0; }
+.calendar-legend { font-size:.875rem; }
+.calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; }
+.calendar-weekday { padding:8px 0; text-align:center; color:var(--muted); font-size:.875rem; }
+.calendar-day { display:flex; flex-direction:column; justify-content:space-between; align-items:flex-start; gap:4px; min-width:0; min-height:100px; aspect-ratio:1; margin:0; padding:10px; border-color:var(--border); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; font-size:.875rem; }
+.calendar-day:hover { border-color:var(--accent); background:var(--surface); }
+.calendar-day time { font-size:1rem; font-weight:700; }
+.calendar-day[aria-current] time { color:var(--accent); text-decoration:underline; text-underline-offset:4px; }
+.calendar-day[aria-pressed=true] { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+.calendar-calories { color:var(--accent); }
+.calendar-water { color:#a9c9ff; }
+.calendar-details { margin-top:24px; padding:16px; min-width:0; overflow-wrap:anywhere; }
+.calendar-detail-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+.calendar-detail-heading h3 { margin:0; }
+.calendar-detail-heading button { width:auto; margin:0; }
+.calendar-details h4 { margin:24px 0 8px; }
+@media(max-width:1099px) {
+  .calendar-grid { gap:2px; }
+  .calendar-day { padding:6px 3px; font-size:.75rem; min-height:100px; aspect-ratio:auto; }
+}
+@media(max-width:767px) {
+  .day-calendar { padding:8px; }
+  .calendar-details { padding:8px; }
+}
 .glucose-charts { --chart-minimum:#a9c9ff; --chart-maximum:#e9be70; margin-top: 24px; padding: 0; border: 0; border-radius: 0; background: transparent; min-width:0; }
 .glucose-charts h2 { margin:8px 0 24px; font-size:1.5rem; font-weight:600; }
 .glucose-period { display:flex; flex-wrap:wrap; gap:16px; align-items:end; padding:20px; border:1px solid var(--border); border-radius:12px; background:var(--raised); }
