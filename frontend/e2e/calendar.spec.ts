@@ -48,6 +48,7 @@ test('month calendar opens the complete Moscow day without losing the draft', as
     const water = await open.locator('.calendar-water').boundingBox()
     const selected = await open.boundingBox()
     expect(water!.y + water!.height).toBeLessThanOrEqual(selected!.y + selected!.height)
+    expect((await open.locator('.calendar-calories').boundingBox())!.height).toBeLessThanOrEqual(21)
     if (process.env.DIARY_ACCEPTANCE_DIR) await calendar.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-${info.project.name}-${width}.png` })
   }
   await calendar.getByRole('button', { name: 'Следующий месяц' }).click()

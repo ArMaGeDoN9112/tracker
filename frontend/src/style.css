@@ -80,7 +80,7 @@ button:disabled { opacity: .65; cursor: wait; }
 .calendar-details h4 { margin:24px 0 8px; }
 @media(max-width:1099px) {
   .calendar-grid { gap:2px; }
-  .calendar-day { padding:6px 3px; font-size:.75rem; min-height:100px; aspect-ratio:auto; }
+  .calendar-day { padding:6px 1px; font-size:.75rem; min-height:100px; aspect-ratio:auto; }
 }
 @media(max-width:767px) {
   .day-calendar { padding:8px; }
