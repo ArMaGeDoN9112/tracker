@@ -59,7 +59,7 @@ test('catalog, Cyrillic search, portions and drafts survive navigation and login
 
 test('lost response after commit keeps exact request through navigation and login, explicit replay creates no duplicate', async ({ page }) => {
   const name = await newDraft(page)
-  await expect(page.getByRole('button', { name: 'Обновить каталог', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Обновить каталог', exact: true })).toHaveCount(0)
   const bodies: string[] = []
   page.on('request', request => { if (request.url().endsWith('/api/products') && request.method() === 'POST') bodies.push(request.postData()!) })
   await page.route('**/api/products', async route => {
@@ -161,9 +161,10 @@ test('save paused at CSRF cannot automatically continue under a new session', as
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await captured
   await context.clearCookies()
-  await page.clock.fastForward(60001)
+  await page.getByRole('link', { name: 'Графики', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await signIn(page)
+  await page.getByRole('link', { name: 'Каталог', exact: true }).click()
   let writes = 0
   page.on('request', request => { if (request.url().endsWith('/api/products') && request.method() === 'POST') writes++ })
   release()

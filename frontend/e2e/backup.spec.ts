@@ -24,7 +24,7 @@ test('settings show backup delay, local-only copy and sanitized failure', async 
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Черновик перед проверкой копий')
 })
 
-test('one backup state refreshes each minute and becomes unknown after a read failure', async ({ page }) => {
+test('backup state loads once and stays unchanged while the page is open', async ({ page }) => {
   await page.clock.install()
   let reads = 0
   let fail = false
@@ -48,17 +48,17 @@ test('one backup state refreshes each minute and becomes unknown after a read fa
   expect(reads).toBe(1)
   fail = true
   await page.clock.fastForward(60001)
-  await expect(backup).toContainText('Состояние резервирования неизвестно')
-  await expect(backup).not.toContainText('19.10.2026, 15:00:00 МСК')
+  await expect(backup).toContainText('19.10.2026, 15:00:00 МСК')
+  expect(reads).toBe(1)
   await page.getByRole('link', { name: 'Дневник', exact: true }).click()
-  await expect(page.getByRole('link', { name: 'Проверить резервирование' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Проверить резервирование' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await page.clock.fastForward(120001)
-  expect(reads).toBe(2)
+  expect(reads).toBe(1)
 })
 
-test('delayed older backup success cannot replace a newer unknown state', async ({ page }) => {
+test('delayed backup success from a previous login cannot replace a newer unknown state', async ({ page }) => {
   await page.clock.install()
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
@@ -75,7 +75,10 @@ test('delayed older backup success cannot replace a newer unknown state', async 
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   const backup = page.getByRole('region', { name: 'Резервное копирование' })
   await expect(backup.getByRole('status')).toContainText('Проверяем резервирование')
-  await page.clock.fastForward(60001)
+  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await expect(backup).toContainText('Состояние резервирования неизвестно')
   const previous = page.waitForResponse('**/api/backup-status')
   release()

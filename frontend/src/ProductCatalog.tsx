@@ -139,7 +139,6 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
       <p className="muted">Нажмите на карточку, чтобы посмотреть КБЖУ и порции.</p>
       <label htmlFor="product-search">Поиск продуктов</label><input id="product-search" type="search" value={search} onChange={event => setSearch(event.target.value)} />
       <button disabled={!!draft || busy || !!pending} onClick={() => open()}>Новый продукт</button>
-      <button onClick={() => void load().catch(() => {})} disabled={loading || busy}>Обновить каталог</button>
       {loading && <p role="status">Загружаем каталог…</p>}
       {loadError && <p role="alert" className="error">{loadError}</p>}
       {!loading && !loadError && rows.length === 0 && <p>{search ? 'Продукты не найдены.' : 'Каталог пуст.'}</p>}

@@ -57,7 +57,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       const result = await read<Day>(`/api/nutrition-day?day=${selected}`)
       if (sequence === generation.current && selected === selectedDay.current) setData(result)
     } catch (failure) {
-      if (sequence === generation.current) setDayError('Не удалось загрузить воду. Повторите обновление.')
+      if (sequence === generation.current) setDayError('Не удалось загрузить воду. Перезагрузите страницу.')
       throw failure
     } finally { if (sequence === generation.current) setLoading(false) }
   }
@@ -231,7 +231,6 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       {pending && (pending.action === 'save' || pending.action === 'settings') && <><p role="status">{confirmed ? 'Операция подтверждена.' : 'Результат запроса неизвестен.'} Явный повтор отправит прежние данные, время и UUID.</p><button disabled={busy} onClick={() => void retry()}>Повторить запрос воды</button></>}
       {notice && <p role="status">{notice}</p>}
       <section aria-label="История воды"><h3>Вода за {day}</h3>
-        <button disabled={loading || !day} onClick={() => void loadDay(day).catch(() => {})}>Обновить воду</button>
         {loading && <p role="status">Загружаем воду…</p>}{dayError && <p role="alert">{dayError}</p>}
         {!loading && !dayError && data?.day === day && <>{data.water_total_ml === null ? <p>Нет записей воды</p> : <p>Сумма воды: {data.water_total_ml} мл</p>}
           {data.water.map(row => <article className="meal-history" key={row.id} aria-label={`Вода ${moscowLabel(row.occurred_at)}`}><p>{row.volume_ml} мл</p><p>{moscowLabel(row.occurred_at)}</p><div className="catalog-actions"><button disabled={locked} onClick={() => edit(row)}>Изменить воду</button><button disabled={locked} onClick={() => action(row, 'delete')}>Удалить воду</button></div></article>)}

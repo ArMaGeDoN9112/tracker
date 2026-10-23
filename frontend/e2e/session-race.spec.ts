@@ -23,7 +23,7 @@ test('old save paused at CSRF cannot resume automatically under a new login', as
   await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
   await reached
   await context.clearCookies()
-  await page.clock.fastForward(60001)
+  await page.getByLabel('День — Москва', { exact: true }).fill('1900-01-01')
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await signIn()
   await expect(page.getByLabel('Комментарий', { exact: true })).toBeVisible()

@@ -111,7 +111,7 @@ test('acknowledged schedule stays saved when refresh fails and invalid intervals
   await expect(page.getByRole('button', { name: 'Повторить сохранение расписания', exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Скорость 1, ед/ч')).toBeEnabled()
   await page.unroute('**/api/basal-schedules')
-  await page.getByRole('button', { name: 'Обновить историю', exact: true }).click()
+  await page.reload()
   const version = page.getByLabel('История расписаний').locator('article').filter({ has: page.locator(`summary time[datetime^="${day}"]`) })
   await expect(version).toHaveCount(1)
   await version.locator('summary').click()

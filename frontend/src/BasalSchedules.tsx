@@ -47,7 +47,7 @@ export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
       setVersions(history); setHistoryLoaded(true)
       return history
     } catch (failure) {
-      setHistoryError('Не удалось загрузить историю расписаний. Обновите историю.')
+      setHistoryError('Не удалось загрузить историю расписаний. Перезагрузите страницу.')
       throw failure
     } finally { setHistoryLoading(false) }
   }
@@ -84,7 +84,7 @@ export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
         await request('/api/basal-schedules', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body })
         setPending(null); setPreview(null); setSaved(true)
         const updates = await Promise.allSettled([loadHistory(), onSaved()])
-        if (updates.some(update => update.status === 'rejected')) setError('Расписание сохранено, но обновление данных не удалось. Обновите историю и день.')
+        if (updates.some(update => update.status === 'rejected')) setError('Расписание сохранено, но обновление данных не удалось. Перезагрузите страницу.')
       }
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Ошибка сети. Повторите сохранение расписания.')
@@ -134,7 +134,6 @@ export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
     <div className="schedule-history" aria-label="История расписаний" aria-busy={historyLoading}>
       <span className="eyebrow">СРОКИ ДЕЙСТВИЯ</span>
       <h3>История расписаний</h3>
-      <button type="button" disabled={busy || historyLoading} onClick={() => loadHistory().catch(() => {})}>Обновить историю</button>
       {historyLoading && <p role="status">Загружаем историю расписаний…</p>}
       {historyError && <p className="error" role="alert">{historyError}</p>}
       {historyLoaded && !historyLoading && !historyError && versions.length === 0 && <p>Расписание ещё не задано.</p>}

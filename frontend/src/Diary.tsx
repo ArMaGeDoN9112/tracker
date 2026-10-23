@@ -118,10 +118,10 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       if (updates[0].status === 'rejected') setError('Удаление подтверждено сервером, но доступность отмены не удалось проверить. Повторите операцию с прежним UUID.')
       else {
         setPendingAction(null)
-        if (updates[1].status === 'rejected') setError('Операция подтверждена сервером, но обновление дня не удалось. Обновите день.')
+        if (updates[1].status === 'rejected') setError('Операция подтверждена сервером, но обновление дня не удалось. Перезагрузите страницу.')
       }
     } catch (failure) {
-      setError(committed ? 'Операция подтверждена сервером, но обновление дня не удалось. Обновите день.' : failure instanceof Error ? failure.message : 'Ошибка сети. Повторите операцию.')
+      setError(committed ? 'Операция подтверждена сервером, но обновление дня не удалось. Перезагрузите страницу.' : failure instanceof Error ? failure.message : 'Ошибка сети. Повторите операцию.')
     } finally {
       sending.current = false; setBusy(false)
     }
@@ -150,7 +150,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       const result = await response.json()
       if (sequence === dayRequest.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes); setTemporaryBasals(result.temporary_basals); setTemporaryPercent(result.temporary_percent) }
     } catch (failure) {
-      if (sequence === dayRequest.current) setDayError('Не удалось загрузить день. Повторите обновление.')
+      if (sequence === dayRequest.current) setDayError('Не удалось загрузить день. Перезагрузите страницу.')
       if (sequence === dayRequest.current) throw failure
     } finally {
       if (sequence === dayRequest.current) setDayLoading(false)
@@ -312,7 +312,6 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       <button type="button" disabled={!day || day === '0001-01-01'} onClick={() => adjacentDay(-1)}>Предыдущий день</button>
       <button type="button" disabled={todayLoading} onClick={today}>{todayLoading ? 'Получаем сегодня…' : 'Сегодня'}</button>
       <button type="button" disabled={!day || day === '9999-12-31'} onClick={() => adjacentDay(1)}>Следующий день</button>
-      <button type="button" disabled={!day || dayLoading} onClick={() => loadDay(day).catch(() => {})}>Обновить день</button>
     </div>
     {dayLoading && <p role="status">Загружаем день…</p>}
     {dayError && <p role="alert" className="error">{dayError}</p>}

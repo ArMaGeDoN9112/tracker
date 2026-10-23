@@ -17,22 +17,19 @@ export function useBackupStatus(active: boolean) {
   const [error, setError] = useState('')
   useEffect(() => {
     let cancelled = false
-    let sequence = 0
     if (!active) { setStatus(null); setError(''); return }
     async function load() {
-      const current = ++sequence
       try {
         const response = await privateFetch('/api/backup-status', { cache: 'no-store' })
         if (!response.ok) throw new Error()
         const result: Status = await response.json()
-        if (!cancelled && current === sequence) { setStatus(result); setError('') }
+        if (!cancelled) { setStatus(result); setError('') }
       } catch {
-        if (!cancelled && current === sequence) { setStatus(null); setError('Состояние резервирования неизвестно. Не удалось получить состояние резервирования.') }
+        if (!cancelled) { setStatus(null); setError('Состояние резервирования неизвестно. Не удалось получить состояние резервирования.') }
       }
     }
     void load()
-    const timer = setInterval(load, 60_000)
-    return () => { cancelled = true; clearInterval(timer) }
+    return () => { cancelled = true }
   }, [active])
   return { status, error }
 }

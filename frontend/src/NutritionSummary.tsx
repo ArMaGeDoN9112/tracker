@@ -19,7 +19,6 @@ export function NutritionSummary({ active, generation, onDay }: {
   const [query, setQuery] = useState('period=week')
   const [summary, setSummary] = useState<Summary | null>(null)
   const [error, setError] = useState('')
-  const [refresh, setRefresh] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -38,14 +37,14 @@ export function NutritionSummary({ active, generation, onDay }: {
     }
     void load()
     return () => { cancelled = true }
-  }, [active, generation, query, refresh])
+  }, [active, generation, query])
 
   function show(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const params = new URLSearchParams({ period })
     if (period === 'custom') params.set('start', start)
     if (end) params.set('end', end)
-    setQuery(params.toString()); setRefresh(value => value + 1)
+    setQuery(params.toString())
   }
 
   return <section className="nutrition-summary" aria-label="Сводки питания">
@@ -62,7 +61,6 @@ export function NutritionSummary({ active, generation, onDay }: {
       <button type="submit">Показать период питания</button>
       <p id="nutrition-period-hint" className="muted">Если конец не выбран, используется сегодня по Москве.</p>
     </form>
-    <button onClick={() => setRefresh(value => value + 1)}>Обновить сводку питания</button>
     {error ? <p role="alert" className="error">Не удалось загрузить сводку питания. {error}</p>
       : !summary && <p role="status">Загружаем сводку питания…</p>}
     {summary && <>

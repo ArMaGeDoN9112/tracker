@@ -52,7 +52,7 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
       setHistory(rows); setHistoryLoaded(true)
       return rows
     } catch (failure) {
-      setHistoryError('Не удалось загрузить историю временной базы. Обновите историю.')
+      setHistoryError('Не удалось загрузить историю временной базы. Перезагрузите страницу.')
       throw failure
     } finally { setHistoryLoading(false) }
   }
@@ -112,7 +112,7 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
     }
     setPending(null); setPreview(null)
     if (editing) cancel()
-    if (updates.slice(1).some(update => update.status === 'rejected')) setError('Временная база сохранена, но обновление данных не удалось. Обновите историю и день.')
+    if (updates.slice(1).some(update => update.status === 'rejected')) setError('Временная база сохранена, но обновление данных не удалось. Перезагрузите страницу.')
   }
 
   async function restore() {
@@ -226,7 +226,6 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
     <div className="schedule-history temporary-history" aria-label="История временной базы" aria-busy={historyLoading}>
     <span className="eyebrow">ПЕРИОДЫ ДЕЙСТВИЯ</span>
     <h3>История временной базы</h3>
-    <button type="button" disabled={busy || historyLoading} onClick={() => loadHistory().catch(() => {})}>Обновить историю временной базы</button>
     {historyLoading && <p role="status">Загружаем историю временной базы…</p>}
     {historyError && <p role="alert" className="error">{historyError}</p>}
     {historyLoaded && !historyLoading && !historyError && history.length === 0 && <p>Временная база ещё не задана.</p>}

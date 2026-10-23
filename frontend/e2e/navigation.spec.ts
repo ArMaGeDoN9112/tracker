@@ -5,6 +5,7 @@ test('navigation keeps three drafts and a separate selected day through history'
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await expect(page.getByRole('button', { name: /^(Обновить|Повторить загрузку)/, includeHidden: true })).toHaveCount(0)
   await expect(page.getByLabel('День — Москва')).toHaveValue('2024-02-29')
   await page.getByLabel('Комментарий', { exact: true }).fill('Черновик дневника')
   const time = await page.getByLabel('Время события — Москва').inputValue()
@@ -48,7 +49,7 @@ for (const day of ['2024-99-99', '0000-01-01', '2024-01-32']) {
   })
 }
 
-test('401 from background backup hides every private section and keeps all drafts for explicit continuation', async ({ page, context }) => {
+test('401 while opening a section hides every private section and keeps all drafts for explicit continuation', async ({ page, context }) => {
   await page.clock.install()
   await page.goto('/')
   const signIn = async () => {
@@ -63,9 +64,10 @@ test('401 from background backup hides every private section and keeps all draft
   await page.getByRole('link', { name: 'Временная база', exact: true }).click()
   await page.getByLabel('Процент от расписания').fill('137')
   await context.clearCookies()
-  await page.clock.fastForward(60001)
+  await page.getByRole('link', { name: 'Графики', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await expect(page.getByRole('navigation')).toHaveCount(0)
+  await page.goBack()
   await page.goBack()
   await expect(page.getByLabel('Скорость 1, ед/ч')).toBeHidden()
   let writes = 0

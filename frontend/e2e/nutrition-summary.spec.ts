@@ -109,7 +109,8 @@ test('network failure can be retried; delayed real period cannot replace a newer
   await page.route('**/api/nutrition-summary?period=week', async route => {
     const response = await route.fetch(); captured(); await delayed; await route.fulfill({ response })
   }, { times: 1 })
-  await summary(page).getByRole('button', { name: 'Обновить сводку питания' }).click()
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Питание', exact: true }).click()
   await ready
   await expect(summary(page).getByRole('status')).toHaveText('Загружаем сводку питания…')
   await period(page, '1900-01-01', '1900-01-02')
@@ -131,7 +132,8 @@ test('summary captured before a meal save cannot replace the refreshed result', 
   await page.route(url, async route => {
     const response = await route.fetch(); captured(); await delayed; await route.fulfill({ response })
   }, { times: 1 })
-  await summary(page).getByRole('button', { name: 'Обновить сводку питания' }).click()
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Питание', exact: true }).click()
   await ready
   await page.getByRole('button', { name: 'Добавить разовую еду' }).click()
   await page.getByLabel('Название строки 1', { exact: true }).fill('Новая еда')

@@ -118,7 +118,7 @@ export function Nutrition({ authorized, visible, catalogVisible, day, onDay, csr
       const result = await read<Day>(`/api/nutrition-day?day=${selected}`)
       if (sequence === generation.current && selected === selectedDay.current) setData(result)
     } catch (failure) {
-      if (sequence === generation.current) setDayError('Не удалось загрузить день питания. Повторите обновление.')
+      if (sequence === generation.current) setDayError('Не удалось загрузить день питания. Перезагрузите страницу.')
       throw failure
     } finally { if (sequence === generation.current) setLoading(false) }
   }
@@ -327,7 +327,6 @@ export function Nutrition({ authorized, visible, catalogVisible, day, onDay, csr
         <section aria-label="День питания">
           <h2 id="nutrition-history" tabIndex={-1}>История питания</h2>
           <label htmlFor="nutrition-day">День питания — Москва</label><input id="nutrition-day" type="date" value={day} onChange={e => { if (e.target.value) onDay(e.target.value) }} />
-          <button disabled={loading || !day} onClick={() => void loadDay(day).catch(() => {})}>Обновить день питания</button>
           {loading && <p role="status">Загружаем день питания…</p>}
           {dayError && <p role="alert" className="error">{dayError}</p>}
           {!loading && !dayError && data?.day === day && <>{!data.meals.length ? <p>Нет записей еды</p> : <><h3>Итоги дня</h3><TotalsView totals={data.totals} />

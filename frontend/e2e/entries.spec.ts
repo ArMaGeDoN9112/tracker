@@ -274,7 +274,6 @@ test('expired session keeps draft and requires explicit save after signing in', 
   await signIn(page)
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('После повторного входа')
   await page.getByLabel('День — Москва').fill(day)
-  await page.getByRole('button', { name: 'Обновить день' }).click()
   await expect(page.locator('.entries > .entry')).toHaveCount(0)
   await page.getByRole('button', { name: /^(Сохранить запись|Повторить сохранение)$/ }).click()
   await expect(page.locator('.entries > .entry')).toHaveCount(1)

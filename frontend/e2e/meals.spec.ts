@@ -167,7 +167,8 @@ test('exact half-up preview, historical milliseconds, movement between days and 
     operation_id: crypto.randomUUID(), occurred_at: '2026-10-19T15:00:12.123+03:00', category: null, lines: [source, { ...source, id: crypto.randomUUID() }],
   } })
   expect(created.ok()).toBeTruthy()
-  await page.getByRole('button', { name: 'Обновить день питания', exact: true }).click()
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Питание', exact: true }).click()
   const saved = history(page).getByRole('article').filter({ hasText: name })
   await expect(saved).toContainText('0.01 г')
   await saved.getByRole('button', { name: 'Изменить приём', exact: true }).click()
@@ -190,7 +191,8 @@ test('exact half-up preview, historical milliseconds, movement between days and 
     const response = await route.fetch()
     reached(); await gate; await route.fulfill({ response })
   }, { times: 1 })
-  await page.getByRole('button', { name: 'Обновить день питания', exact: true }).click()
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Питание', exact: true }).click()
   await captured
   await page.getByLabel('День питания — Москва').fill('2026-10-21')
   await expect(history(page)).toContainText('Нет записей еды')
@@ -235,9 +237,10 @@ test('expired session during CSRF does not automatically save under a new login'
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await captured
   await context.clearCookies()
-  await page.clock.fastForward(60001)
+  await page.getByRole('link', { name: 'Графики', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await signIn(page)
+  await page.getByRole('link', { name: 'Питание', exact: true }).click()
   let writes = 0
   page.on('request', request => { if (request.url().endsWith('/api/meals') && request.method() === 'POST') writes++ })
   release()
