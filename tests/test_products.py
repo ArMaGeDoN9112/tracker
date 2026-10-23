@@ -12,13 +12,14 @@ def product(**changes):
 
 
 def legacy_product(database):
-    from sqlalchemy import insert
+    from sqlalchemy import MetaData, Table, insert
     from diary.db import database_engine
-    from diary.tables import product as product_table, product_portion
+    from diary.tables import product_portion
     identifier, portion_id = str(uuid4()), str(uuid4())
     engine = database_engine(database)
     try:
         with engine.begin() as connection:
+            product_table = Table("product", MetaData(), autoload_with=connection)
             connection.execute(insert(product_table).values(
                 id=identifier, name='Творог', unit='g', protein=1000, fat=500,
                 carbohydrate=2000, calories=18000, archived=False, revision=1, created_at=0, updated_at=0))
@@ -30,7 +31,7 @@ def legacy_product(database):
     values = {'name': 'Творог', 'unit': 'g', 'protein': '10.00', 'fat': '5.00', 'carbohydrate': '20.00', 'calories': '180.00'}
     source = {**values, 'id': str(uuid4()), 'kind': 'product', 'quantity': '30', 'basis_quantity': '100',
               'product_id': identifier, 'product_revision': 1, 'portion': portion}
-    catalog = [{**values, 'id': identifier, 'photo': None, 'portions': [portion], 'archived': False,
+    catalog = [{**values, 'id': identifier, 'photo': None, 'portions': [portion],
                 'revision': 1, 'created_at': '1970-01-01T00:00:00.000Z', 'updated_at': '1970-01-01T00:00:00.000Z'}]
     return source, catalog
 
@@ -83,7 +84,7 @@ def test_photo_is_preserved_for_older_clients_and_can_be_removed(diary):
     assert client.get(path).json()['photo'] is None
 
 
-def test_edit_portions_archive_restore_and_old_receipts(diary):
+def test_edit_portions_and_old_receipts(diary):
     client, database = diary
     payload = product(calories='180')
     created = client.post('/api/products', json=payload).json()
@@ -96,18 +97,15 @@ def test_edit_portions_archive_restore_and_old_receipts(diary):
     assert saved['calories'] == '181.00'
     assert saved['created_at'] <= saved['updated_at']
     assert client.put(path, json={**edit, 'operation_id': str(uuid4())}).json()['code'] == 'revision_conflict'
-    archive = {**edit, 'operation_id': str(uuid4()), 'expected_revision': 2, 'archived': True, 'portions': [portions[0]]}
-    assert client.put(path, json=archive).json()['revision'] == 3
-    assert client.get(path).json()['archived'] is True
+    updated = {**edit, 'operation_id': str(uuid4()), 'expected_revision': 2, 'portions': [portions[0]]}
+    assert client.put(path, json=updated).json()['revision'] == 3
     assert client.post('/api/products', json=payload).json()['replayed'] is True
     assert client.put(path, json=edit).json()['replayed'] is True
     assert client.get(path).json()['revision'] == 3
-    restore = {**archive, 'operation_id': str(uuid4()), 'expected_revision': 3, 'archived': False}
-    assert client.put(path, json=restore).json()['revision'] == 4
     from diary.db import migrate
     migrate(database)
     migrate(database)
-    assert client.get(path).json()['archived'] is False
+    assert client.get(path).json()['portions'] == [{**portions[0], 'quantity': '180.00'}]
     assert len(client.get('/api/products').json()) == 1
 
 
@@ -131,7 +129,7 @@ def test_unit_change_requires_explicit_values_confirmation_and_new_portions(diar
     ('name', ''), ('name', ' \t '), ('name', 'я' * 201), ('unit', 'kg'),
     ('protein', 1), ('fat', True), ('calories', '1e2'), ('calories', 'NaN'),
     ('protein', '-1'), ('fat', 'Infinity'), ('carbohydrate', '0.001'),
-    ('protein', '21474836.48'), ('protein', '9' * 10000), ('archived', 1),
+    ('protein', '21474836.48'), ('protein', '9' * 10000), ('archived', True),
     ('portions', [{'id': str(uuid4()), 'name': 'Порция', 'quantity': '0'}]),
     ('portions', [{'id': str(uuid4()), 'name': 'Порция', 'quantity': 1}]),
     ('portions', [{'id': 'invalid', 'name': 'Порция', 'quantity': '1'}]),
@@ -224,7 +222,7 @@ def test_concurrent_revisions_and_same_operation(diary):
     assert all(r.status_code == 200 for r in responses)
     assert sorted(r.json()['replayed'] for r in responses) == [False, True]
     path = '/api/products/' + responses[0].json()['result_id']
-    requests = [('PUT', path, product(expected_revision=1, archived=archived)) for archived in (True, False)]
+    requests = [('PUT', path, product(expected_revision=1, name=name)) for name in ('Творог 1', 'Творог 2')]
     with ThreadPoolExecutor(max_workers=2) as pool:
         responses = list(pool.map(send, requests))
     assert sorted(r.status_code for r in responses) == [200, 409]
@@ -260,3 +258,64 @@ def test_upgrade_existing_diary_preserves_history_and_session(tmp_path):
         assert client.get('/api/day?day=2026-10-19').json() == before
         assert client.get('/api/products').json() == []
         assert client.post('/api/products', json=product(), headers=headers).status_code == 200
+
+
+@pytest.mark.parametrize('previously_hidden', [False, True])
+@pytest.mark.parametrize('interrupted', [False, True])
+def test_remove_archive_keeps_products_photos_portions_and_history(tmp_path, previously_hidden, interrupted):
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    from fastapi.testclient import TestClient
+    from sqlalchemy import Engine, MetaData, Table, event, inspect, update
+    from sqlalchemy.exc import IntegrityError
+    from diary.admin import create_account
+    from diary.app import create_app
+    from diary.db import database_engine, migrate
+    from diary.tables import product as product_table
+    from test_access import ORIGIN, PASSWORD, login
+    from test_meals import meal
+    database = tmp_path / 'catalog.sqlite3'
+    config = Config()
+    config.set_main_option('script_location', str(Path(__file__).resolve().parents[1] / 'migrations'))
+    engine = database_engine(database)
+    with engine.begin() as connection:
+        config.attributes['connection'] = connection
+        command.upgrade(config, '009_product_photos')
+    source, expected = legacy_product(database)
+    photo = 'data:image/jpeg;base64,/9j/2Q=='
+    with engine.begin() as connection:
+        previous_product = Table('product', MetaData(), autoload_with=connection)
+        connection.execute(update(previous_product).values(archived=previously_hidden, photo=photo))
+    expected[0]['photo'] = photo
+    create_account(database, 'owner', PASSWORD)
+    with TestClient(create_app(database, ORIGIN), base_url=ORIGIN) as client:
+        login(client)
+        client.headers.update({'Origin': ORIGIN, 'X-CSRF-Token': client.get('/api/auth/csrf').json()['csrf_token']})
+        receipt = client.post('/api/meals', json=meal([source])).json()
+        path = '/api/meals/' + receipt['result_id']
+        before = client.get(path).json()
+        if interrupted:
+            def fail_rebuild(connection, cursor, statement, parameters, context, executemany):
+                if statement.startswith('ALTER TABLE _alembic_tmp_product'):
+                    raise RuntimeError('Interrupted migration')
+            event.listen(Engine, 'before_cursor_execute', fail_rebuild)
+            try:
+                with pytest.raises(RuntimeError, match='Interrupted migration'):
+                    migrate(database)
+            finally:
+                event.remove(Engine, 'before_cursor_execute', fail_rebuild)
+            assert client.get('/api/products').json() == expected
+            with engine.connect() as connection:
+                assert 'archived' in {column['name'] for column in inspect(connection).get_columns('product')}
+        migrate(database)
+        migrate(database)
+        assert client.get('/api/products').json() == expected
+        assert client.get(path).json() == before
+        assert client.put('/api/products/' + source['product_id'], json=product(expected_revision=1, photo=photo)).status_code == 200
+    with engine.connect() as connection:
+        assert 'archived' not in {column['name'] for column in inspect(connection).get_columns('product')}
+        assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
+        with pytest.raises(IntegrityError):
+            connection.execute(update(product_table).values(unit='kg'))
+    engine.dispose()

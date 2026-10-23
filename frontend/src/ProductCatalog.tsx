@@ -3,19 +3,18 @@ import { privateFetch } from './access'
 
 export const nutrients = [['protein', 'Белки', 'г'], ['fat', 'Жиры', 'г'], ['carbohydrate', 'Углеводы', 'г'], ['calories', 'Калории', 'ккал']] as const
 export type Portion = { id: string; name: string; quantity: string }
-type Values = { name: string; unit: 'g' | 'ml'; photo: string | null; protein: string | null; fat: string | null; carbohydrate: string | null; calories: string | null; portions: Portion[]; archived: boolean }
+type Values = { name: string; unit: 'g' | 'ml'; photo: string | null; protein: string | null; fat: string | null; carbohydrate: string | null; calories: string | null; portions: Portion[] }
 export type Product = Values & { id: string; revision: number }
 type Draft = Values & { id?: string; revision?: number }
 export type ProductSeed = Pick<Values, 'name' | 'unit' | 'protein' | 'fat' | 'carbohydrate' | 'calories'>
 type Pending = { path: string; method: string; body: string }
-const empty = (): Draft => ({ name: '', unit: 'g', photo: null, protein: '', fat: '', carbohydrate: '', calories: '', portions: [], archived: false })
+const empty = (): Draft => ({ name: '', unit: 'g', photo: null, protein: '', fat: '', carbohydrate: '', calories: '', portions: [] })
 
 export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selectionDisabled = false, seed, onEditingChange }: { authorized: boolean; visible: boolean; csrfToken: () => Promise<string>; onSelect?: (product: Product) => void; selectionDisabled?: boolean; seed?: ProductSeed | null; onEditingChange?: (editing: boolean) => void }) {
   const [products, setProducts] = useState<Product[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
   const [original, setOriginal] = useState<Product | null>(null)
   const [search, setSearch] = useState('')
-  const [archive, setArchive] = useState(false)
   const [pending, setPending] = useState<Pending | null>(null)
   const [busy, setBusy] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
@@ -100,8 +99,8 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
     try {
       let request = pending
       if (!request) {
-        const { id, revision, name, unit, photo, protein, fat, carbohydrate, calories, portions, archived } = draft
-        request = { path: id ? `/api/products/${id}` : '/api/products', method: id ? 'PUT' : 'POST', body: JSON.stringify({ name, unit, photo, protein, fat, carbohydrate, calories, portions, archived, operation_id: crypto.randomUUID(), ...(id ? { expected_revision: revision, unit_change_confirmed: unitConfirmed } : {}) }) }
+        const { id, revision, name, unit, photo, protein, fat, carbohydrate, calories, portions } = draft
+        request = { path: id ? `/api/products/${id}` : '/api/products', method: id ? 'PUT' : 'POST', body: JSON.stringify({ name, unit, photo, protein, fat, carbohydrate, calories, portions, operation_id: crypto.randomUUID(), ...(id ? { expected_revision: revision, unit_change_confirmed: unitConfirmed } : {}) }) }
         setPending(request)
       }
       const csrf = await csrfToken()
@@ -133,18 +132,17 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? 'product-error' : undefined })
   const unit = draft?.unit === 'ml' ? 'мл' : 'г'
   const unitChanged = !!original && draft?.unit !== original.unit
-  const rows = products.filter(product => product.archived === archive && product.name.toLocaleLowerCase('ru').includes(search.toLocaleLowerCase('ru')))
+  const rows = products.filter(product => product.name.toLocaleLowerCase('ru').includes(search.toLocaleLowerCase('ru')))
   return <div hidden={!authorized || !visible} className="product-catalog">
     <section aria-label="Каталог продуктов">
       <span className="eyebrow">ЛИЧНЫЙ КАТАЛОГ</span><h2 id="catalog-title" tabIndex={-1}>{onSelect ? 'Выберите еду' : 'Продукты и порции'}</h2>
       <p className="muted">Нажмите на карточку, чтобы посмотреть КБЖУ и порции.</p>
-      <div className="catalog-actions"><button onClick={() => setArchive(false)} aria-pressed={!archive}>Каталог</button><button onClick={() => setArchive(true)} aria-pressed={archive}>Архив</button></div>
       <label htmlFor="product-search">Поиск продуктов</label><input id="product-search" type="search" value={search} onChange={event => setSearch(event.target.value)} />
       <button disabled={!!draft || busy || !!pending} onClick={() => open()}>Новый продукт</button>
       <button onClick={() => void load().catch(() => {})} disabled={loading || busy}>Обновить каталог</button>
       {loading && <p role="status">Загружаем каталог…</p>}
       {loadError && <p role="alert" className="error">{loadError}</p>}
-      {!loading && !loadError && rows.length === 0 && <p>{search ? 'Продукты не найдены.' : archive ? 'Архив пуст.' : 'Каталог пуст.'}</p>}
+      {!loading && !loadError && rows.length === 0 && <p>{search ? 'Продукты не найдены.' : 'Каталог пуст.'}</p>}
       <div className="food-grid" hidden={loading || !!loadError}>{rows.map(product => <article className="food-card" key={product.id}>
         <details>
         <summary>
@@ -163,7 +161,7 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
         </summary>
         <div className="food-details">
         <p>На 100 {product.unit === 'g' ? 'г' : 'мл'}</p>
-        {onSelect && !product.archived && <button disabled={selectionDisabled || busy || !!pending} onClick={() => onSelect(product)}>Добавить в приём</button>}
+        {onSelect && <button disabled={selectionDisabled || busy || !!pending} onClick={() => onSelect(product)}>Добавить в приём</button>}
         {nutrients.map(([key, label, nutrientUnit]) => <p key={key}>{label}: {product[key] === null ? 'неизвестно' : `${product[key]} ${nutrientUnit}`}</p>)}
         <ul>{product.portions.map(portion => <li key={portion.id}>{portion.name}: {portion.quantity} {product.unit === 'g' ? 'г' : 'мл'}</li>)}</ul>
         <button disabled={!!draft || busy || !!pending} onClick={() => open(product)}>Изменить</button>
@@ -191,7 +189,6 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
               <div className="catalog-actions"><button type="button" disabled={index === 0} onClick={() => { const portions = [...draft.portions]; [portions[index - 1], portions[index]] = [portions[index], portions[index - 1]]; setDraft({ ...draft, portions }) }}>Выше — порция {index + 1}</button><button type="button" onClick={() => setDraft({ ...draft, portions: draft.portions.filter(p => p.id !== portion.id) })}>Убрать порцию {index + 1}</button></div>
             </div>)}
             <button type="button" onClick={() => setDraft({ ...draft, portions: [...draft.portions, { id: crypto.randomUUID(), name: '', quantity: '' }] })}>Добавить порцию</button>
-            <label className="catalog-check"><input type="checkbox" checked={draft.archived} onChange={e => setDraft({ ...draft, archived: e.target.checked })} />В архиве</label>
             {unitChanged && <div className="schedule-preview"><p>Новая основа: 100 {unit}. Прежние значения и порции очищены; укажите новые значения или оставьте их неизвестными.</p>
               <p>{nutrients.map(([key, label]) => `${label}: ${draft[key] || 'неизвестно'}`).join('; ')}</p>
               <p>Новые порции: {draft.portions.length ? draft.portions.map(p => `${p.name}: ${p.quantity} ${unit}`).join('; ') : 'пустой набор'}</p>
@@ -203,7 +200,7 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
           <button type="button" disabled={busy || photoBusy || !!pending} onClick={() => { setDraft(null); setError(''); setConflict(false); setLatest(null) }}>Отменить редактирование</button>
         </form>
         {conflict && <button disabled={busy} onClick={loadLatest}>Загрузить актуальную карточку</button>}
-        {latest && <section aria-label="Актуальная карточка"><h3>{latest.name}</h3><p>Редакция {latest.revision} · 100 {latest.unit === 'g' ? 'г' : 'мл'} · {latest.archived ? 'В архиве' : 'В каталоге'}</p>
+        {latest && <section aria-label="Актуальная карточка"><h3>{latest.name}</h3><p>Редакция {latest.revision} · 100 {latest.unit === 'g' ? 'г' : 'мл'}</p>
           {latest.photo && <img className="food-photo-preview" src={latest.photo} alt="Актуальная фотография еды" />}
           {nutrients.map(([key, label]) => <p key={key}>{label}: {latest[key] ?? 'неизвестно'}</p>)}
           <ul>{latest.portions.map(p => <li key={p.id}>{p.name}: {p.quantity}</li>)}</ul>

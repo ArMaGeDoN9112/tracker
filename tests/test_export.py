@@ -34,7 +34,7 @@ def nutrition_history(client):
     assert client.put("/api/products/" + source["product_id"], json=product(
         expected_revision=1, name="Новая карточка", unit="ml", protein="99", fat="0", calories=None,
         portions=[{"id": str(uuid4()), "name": "Стакан", "quantity": "200"}],
-        archived=True, unit_change_confirmed=True)).status_code == 200
+        unit_change_confirmed=True)).status_code == 200
     current = client.get("/api/products/" + source["product_id"]).json()
     edited = {**source, "id": str(uuid4()), "name": current["name"], "unit": current["unit"],
               "protein": current["protein"], "fat": current["fat"], "calories": current["calories"],
@@ -70,7 +70,7 @@ def test_empty_export_is_private_download(diary):
     assert response.headers["content-disposition"].startswith('attachment; filename="diabetes-diary-')
     result = response.json()
     validate_export(result)
-    assert result["schema_version"] == 2
+    assert result["schema_version"] == 3
     assert result["settings"] == {"timezone": "Europe/Moscow", "theme": "dark",
                                   "water": {"volumes_ml": [200, 250, 500], "revision": 1}}
     assert result["products"] == result["meals"] == result["water"] == []
@@ -157,7 +157,7 @@ def test_export_nutrition_preserves_catalog_and_independent_history(diary):
     validate_export(result)
     assert result["products"] == client.get("/api/products").json()
     assert len(result["products"]) == 1
-    assert result["products"][0]["archived"] is True
+    assert "archived" not in result["products"][0]
     assert result["products"][0]["unit"] == "ml"
     assert result["products"][0]["portions"][0]["quantity"] == "200.00"
     assert len(result["meals"]) == len(result["water"]) == 2
@@ -178,11 +178,11 @@ def test_export_nutrition_preserves_catalog_and_independent_history(diary):
     assert client.get("/api/meals/" + copy.json()["result_id"]).json()["totals"] == historical["totals"]
 
 
-def test_v2_contract_and_example_match_application_dto():
+def test_v3_contract_and_example_match_application_dto():
     from diary.export import FullExport
-    schema = json.loads(Path("docs/export/schema-v2.json").read_text())
+    schema = json.loads(Path("docs/export/schema-v3.json").read_text())
     assert schema == FullExport.model_json_schema()
-    example = json.loads(Path("docs/export/example-v2.json").read_text())
+    example = json.loads(Path("docs/export/example-v3.json").read_text())
     validate_export(example)
     assert FullExport.model_validate(example).model_dump(mode="json") == example
 

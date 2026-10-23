@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, Integer, Text, column, table
+from sqlalchemy import BigInteger, Integer, Text, column, table
 
 
 # Query definitions only; Alembic migrations own the database schema.
@@ -79,7 +79,7 @@ product = table(
     "product", column("id", Text), column("name", Text), column("unit", Text),
     column("photo", Text),
     column("protein", Integer), column("fat", Integer), column("carbohydrate", Integer),
-    column("calories", Integer), column("archived", Boolean), column("revision", BigInteger),
+    column("calories", Integer), column("revision", BigInteger),
     column("created_at", BigInteger), column("updated_at", BigInteger),
 )
 product_portion = table(

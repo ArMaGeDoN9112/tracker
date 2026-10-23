@@ -85,7 +85,7 @@ def test_summary_uses_snapshots_and_updates_after_edit_move_delete_restore(diary
     assert before['averages']['protein']['value'] == '15.00'
     assert client.put('/api/products/' + source['product_id'], json=product(
         expected_revision=1, name='Изменённый', unit='ml', portions=[], protein='99',
-        archived=True, unit_change_confirmed=True)).status_code == 200
+        unit_change_confirmed=True)).status_code == 200
     assert client.get(summary_path).json() == before
     edit = {**payload, 'operation_id': str(uuid4()), 'expected_revision': 1,
             'occurred_at': '2026-10-20T00:00:00+03:00', 'lines': [{**source, 'quantity': '200'}]}

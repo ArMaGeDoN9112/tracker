@@ -86,7 +86,7 @@ def test_repeat_freezes_history_and_server_time_without_writing(diary, monkeypat
     path = '/api/meals/' + client.post('/api/meals', json=meal([source, one_off(carbohydrate='12')], category='lunch')).json()['result_id']
     original = client.get(path).json()
     from test_products import product
-    assert client.put('/api/products/' + source['product_id'], json=product(expected_revision=1, name='Изменён', carbohydrate='99', archived=True)).status_code == 200
+    assert client.put('/api/products/' + source['product_id'], json=product(expected_revision=1, name='Изменён', carbohydrate='99')).status_code == 200
     monkeypatch.setattr('diary.meals.now_ms', lambda: 1792500000123)
     response = client.get(path + '/repeat-form')
     assert response.status_code == 200

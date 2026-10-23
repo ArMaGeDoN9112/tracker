@@ -15,7 +15,7 @@ async function newDraft(page: Page) {
   return name
 }
 
-test('catalog, Cyrillic search, portions, archive and drafts survive navigation and login', async ({ page }) => {
+test('catalog, Cyrillic search, portions and drafts survive navigation and login', async ({ page }) => {
   await page.goto('/?section=catalog')
   await signIn(page)
   await expect(page.getByRole('heading', { name: 'Каталог еды', exact: true })).toBeVisible()
@@ -47,15 +47,13 @@ test('catalog, Cyrillic search, portions, archive and drafts survive navigation 
   expect(page.url()).not.toContain(encodeURIComponent('творог'))
   if (!await card.getByRole('button', { name: 'Изменить', exact: true }).isVisible()) await card.locator('summary').click()
   await card.getByRole('button', { name: 'Изменить', exact: true }).click()
-  await page.getByLabel('В архиве', { exact: true }).check()
+  await page.getByLabel('Калории, ккал на 100 г').fill('150')
+  const saved = page.waitForResponse(response => response.url().includes('/api/products/') && response.request().method() === 'PUT')
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
-  await expect(card).toHaveCount(0)
-  await page.getByRole('button', { name: 'Архив', exact: true }).click()
-  if (!await card.getByRole('button', { name: 'Изменить', exact: true }).isVisible()) await card.locator('summary').click()
-  await card.getByRole('button', { name: 'Изменить', exact: true }).click()
-  await page.getByLabel('В архиве', { exact: true }).uncheck()
-  await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
-  await page.getByRole('button', { name: 'Каталог', exact: true }).click()
+  expect((await saved).ok()).toBeTruthy()
+  await expect(card).toContainText('Калории: 150.00 ккал')
+  await expect(page.getByRole('button', { name: 'Архив', exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('В архиве', { exact: true })).toHaveCount(0)
   await expect(card).toBeVisible()
 })
 

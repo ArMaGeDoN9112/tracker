@@ -55,7 +55,6 @@ class ProductInput(NamedInput, OperationInput):
     carbohydrate: str | None = Field(max_length=10000)
     calories: str | None = Field(max_length=10000)
     portions: list[PortionInput]
-    archived: bool = False
     photo: str | None = Field(default=None, max_length=45000)
 
     @field_validator("photo")
@@ -99,7 +98,6 @@ class ProductRecord(BaseModel):
     fat: int | None
     carbohydrate: int | None
     calories: int | None
-    archived: bool
     revision: int
     created_at: int
     updated_at: int
@@ -115,7 +113,6 @@ class ProductOutput(BaseModel):
     carbohydrate: str | None
     calories: str | None
     portions: list[PortionInput]
-    archived: bool
     revision: int
     created_at: str
     updated_at: str
@@ -182,7 +179,7 @@ def register_products(app: FastAPI, engine: Engine) -> None:
                 fat=hundredths(payload.fat) if payload.fat is not None else None,
                 carbohydrate=hundredths(payload.carbohydrate) if payload.carbohydrate is not None else None,
                 calories=hundredths(payload.calories) if payload.calories is not None else None,
-                archived=payload.archived, revision=1, created_at=now, updated_at=now,
+                revision=1, created_at=now, updated_at=now,
             )
             if product_id:
                 assert isinstance(payload, EditProductInput)

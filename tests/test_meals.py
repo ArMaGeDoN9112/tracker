@@ -64,7 +64,7 @@ def test_snapshots_survive_catalog_changes_and_edit_uses_historical_basis(diary)
     before = client.get(meal_path).json()
     other_id = client.post('/api/meals', json=meal([source])).json()['result_id']
     other = client.get('/api/meals/' + other_id).json()
-    edit = product(expected_revision=1, name='Новое имя', unit='ml', portions=[], protein='99', archived=True, unit_change_confirmed=True)
+    edit = product(expected_revision=1, name='Новое имя', unit='ml', portions=[], protein='99', unit_change_confirmed=True)
     assert client.put(path, json=edit).status_code == 200
     assert client.get(meal_path).json() == before
     # A draft picked before the card changed must also retain its snapshot.

@@ -246,7 +246,7 @@ test('expired session during CSRF does not automatically save under a new login'
   await expect(page.getByLabel('Количество строки 1, г')).toHaveValue('100')
 })
 
-test('explicit new selection reads current card while earlier snapshot stays frozen; archived choice is rejected', async ({ page }) => {
+test('explicit new selection reads current card while earlier snapshot stays frozen', async ({ page }) => {
   await start(page)
   const name = await createProduct(page)
   await choose(page, name)
@@ -261,17 +261,4 @@ test('explicit new selection reads current card while earlier snapshot stays fro
   const fields = form(page).locator('.meal-line')
   await expect(fields.nth(0)).toContainText('180.00 ккал')
   await expect(fields.nth(1)).toContainText('200.00 ккал')
-  const loaded = page.waitForResponse(response => response.url().endsWith('/api/products') && response.request().method() === 'GET')
-  await page.getByRole('button', { name: 'Выбрать из каталога', exact: true }).click()
-  await loaded
-  const staleCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
-  await expect(page.getByRole('status').filter({ hasText: 'Загружаем каталог' })).toHaveCount(0)
-  if (!await staleCard.getByRole('button', { name: 'Добавить в приём', exact: true }).isVisible()) await staleCard.locator('summary').click()
-  expect((await page.request.put(`/api/products/${id}`, { headers, data: {
-    ...values, calories: '200', archived: true, operation_id: crypto.randomUUID(), expected_revision: revision + 1,
-  } })).ok()).toBeTruthy()
-  await staleCard.getByRole('button', { name: 'Добавить в приём', exact: true }).click()
-  await expect(page.getByRole('alert').filter({ hasText: 'Продукт в архиве' })).toBeVisible()
-  await page.getByRole('button', { name: 'Вернуться к приёму пищи', exact: true }).click()
-  await expect(fields).toHaveCount(2)
 })

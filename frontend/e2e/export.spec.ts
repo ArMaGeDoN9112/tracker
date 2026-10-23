@@ -35,7 +35,7 @@ test('settings download readable full JSON with a privacy warning', async ({ pag
       { id: crypto.randomUUID(), kind: 'one_off', name: 'Без веса', protein: '0' },
     ] })
     await send(`/api/meals/${meal.result_id}/delete`, { expected_revision: 1 })
-    await send(`/api/products/${product.result_id}`, { ...card, expected_revision: 1, name: 'Новая карточка', protein: '99', portions: [], archived: true }, 'PUT')
+    await send(`/api/products/${product.result_id}`, { ...card, expected_revision: 1, name: 'Новая карточка', protein: '99', portions: [] }, 'PUT')
     const water = await send('/api/water', { volume_ml: 330, occurred_at: '1970-01-01T00:00:00.123Z' })
     await send(`/api/water/${water.result_id}/delete`, { expected_revision: 1 })
     const settings = await (await fetch('/api/water-settings')).json()
@@ -51,14 +51,14 @@ test('settings download readable full JSON with a privacy warning', async ({ pag
   expect(await download.failure()).toBeNull()
   const path = await download.path()
   const document = JSON.parse(await readFile(path!, 'utf8'))
-  expect(document.schema_version).toBe(2)
+  expect(document.schema_version).toBe(3)
   expect(document.timezone).toBe('Europe/Moscow')
   expect(document.entries).toContainEqual(expect.objectContaining({
     id: ids.entry, occurred_at: '1970-01-01T00:00:00.123Z', comment: 'Старое 😀\nУдалено', glucose: null, bolus: '0.0', revision: 2,
     deleted_at: expect.any(String),
   }))
   expect(Object.keys(document.account).sort()).toEqual(['created_at', 'id', 'login'])
-  expect(document.products).toContainEqual(expect.objectContaining({ id: ids.product, archived: true, revision: 2, protein: '99.00', portions: [] }))
+  expect(document.products).toContainEqual(expect.objectContaining({ id: ids.product, revision: 2, protein: '99.00', portions: [] }))
   const historical = document.meals.find((meal: { id: string }) => meal.id === ids.meal)
   expect(historical).toMatchObject({ revision: 2, deleted_at: expect.any(String), lines: [
     expect.objectContaining({ name: 'Историческая карточка', protein: '10.00', basis_quantity: '100.00', quantity: '30.00',

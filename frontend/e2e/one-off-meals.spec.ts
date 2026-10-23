@@ -10,7 +10,7 @@ async function start(page: Page) {
 const form = (page: Page) => page.getByRole('region', { name: 'Форма приёма пищи', exact: true })
 const history = (page: Page) => page.getByRole('region', { name: 'День питания', exact: true })
 
-test('one-off portion, explicit card preview, mixed meal and independent repeat after archive', async ({ page }) => {
+test('one-off portion, explicit card preview, mixed meal and independent repeat after product editing', async ({ page }) => {
   await start(page)
   const name = `Разовая еда ${crypto.randomUUID()}`
   await page.getByRole('button', { name: 'Добавить разовую еду', exact: true }).click()
@@ -47,7 +47,6 @@ test('one-off portion, explicit card preview, mixed meal and independent repeat 
   await page.getByRole('link', { name: 'Каталог', exact: true }).click()
   await card.getByRole('button', { name: 'Изменить', exact: true }).click()
   await page.getByLabel('Углеводы, г на 100 г', { exact: true }).fill('99')
-  await page.getByLabel('В архиве', { exact: true }).check()
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await expect(cardForm).toBeHidden()
   await page.getByRole('link', { name: 'Питание', exact: true }).click()

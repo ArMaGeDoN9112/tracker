@@ -151,7 +151,6 @@ export function Nutrition({ authorized, visible, catalogVisible, day, onDay, csr
     sending.current = true; setBusy(true); setError(''); setField(null)
     try {
       const current = await read<Product>(`/api/products/${product.id}`)
-      if (current.archived) throw new Error('Продукт в архиве. Обновите каталог и выберите доступный продукт.')
       const { id, revision, name, unit, protein, fat, carbohydrate, calories, portions } = current
       setLines(rows => [...rows, { id: crypto.randomUUID(), kind: 'product', name, unit, quantity: '100', basis_quantity: '100.00',
         protein, fat, carbohydrate, calories, product_id: id, product_revision: revision, portion: null, portions }])
