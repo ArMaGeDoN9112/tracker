@@ -16,8 +16,9 @@ from diary.domain.precision import rate_string
 from diary.domain.products import ProductRecord
 from diary.interfaces.http.entries import entry_output
 from diary.interfaces.http.outputs import timestamp
-from diary.meals import MealLineOutput, MealOutput, meal_lines, meal_output
-from diary.products import ProductOutput, product_output
+from diary.interfaces.http.meals import MealLineOutput, MealOutput, meal_output
+from diary.infrastructure.nutrition import SqliteProducts, meal_lines
+from diary.interfaces.http.products import ProductOutput, product_output
 from diary.security import now_ms
 from diary.tables import account, entry, meal, product, temporary_basal, water, water_settings
 from diary.application.water import WaterSettingsInput, WaterSettingsOutput
@@ -157,7 +158,7 @@ def full_export(connection: Connection) -> FullExport:
         exported_at=timestamp(exported_at),
         settings=ExportSettings(water=ExportWaterSettings(
             volumes_ml=json.loads(settings["volumes_ml"]), revision=settings["revision"])),
-        products=[ExportProduct.model_validate(product_output(connection, ProductRecord.model_validate(row)).model_dump())
+        products=[ExportProduct.model_validate(product_output(SqliteProducts(connection).result(ProductRecord.model_validate(row))).model_dump())
                   for row in connection.execute(select(product).order_by(product.c.created_at, product.c.id)).mappings()],
         meals=[ExportMeal.model_validate(meal_output(MealRecord.model_validate(row), meal_lines(connection, row["id"])).model_dump())
                for row in connection.execute(select(meal).order_by(meal.c.occurred_at, meal.c.created_at, meal.c.id)).mappings()],

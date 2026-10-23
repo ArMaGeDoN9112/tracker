@@ -86,7 +86,7 @@ def test_snapshots_survive_catalog_changes_and_edit_uses_historical_basis(diary)
 
 def test_moscow_boundaries_move_composition_and_stable_order(diary, monkeypatch):
     client, _ = diary
-    monkeypatch.setattr('diary.meals.now_ms', lambda: 1792400000000)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: 1792400000000)
     source = line(client)
     for at in ['2026-10-18T23:59:59.999+03:00', '2026-10-19T00:00:00+03:00',
                '2026-10-19T23:59:59.999+03:00', '2026-10-20T00:00:00+03:00']:
@@ -109,7 +109,7 @@ def test_moscow_boundaries_move_composition_and_stable_order(diary, monkeypatch)
 def test_delete_restore_deadline_and_late_receipts(diary, monkeypatch, elapsed, status):
     client, _ = diary
     clock = 1792400000000
-    monkeypatch.setattr('diary.meals.now_ms', lambda: clock)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: clock)
     monkeypatch.setattr('diary.bootstrap.now_ms', lambda: clock)
     payload = meal([line(client)])
     path = '/api/meals/' + client.post('/api/meals', json=payload).json()['result_id']
@@ -283,7 +283,7 @@ def test_upgrade_catalog_and_diary_preserves_history_and_session(tmp_path):
 
 def test_ml_unknown_values_and_full_day_without_pagination(diary, monkeypatch):
     client, _ = diary
-    monkeypatch.setattr('diary.meals.now_ms', lambda: 1792400000000)
+    monkeypatch.setattr('diary.bootstrap.now_ms', lambda: 1792400000000)
     source = line(client, unit='ml', quantity='30', protein=None, fat='0', carbohydrate='20', calories=None, portion=None)
     payload = meal([source])
     for _ in range(105):

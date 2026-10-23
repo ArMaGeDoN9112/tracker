@@ -19,11 +19,9 @@ from diary.application.entries import (
     CreateEntry, DeleteEntry, EditEntry, EntryOperations, GetDay, GetEntry,
     GetEntryForm, GetMoscowTime, RestoreEntry,
 )
-from diary.application.operations import ReceiptRecord
 from diary.infrastructure.diary import diary_uow
 from diary.interfaces.http.entries import EntryUseCases, register_entries
 from diary.interfaces.http.basal import BasalUseCases, register_basal
-from diary.interfaces.http.outputs import ReceiptOutput, receipt_output as format_receipt
 
 
 def register_water_http(app: FastAPI, engine: Engine) -> None:
@@ -62,6 +60,25 @@ def register_diary_http(app: FastAPI, engine: Engine) -> None:
     ), clock)
 
 
-def receipt_output(receipt: ReceiptRecord, replayed: bool) -> ReceiptOutput:
-    # shortcut: products/meals still own their operations until stage 05.
-    return format_receipt(receipt, replayed, now_ms())
+def register_nutrition_http(app: FastAPI, engine: Engine) -> None:
+    from diary.application.products import CreateProduct, EditProduct, GetProduct, GetProducts, ProductOperations
+    from diary.application.meals import (
+        CreateMeal, DeleteMeal, EditMeal, GetMeal, MealOperations, PreviewMealProduct, RepeatMeal, RestoreMeal,
+    )
+    from diary.infrastructure.nutrition import nutrition_uow
+    from diary.interfaces.http.products import ProductUseCases, register_products
+    from diary.interfaces.http.meals import MealUseCases, register_meals
+
+    reads = lambda: nutrition_uow(engine)
+    writes = lambda: nutrition_uow(engine, write=True)
+    clock = lambda: now_ms()
+    new_id = lambda: str(uuid4())
+    products = ProductOperations(writes, clock, new_id)
+    meals = MealOperations(writes, clock, new_id)
+    register_products(app, ProductUseCases(
+        get=GetProduct(reads), list=GetProducts(reads), create=CreateProduct(products), edit=EditProduct(products),
+    ), clock)
+    register_meals(app, MealUseCases(
+        get=GetMeal(reads), repeat=RepeatMeal(reads, clock, new_id), preview=PreviewMealProduct(),
+        create=CreateMeal(meals), edit=EditMeal(meals), delete=DeleteMeal(meals), restore=RestoreMeal(meals),
+    ), clock)
