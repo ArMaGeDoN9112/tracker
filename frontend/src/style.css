@@ -107,7 +107,12 @@ button:disabled { opacity: .65; cursor: wait; }
 .basal-fill { fill:var(--accent); fill-opacity:.12; }
 .basal-line { fill:none; stroke:var(--accent); stroke-width:2; vector-effect:non-scaling-stroke; }
 .basal-unknown { fill:var(--raised); stroke:var(--muted); stroke-dasharray:3 3; }
-.basal-day-chart summary,.calendar-temporary summary { cursor:pointer; min-height:44px; padding:10px 0; color:var(--muted); }
+.basal-hit { fill:transparent; cursor:crosshair; }
+.basal-selected { fill:var(--accent); fill-opacity:.12; }
+.basal-hit:focus-visible { outline:2px solid var(--accent); outline-offset:0; }
+.basal-tooltip rect { fill:var(--raised); stroke:var(--muted); }
+.basal-day-chart .basal-tooltip text { fill:var(--text); }
+.calendar-temporary summary { cursor:pointer; min-height:44px; padding:10px 0; color:var(--muted); }
 .calendar-temporary { margin-top:8px; }
 @media(max-width:767px) {
   .calendar-nutrients { grid-template-columns:repeat(2,minmax(0,1fr)); }

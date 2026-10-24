@@ -1,3 +1,4 @@
+import { useEffect, useId, useState } from 'react'
 import { localMinute, basalText, moscowLabel } from './time'
 
 type Change = { occurred_at: string; basal: string | null }
@@ -5,6 +6,13 @@ const moscowOffset = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Moscow', 
 const offset = (date: Date) => moscowOffset.formatToParts(date).find(part => part.type === 'timeZoneName')?.value
 
 export function BasalDayChart({ basal, changes }: { basal: string | null; changes: Change[] }) {
+  const [selected, setSelected] = useState<number | null>(null)
+  const tooltipId = useId()
+  useEffect(() => {
+    const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelected(null) }
+    document.addEventListener('keydown', dismiss)
+    return () => document.removeEventListener('keydown', dismiss)
+  }, [])
   const clockChange = changes.some((change, index) => {
     const before = index === 0 ? new Date(Date.parse(change.occurred_at) - 1) : new Date(changes[index - 1].occurred_at)
     return offset(new Date(change.occurred_at)) !== offset(before)
@@ -30,7 +38,8 @@ export function BasalDayChart({ basal, changes }: { basal: string | null; change
 
   return <div className="basal-day-chart">
     <p className="muted">Скорость по расписанию с учётом временной базы · ед/ч</p>
-    <svg viewBox="0 0 360 180" role="img" aria-label="График базы с 00 до 24 часов, Москва">
+    <svg viewBox="0 0 360 180" role="group" aria-label="График базы с 00 до 24 часов, Москва"
+      onPointerLeave={event => { if (event.pointerType === 'mouse' && !event.currentTarget.contains(document.activeElement)) setSelected(null) }}>
       <text x="4" y="36">{maximum}</text><text x="24" y="144">0</text>
       {[0, 6, 12, 18, 24].map(hour => <g key={hour}>
         <line x1={x(hour)} x2={x(hour)} y1="28" y2="140" className="basal-grid" />
@@ -38,7 +47,6 @@ export function BasalDayChart({ basal, changes }: { basal: string | null; change
       </g>)}
       <line x1="40" x2="340" y1="140" y2="140" className="basal-grid" />
       {segments.map((point, index) => <g key={index}>
-        <title>{time(point.hour)}–{time(point.end)}: {basalText(point.basal)}</title>
         {point.basal === null ? <>
           <rect x={x(point.hour)} y="28" width={x(point.end) - x(point.hour)} height="112" className="basal-unknown" />
           <text x={(x(point.hour) + x(point.end)) / 2} y="90" textAnchor="middle">?</text>
@@ -47,8 +55,22 @@ export function BasalDayChart({ basal, changes }: { basal: string | null; change
           <path d={`M${x(point.hour)},${y(point.basal)} H${x(point.end)}${segments[index + 1]?.basal != null ? ` V${y(segments[index + 1].basal!)}` : ''}`} className="basal-line" />
         </>}
       </g>)}
+      {segments.map((point, index) => <rect key={index} x={x(point.hour)} y="28" width={x(point.end) - x(point.hour)} height="112"
+        className={`basal-hit${selected === index ? ' basal-selected' : ''}`} role="button" tabIndex={0}
+        aria-label={`${time(point.hour)}–${time(point.end)} · ${basalText(point.basal)}`} aria-describedby={selected === index ? tooltipId : undefined}
+        onPointerMove={() => setSelected(index)} onPointerDown={event => { event.currentTarget.focus(); setSelected(index) }}
+        onClick={() => setSelected(index)}
+        onFocus={() => setSelected(index)} onBlur={() => setSelected(null)}
+        onKeyDown={event => {
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(index) }
+        }} />)}
+      {selected !== null && segments[selected] && <g role="tooltip" id={tooltipId} className="basal-tooltip" pointerEvents="none"
+        transform={`translate(${Math.max(40, Math.min(180, x((segments[selected].hour + segments[selected].end) / 2) - 80))}, 2)`}>
+        <rect width="160" height="44" rx="6" />
+        <text x="80" y="17" textAnchor="middle">{time(segments[selected].hour)}–{time(segments[selected].end)}</text>
+        <text x="80" y="34" textAnchor="middle">{basalText(segments[selected].basal)}</text>
+      </g>}
     </svg>
     {segments.some(point => point.basal === null) && <p className="muted">? — скорость базы неизвестна</p>}
-    <details><summary>Интервалы и скорости</summary><ul>{segments.map((point, index) => <li key={index}>{time(point.hour)}–{time(point.end)} · {basalText(point.basal)}</li>)}</ul></details>
   </div>
 }
