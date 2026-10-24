@@ -5,8 +5,9 @@ import { nutrients } from './ProductCatalog'
 import { BasalDayChart } from './BasalDayChart'
 import type { TemporaryPeriod } from './TemporaryBasal'
 import { basalText, localMinute, moscowLabel } from './time'
+import type { GlucoseDay } from './GlucoseCharts'
 
-type CalendarDay = { day: string; meal_count: number; totals: Totals; water_total_ml: number | null }
+type CalendarDay = { day: string; meal_count: number; totals: Totals; water_total_ml: number | null; glucose_average: string | null }
 type DiaryDay = {
   basal: string | null; temporary_percent: number | null
   basal_changes: { occurred_at: string; basal: string | null }[]
@@ -105,8 +106,14 @@ export function DayCalendar({ active, day, generation, onDay }: { active: boolea
     let cancelled = false
     setDays(null); setError('')
     if (!active) return
-    read<{ days: CalendarDay[] }>(`/api/nutrition-summary?period=custom&start=${first}&end=${end}`)
-      .then(result => { if (!cancelled) setDays(result.days) })
+    const period = `period=custom&start=${first}&end=${end}`
+    Promise.all([
+      read<{ days: Omit<CalendarDay, 'glucose_average'>[] }>(`/api/nutrition-summary?${period}`),
+      read<{ days: GlucoseDay[] }>(`/api/glucose-summary?${period}`),
+    ]).then(([nutrition, glucose]) => {
+      const averages = new Map(glucose.days.map(row => [row.day, row.average]))
+      if (!cancelled) setDays(nutrition.days.map(row => ({ ...row, glucose_average: averages.get(row.day) ?? null })))
+    })
       .catch(() => { if (!cancelled) setError('Не удалось загрузить календарь. Перезагрузите страницу.') })
     return () => { cancelled = true }
   }, [active, first, end, generation])
@@ -128,20 +135,22 @@ export function DayCalendar({ active, day, generation, onDay }: { active: boolea
       <div><label htmlFor="calendar-month">Месяц — Москва</label><input id="calendar-month" type="month" min="0001-01" max="9999-11" value={month} onChange={event => selectMonth(event.target.value)} /></div>
       <button disabled={month === '9999-11'} onClick={() => moveMonth(1)} aria-label="Следующий месяц">→</button>
     </div>
-    <p className="muted calendar-legend">В каждом дне: калории, ккал · вода, мл.<br />«—» — нет записей; «?» — калории неизвестны; «*» — калории неполные.</p>
+    <p className="muted calendar-legend">В каждом дне: калории, ккал · вода, мл · средний сахар, ммоль/л.<br />«—» — нет записей; «?» — калории неизвестны; «*» — калории неполные.</p>
     {error ? <p role="alert" className="error">{error}</p> : !days ? <p role="status">Загружаем календарь…</p> : <>
       <div className="calendar-grid">
         {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(label => <span className="calendar-weekday" key={label}>{label}</span>)}
         {days.map((row, index) => {
           const calories = row.totals.calories
           const label = !row.meal_count ? 'нет записей еды' : `${calories.value ?? 'неизвестно'} ккал${calories.incomplete ? ', данные неполные' : ''}`
+          const glucose = row.glucose_average?.replace('.', ',') ?? '—'
           return <button key={row.day} id={`calendar-${row.day}`} className="calendar-day" style={index === 0 ? { gridColumnStart: weekday + 1 } : undefined}
-            aria-label={`Открыть сводку за ${row.day}: ${label}; ${row.water_total_ml === null ? 'нет записей воды' : `${row.water_total_ml} мл воды`}`}
+            aria-label={`Открыть сводку за ${row.day}: ${label}; ${row.water_total_ml === null ? 'нет записей воды' : `${row.water_total_ml} мл воды`}; ${row.glucose_average === null ? 'нет измерений сахара' : `средний сахар ${glucose} ммоль/л`}`}
             aria-pressed={open && row.day === day} aria-current={row.day === today ? 'date' : undefined}
             onClick={() => { setOpen(true); onDay(row.day) }}>
             <time dateTime={row.day}>{Number(row.day.slice(-2))}</time>
             <span className="calendar-calories">{!row.meal_count ? '—' : calories.value ?? '?'}{calories.incomplete && '*'}</span>
             <span className="calendar-water">{row.water_total_ml ?? '—'}</span>
+            <span className="calendar-glucose">{glucose}</span>
           </button>
         })}
       </div>

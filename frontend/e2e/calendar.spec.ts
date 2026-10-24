@@ -18,6 +18,8 @@ test('month calendar opens the complete Moscow day without losing the draft', as
     ['/api/meals', { lines: [{ id: crypto.randomUUID(), kind: 'one_off', name: 'Обед в календаре', calories: '123.45', protein: '7' }] }],
     ['/api/water', { volume_ml: 750 }],
     ['/api/entries', { glucose: '5.6', bolus: '1.2', reason: 'food', comment: 'Запись календаря' }],
+    ['/api/entries', { glucose: '7.0' }],
+    ['/api/entries', { bolus: '0.5' }],
   ] as const) {
     expect((await page.request.post(path, { headers, data: { operation_id: crypto.randomUUID(), occurred_at: `${day}T23:59:59.999+03:00`, ...data } })).ok()).toBeTruthy()
   }
@@ -34,6 +36,10 @@ test('month calendar opens the complete Moscow day without losing the draft', as
   const open = calendar.getByRole('button', { name: `Открыть сводку за ${day}:` })
   await expect(open).toContainText('123.45')
   await expect(open).toContainText('750')
+  await expect(open.locator('.calendar-glucose')).toHaveText('6,3')
+  await expect(open).toHaveAccessibleName(/средний сахар 6,3 ммоль\/л/)
+  await expect(days.first().locator('.calendar-glucose')).toHaveText('—')
+  await expect(days.first()).toHaveAccessibleName(/нет измерений сахара/)
   await open.focus(); await page.keyboard.press('Enter')
   const details = calendar.getByRole('region', { name: 'Подробная сводка дня', exact: true })
   await expect(details.getByRole('heading', { name: `Сводка за ${day}` })).toBeFocused()
@@ -63,6 +69,8 @@ test('month calendar opens the complete Moscow day without losing the draft', as
     const water = await open.locator('.calendar-water').boundingBox()
     const selected = await open.boundingBox()
     expect(water!.y + water!.height).toBeLessThanOrEqual(selected!.y + selected!.height)
+    const glucose = await open.locator('.calendar-glucose').boundingBox()
+    expect(glucose!.y + glucose!.height).toBeLessThanOrEqual(selected!.y + selected!.height)
     expect((await open.locator('.calendar-calories').boundingBox())!.height).toBeLessThanOrEqual(21)
     if (process.env.DIARY_ACCEPTANCE_DIR) await calendar.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-${info.project.name}-${width}.png` })
   }

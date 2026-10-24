@@ -2,7 +2,7 @@ import { privateFetch } from './access'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Dot, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, type DotItemDotProps } from 'recharts'
 
-type GlucoseDay = { day: string; count: number; average: string | null; minimum: string | null; maximum: string | null }
+export type GlucoseDay = { day: string; count: number; average: string | null; minimum: string | null; maximum: string | null }
 type Summary = { start: string; end: string; count: number; average: string | null; days: GlucoseDay[] }
 const glucoseText = (value: string | null) => value === null ? '—' : value.replace('.', ',')
 
