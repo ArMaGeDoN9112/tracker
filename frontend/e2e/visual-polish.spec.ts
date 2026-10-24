@@ -64,6 +64,13 @@ test('every screen keeps readable cards, unknown values and usable controls at a
     for (const width of [375, 768, 1280]) {
       await page.setViewportSize({ width, height: 1000 })
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      if (section === 'Ввод питания') {
+        const form = await page.getByRole('region', { name: 'Форма приёма пищи', exact: true }).boundingBox()
+        const history = await page.getByRole('region', { name: 'День питания', exact: true }).boundingBox()
+        expect(form).not.toBeNull()
+        expect(history).not.toBeNull()
+        expect(history!.y).toBeGreaterThanOrEqual(form!.y + form!.height)
+      }
       if (process.env.DIARY_ACCEPTANCE_DIR) await page.locator('.workspace').screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/${info.project.name}-${section}-${width}.png` })
     }
   }
