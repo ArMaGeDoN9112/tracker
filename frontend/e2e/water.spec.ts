@@ -30,7 +30,7 @@ test('water quick/manual entry, settings, move and global undo preserve draft', 
   await page.getByRole('button', { name: 'Добавить 250 мл', exact: true }).click()
   await expect(page.getByText('Вода сохранена. Показана актуальная история.', { exact: true })).toBeVisible()
   await page.getByLabel('День питания — Москва').fill(new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Moscow' }).format(new Date()))
-  await expect(page.getByLabel('История воды').getByText('250 мл', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('История воды').getByRole('article').getByText('250 мл', { exact: true })).toBeVisible()
   await page.getByLabel('Объём воды, мл', { exact: true }).fill('333')
   await page.getByLabel('Время воды — Москва', { exact: true }).fill('2026-10-19T14:00')
   await page.getByRole('button', { name: 'Сохранить воду', exact: true }).click()

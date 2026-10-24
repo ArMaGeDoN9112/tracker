@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { BasalSchedules } from './BasalSchedules'
 import { GlucoseCharts } from './GlucoseCharts'
 import { DayCalendar } from './DayCalendar'
+import { BasalDayChart } from './BasalDayChart'
 import { TemporaryBasal, type TemporaryPeriod } from './TemporaryBasal'
 import { localMinute, basalText, moscowLabel } from './time'
 
@@ -318,13 +319,14 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     {dayLoading && <p role="status">Загружаем день…</p>}
     {dayError && <p role="alert" className="error">{dayError}</p>}
     <div hidden={dayLoading || !!dayError}>
-    <p className="muted" data-testid="day-basal">База на начало дня: {basalText(dayBasal)} · по расписанию</p>
-    <p data-testid="day-temporary-basal">На начало дня: {temporaryPercent === null ? 'обычное расписание' : `временная база ${temporaryPercent}% от расписания`} · по расписанию</p>
+    <div className="day-basal-overview"><p data-testid="day-basal">База на начало дня: <strong>{basalText(dayBasal)}</strong> · по расписанию</p>
+    <p data-testid="day-temporary-basal">На начало дня: <span className="status-badge">{temporaryPercent === null ? 'обычное расписание' : `временная база ${temporaryPercent}% от расписания`}</span></p></div>
+    <details className="explanation"><summary>График базы за день</summary><BasalDayChart basal={dayBasal} changes={basalChanges} /></details>
     <section className="day-temporary" aria-label="Временная база дня" hidden={temporaryBasals.length === 0}>
       {temporaryBasals.map(row => <article key={row.id}>
         <p>Временная база {row.percent}% · с {moscowLabel(row.starts_at)} · по расписанию</p>
-        <p>Исходная длительность: {row.duration_minutes} мин. Заданное окончание: {moscowLabel(row.ends_at)}.</p>
-        <p>Эффективное окончание: {moscowLabel(row.effective_ends_at)} (не включая).</p>
+        <details className="explanation"><summary>Параметры периода</summary><p>Исходная длительность: {row.duration_minutes} мин. Заданное окончание: {moscowLabel(row.ends_at)}.</p>
+        <p>Эффективное окончание: {moscowLabel(row.effective_ends_at)} (не включая).</p></details>
       </article>)}
     </section>
     <ol className="entries">{[...entries.map(row => ({ kind: 'entry' as const, row, occurred_at: row.occurred_at })),
@@ -338,8 +340,8 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         const row = item.row
         return <li className="entry" key={row.id}>
       <time dateTime={row.occurred_at}>{moscowTime.format(new Date(row.occurred_at))}</time>
-      <div className="entry-values"><p className="entry-glucose"><span>Сахар: </span><strong>{row.glucose?.replace('.', ',') ?? 'не указан'}</strong><small>ммоль/л</small></p><p className="entry-bolus">Подколка: {row.bolus.replace('.', ',')} ед.</p></div>
-      {row.reason && <p>{reasons[row.reason]}</p>}
+      <div className="entry-values"><p className="entry-glucose"><span>Сахар: </span><strong>{row.glucose?.replace('.', ',') ?? 'не указан'}</strong><small>ммоль/л</small></p><p className="entry-bolus">Подколка: <strong>{row.bolus.replace('.', ',')}</strong> ед.</p></div>
+      {row.reason && <p><span className="status-badge">{reasons[row.reason]}</span></p>}
       {row.comment && <p className="comment">{row.comment}</p>}
       <p className="muted">База: {basalText(row.basal)} · по расписанию</p>
       <div className="entry-actions"><button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => edit(row)}>Изменить</button>

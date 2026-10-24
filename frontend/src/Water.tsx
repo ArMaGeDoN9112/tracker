@@ -191,6 +191,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось загрузить актуальные данные.') }
   }
   const locked = busy || !!pending
+  const maxWater = data?.water.reduce((maximum, event) => Math.max(maximum, event.volume_ml), 1) ?? 1
   const invalid = (name: string) => ({ 'aria-invalid': field === name || !!field?.startsWith(name + '.'),
     'aria-describedby': field === name || field?.startsWith(name + '.') ? 'water-error' : undefined })
   const undoTarget = document.getElementById('global-undo')
@@ -200,7 +201,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       {pending && (pending.action === 'delete' || pending.action === 'restore') && <><p role="status">{confirmed ? 'Операция подтверждена.' : 'Результат операции неизвестен.'}</p><button disabled={busy} onClick={() => void retry()}>Повторить операцию с водой</button>{error && <p role="alert">{error}</p>}</>}
     </div>, undoTarget)}
     <section className="water-panel" aria-label="Учёт воды" hidden={!authorized || !visible}>
-      <h2>Вода</h2><p className="muted">Только явно внесённая вода. Кнопки добавляют воду сейчас по серверу; другое время задайте по Москве.</p>
+      <h2>Вода</h2><p className="muted">Быстрые кнопки добавляют воду сейчас. Другое время укажите ниже.</p>
       {error && <p id="water-error" role="alert" tabIndex={-1} className="error">{error}</p>}
       {!settings && <button disabled={busy} onClick={() => void initialize().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение воды</button>}
       <div className="water-buttons">{settings?.volumes_ml.map(value => <button key={value} aria-label={`Добавить ${value} мл`} disabled={locked || !!editing || !!amount} onClick={() => quick(value)}>{value} мл</button>)}</div>
@@ -210,7 +211,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
           <label htmlFor="water-amount">Объём воды, мл</label><input id="water-amount" inputMode="numeric" required value={amount} onChange={e => setAmount(e.target.value)} {...invalid('volume_ml')} />
           <label htmlFor="water-time">Время воды — Москва</label><input id="water-time" type="datetime-local" step="60" required value={localTime} onChange={e => { timeInitialized.current = true; setLocalTime(e.target.value); setInstant(''); setCandidates([]) }} {...invalid('occurred_at')} />
           {candidates.length > 1 && <><label htmlFor="water-offset">Смещение времени воды</label><select id="water-offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение UTC</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
-          <p className="muted">Целые мл от 1 до 2147483647 — технический предел, без дневной цели.</p>
+          <details className="explanation"><summary>Об учёте воды</summary><p className="muted">Только явно внесённая вода. Целые мл от 1 до 2147483647 — технический предел, без дневной цели.</p></details>
           <button type="submit" disabled={!!conflict}>Сохранить воду</button><button type="button" onClick={clear}>Отменить ввод воды</button>
         </fieldset>
       </form>
@@ -232,8 +233,11 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       {notice && <p role="status">{notice}</p>}
       <section aria-label="История воды"><h3>Вода за {day}</h3>
         {loading && <p role="status">Загружаем воду…</p>}{dayError && <p role="alert">{dayError}</p>}
-        {!loading && !dayError && data?.day === day && <>{data.water_total_ml === null ? <p>Нет записей воды</p> : <p>Сумма воды: {data.water_total_ml} мл</p>}
-          {data.water.map(row => <article className="meal-history" key={row.id} aria-label={`Вода ${moscowLabel(row.occurred_at)}`}><p>{row.volume_ml} мл</p><p>{moscowLabel(row.occurred_at)}</p><div className="catalog-actions"><button disabled={locked} onClick={() => edit(row)}>Изменить воду</button><button disabled={locked} onClick={() => action(row, 'delete')}>Удалить воду</button></div></article>)}
+        {!loading && !dayError && data?.day === day && <>{data.water_total_ml === null ? <p>Нет записей воды</p> : <p className="water-total">Сумма воды: <strong>{data.water_total_ml} мл</strong></p>}
+          {data.water.map(row => <article className="meal-history water-record" key={row.id} aria-label={`Вода ${moscowLabel(row.occurred_at)}`}><header className="record-heading"><strong>{row.volume_ml} мл</strong><time dateTime={row.occurred_at}>{localMinute(row.occurred_at).slice(11)}</time></header>
+            <span className="water-bar-track" aria-hidden="true"><span style={{ width: `${row.volume_ml / maxWater * 100}%` }} /></span>
+            <details className="explanation"><summary>Время записи</summary><p>{moscowLabel(row.occurred_at)}</p></details>
+            <div className="catalog-actions"><button disabled={locked} onClick={() => edit(row)}>Изменить воду</button><button disabled={locked} onClick={() => action(row, 'delete')}>Удалить воду</button></div></article>)}
         </>}
       </section>
     </section>

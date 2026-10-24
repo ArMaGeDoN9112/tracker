@@ -38,9 +38,10 @@ export function BackupStatus({ status, error }: ReturnType<typeof useBackupStatu
   return <section aria-labelledby="backup-title">
     <h3 id="backup-title">Резервное копирование</h3>
     {status ? <>
-      <p>Последняя успешная внешняя копия: {when(status.last_external_success)}.</p>
-      {status.last_local_success && <p>Локальная тестовая копия: {when(status.last_local_success)}. Внешняя доставка не подтверждена этим запуском.</p>}
-      <p>Последняя успешная проверка восстановления: {when(status.last_verification)}.</p>
+      <p className={`backup-state${status.overdue || status.error || status.verification_error ? ' needs-attention' : ''}`}><span aria-hidden="true">{status.overdue || status.error || status.verification_error ? '!' : status.last_external_success ? '✓' : '—'}</span> {status.overdue || status.error || status.verification_error ? 'Требует внимания' : status.last_external_success ? 'Внешняя копия создана' : 'Внешней копии ещё нет'}</p>
+      <dl className="backup-facts"><div><dt>Последняя успешная внешняя копия: </dt><dd>{when(status.last_external_success)}.</dd></div>
+      <div><dt>Последняя успешная проверка восстановления: </dt><dd>{when(status.last_verification)}.</dd></div></dl>
+      {status.last_local_success && <p className="muted">Локальная тестовая копия: {when(status.last_local_success)}. Внешняя доставка не подтверждена этим запуском.</p>}
       {status.overdue && <p role="alert" className="error">Нет успешной внешней копии за последние 26 часов. Сохранность последних данных не подтверждена.</p>}
       {status.error && <p role="alert" className="error">{status.error}</p>}
       {status.verification_error && <p role="alert" className="error">{status.verification_error}</p>}

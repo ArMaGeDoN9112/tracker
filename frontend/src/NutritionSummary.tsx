@@ -64,25 +64,25 @@ export function NutritionSummary({ active, generation, onDay }: {
     {error ? <p role="alert" className="error">Не удалось загрузить сводку питания. {error}</p>
       : !summary && <p role="status">Загружаем сводку питания…</p>}
     {summary && <>
-      <p data-testid="nutrition-bounds">{summary.start} — {summary.end} · Москва · обе даты включены</p>
-      <p>Дней с едой: {summary.food_days}; приёмов: {summary.meal_count}</p>
+      <p className="period-bounds" data-testid="nutrition-bounds">{summary.start} — {summary.end} · Москва · обе даты включены</p>
+      <p className="summary-counts"><span>Дней с едой: <strong>{summary.food_days}</strong></span>; <span>приёмов: <strong>{summary.meal_count}</strong></span></p>
       {!summary.food_days && <p role="status">В этом периоде нет записей еды.</p>}
-      <h3>Средние известных дневных сумм</h3>
-      <dl className="meal-totals">{nutrients.map(([key, label, unit]) => {
+      <h3>Среднее по дням с данными</h3>
+      <dl className="meal-totals metric-grid">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, unit]) => {
         const average = summary.averages[key]
         return <div key={key} data-testid={`nutrition-average-${key}`}><dt>{label}</dt><dd>
-          {average.value === null ? 'Неизвестно' : `${average.value} ${unit}`}{average.incomplete && '; данные неполные'}
-          <small>Знаменатель — известных дней: {average.known_days}; неполных дней: {average.incomplete_days}; дней с едой: {summary.food_days}</small>
+          {average.value === null ? <span className="unknown-value">Неизвестно</span> : `${average.value} ${unit}`}{average.incomplete && <small className="incomplete-note">; данные неполные</small>}
+          <details className="explanation"><summary>Данные для среднего</summary><small>Знаменатель — известных дней: {average.known_days}; неполных дней: {average.incomplete_days}; дней с едой: {summary.food_days}</small></details>
         </dd></div>
       })}</dl>
-      <p className="muted">Сумма точных известных вкладов делится на число дней с известным значением каждого показателя. Известный ноль учитывается; пустые и полностью неизвестные дни не становятся нулями. Любое неизвестное значение делает среднее неполным. Средние округляются независимо от дневных итогов до сотых, половина вверх. Вода не учитывается.</p>
+      <details className="explanation"><summary>Как считается среднее</summary><p className="muted">Сумма точных известных вкладов делится на число дней с известным значением каждого показателя. Известный ноль учитывается; пустые и полностью неизвестные дни не становятся нулями. Любое неизвестное значение делает среднее неполным. Средние округляются независимо от дневных итогов до сотых, половина вверх. Вода не учитывается.</p></details>
       <div className="glucose-table" tabIndex={0} role="region" aria-label="Дневные итоги питания">
-        <table><caption>Дневные итоги. Откройте день для проверки исходных приёмов.</caption>
+        <table><caption>Дневные итоги · «—» — нет записей еды. Нажмите на день для просмотра приёмов.</caption>
           <thead><tr><th scope="col">День</th><th scope="col">Приёмов</th>{nutrients.map(([key, label, unit]) => <th key={key} scope="col">{label}, {unit}</th>)}</tr></thead>
-          <tbody>{summary.days.map(row => <tr key={row.day}>
-            <th scope="row"><button onClick={() => onDay(row.day)} aria-label={`Открыть питание за ${row.day}`}>{row.day}</button></th><td>{row.meal_count}{!row.meal_count && <small>Нет записей еды</small>}</td>
-            {nutrients.map(([key]) => <td key={key}>{row.totals[key].value === null ? 'Неизвестно' : `${row.totals[key].incomplete ? 'Известно ' : ''}${row.totals[key].value}`}{row.totals[key].incomplete && '; данные неполные'}
-              <small>Известных строк: {row.totals[key].known_count}; неизвестных: {row.totals[key].unknown_count}</small></td>)}
+          <tbody>{summary.days.map(row => <tr key={row.day} className={row.meal_count ? undefined : 'empty-day'}>
+            <th scope="row"><button onClick={() => onDay(row.day)} aria-label={`Открыть питание за ${row.day}`}>{row.day}</button></th><td>{row.meal_count}{!row.meal_count && <span className="sr-only">Нет записей еды</span>}</td>
+            {nutrients.map(([key]) => <td key={key}>{!row.meal_count ? <span aria-label="Нет записей еды">—</span> : <>{row.totals[key].value === null ? 'Неизвестно' : `${row.totals[key].incomplete ? 'Известно ' : ''}${row.totals[key].value}`}{row.totals[key].incomplete && '; данные неполные'}</>}
+              </td>)}
           </tr>)}</tbody>
         </table>
       </div>

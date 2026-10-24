@@ -1,10 +1,10 @@
 import { privateFetch } from './access'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { moscowLabel } from './time'
+import { BasalChart } from './BasalDayChart'
 
 type Version = { id: string; starts_at: string; ends_at: string | null; intervals: { minute: number; rate: string }[] }
 type Preview = { startsAt: string; endsAt: string | null }
-const clock = (minute: number) => `${Math.floor(minute / 60).toString().padStart(2, '0')}:${(minute % 60).toString().padStart(2, '0')}`
 
 export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
   active: boolean; initialTime: string; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
@@ -139,7 +139,7 @@ export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
       {historyLoaded && !historyLoading && !historyError && versions.length === 0 && <p>Расписание ещё не задано.</p>}
       {versions.map(version => <article id={`schedule-${version.id}`} key={version.id}>
         <details><summary>С <time dateTime={version.starts_at}>{moscowLabel(version.starts_at)}</time><span>До {version.ends_at ? `${moscowLabel(version.ends_at)} (не включая)` : 'следующей версии (не задана)'}</span></summary>
-        <ul>{version.intervals.map((interval, index) => <li key={interval.minute}>{clock(interval.minute)}–{index + 1 < version.intervals.length ? clock(version.intervals[index + 1].minute) : '00:00 следующего дня'}: {interval.rate.replace('.', ',')} ед/ч · по расписанию</li>)}</ul>
+        <BasalChart points={version.intervals.map(interval => ({ hour: interval.minute / 60, basal: interval.rate }))} />
         </details>
       </article>)}
     </div>

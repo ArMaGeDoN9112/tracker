@@ -156,13 +156,13 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
               <circle cx="99" cy="97" r="14" fill="#d87959" /><circle cx="119" cy="75" r="11" fill="#d87959" />
             </>}
           </svg>}
-          <h3>{product.name}</h3><span className="food-card-hint">{product.unit === 'g' ? '100 г' : '100 мл'} · Подробнее</span>
+          <h3>{product.name}</h3><span className="food-energy">{product.calories === null ? 'Калории неизвестны' : `${product.calories} ккал`}</span><span className="food-card-hint">{product.unit === 'g' ? '100 г' : '100 мл'} · Подробнее</span>
         </summary>
         <div className="food-details">
         <p>На 100 {product.unit === 'g' ? 'г' : 'мл'}</p>
         {onSelect && <button disabled={selectionDisabled || busy || !!pending} onClick={() => onSelect(product)}>Добавить в приём</button>}
-        {nutrients.map(([key, label, nutrientUnit]) => <p key={key}>{label}: {product[key] === null ? 'неизвестно' : `${product[key]} ${nutrientUnit}`}</p>)}
-        <ul>{product.portions.map(portion => <li key={portion.id}>{portion.name}: {portion.quantity} {product.unit === 'g' ? 'г' : 'мл'}</li>)}</ul>
+        <dl className="metric-grid product-nutrients">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, nutrientUnit]) => <div key={key}><dt>{label}: </dt><dd>{product[key] === null ? 'неизвестно' : `${product[key]} ${nutrientUnit}`}</dd></div>)}</dl>
+        <ul className="portion-chips">{product.portions.map(portion => <li key={portion.id}>{portion.name}: {portion.quantity} {product.unit === 'g' ? 'г' : 'мл'}</li>)}</ul>
         <button disabled={!!draft || busy || !!pending} onClick={() => open(product)}>Изменить</button>
         </div>
         </details>
@@ -171,7 +171,8 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
     <section className="product-editor" aria-label="Карточка продукта" hidden={!draft}>
       {draft && <><h2>{draft.id ? 'Изменение продукта' : 'Новый продукт'}</h2>
         {seed && !draft.id && <p>Предпросмотр на 100 {unit}: значения округлены до сотых, половина вверх. Проверьте и явно сохраните карточку. Исходный приём не изменится.</p>}
-        <p className="muted">Пустое значение — неизвестно, 0 — известный ноль. До двух знаков после запятой, максимум 21474836,47. Калории вводятся независимо от БЖУ.</p>
+        <p className="muted">Пустое значение — неизвестно, 0 — известный ноль. Калории — с этикетки.</p>
+        <details className="explanation"><summary>Формат значений</summary><p>До двух знаков после запятой, максимум 21474836,47. Калории вводятся независимо от БЖУ.</p></details>
         {error && <p id="product-error" role="alert" tabIndex={-1} className="error">{error}</p>}
         <form onSubmit={save} aria-busy={busy}>
           <fieldset disabled={busy || photoBusy || !!pending}>

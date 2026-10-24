@@ -231,9 +231,9 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
     {historyLoaded && !historyLoading && !historyError && history.length === 0 && <p>Временная база ещё не задана.</p>}
     {history.map(row => <article key={row.id}>
       <p className="temporary-percent">{row.percent}% <span>· по расписанию</span></p>
-      <p><time dateTime={row.starts_at}>{moscowLabel(row.starts_at)}</time> — {moscowLabel(row.effective_ends_at)}</p>
-      <p className="muted">Эффективное окончание: {moscowLabel(row.effective_ends_at)}.</p>
-      <p>Заданное окончание: {moscowLabel(row.ends_at)}. Исходная длительность: {row.duration_minutes} мин.</p>
+      <p className="period-range"><time dateTime={row.starts_at}>{localMinute(row.starts_at).replace('T', ' · ')}</time><span aria-hidden="true">→</span><time dateTime={row.effective_ends_at}>{localMinute(row.effective_ends_at).replace('T', ' · ')}</time></p>
+      <details className="explanation"><summary>Параметры периода</summary><p>Начало: {moscowLabel(row.starts_at)}.</p><p className="muted">Эффективное окончание: {moscowLabel(row.effective_ends_at)}.</p>
+      <p>Заданное окончание: {moscowLabel(row.ends_at)}. Исходная длительность: {row.duration_minutes} мин.</p></details>
       <div className="entry-actions"><button disabled={busy || pending !== null || editing !== null} onClick={() => select(row)}>Изменить / завершить</button>
       <button disabled={busy || pending !== null || editing !== null} onClick={() => select(row, true)}>Удалить</button>
       </div>

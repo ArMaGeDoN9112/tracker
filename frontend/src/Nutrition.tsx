@@ -57,20 +57,23 @@ function preview(lines: DraftLine[]): Totals | null {
   } catch { return null }
 }
 export function TotalsView({ totals }: { totals: Totals }) {
-  return <dl className="meal-totals">{nutrients.map(([key, label, unit]) => <div key={key}><dt>{label}</dt><dd>
-    {totals[key].value === null ? 'Неизвестно' : `${totals[key].incomplete ? 'Известно ' : ''}${totals[key].value} ${unit}`}
-    {totals[key].incomplete && '; данные неполные'}
-    <small>Известных строк: {totals[key].known_count}; неизвестных: {totals[key].unknown_count}</small>
+  return <dl className="meal-totals metric-grid">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, unit]) => <div key={key}><dt>{label}</dt><dd>
+    {totals[key].value === null ? <span className="unknown-value">Неизвестно</span> : `${totals[key].incomplete ? 'Известно ' : ''}${totals[key].value} ${unit}`}
+    {totals[key].incomplete && <small className="incomplete-note">; данные неполные</small>}
   </dd></div>)}</dl>
 }
 export function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; onProduct?: (line: Line) => void; productDisabled?: boolean }) {
-  return <><p>{moscowLabel(meal.occurred_at)} · {categories.find(([key]) => key === meal.category)?.[1] ?? 'Без категории'} · редакция {meal.revision}{meal.deleted_at && ' · Удалён'}</p>
-    <ol>{meal.lines.map((line, index) => <li key={line.id}><strong>{line.name}</strong> · {line.quantity === null ? 'Целая порция; количество неизвестно' : `${line.quantity} ${line.unit === 'g' ? 'г' : 'мл'}`}
-      <p>Основа: {line.basis_quantity === null ? 'исходная порция без известного количества' : `${line.basis_quantity} ${line.unit === 'g' ? 'г' : 'мл'}`} · {nutrients.map(([key, label, unit]) => `${label}: ${line[key] ?? 'неизвестно'}${line[key] === null ? '' : ` ${unit}`}`).join('; ')}</p>
+  return <><header className="record-heading"><strong>{categories.find(([key]) => key === meal.category)?.[1] ?? 'Приём пищи'}</strong><time dateTime={meal.occurred_at}>{localMinute(meal.occurred_at).replace('T', ' · ')}</time>{meal.deleted_at && <span className="status-badge">Удалён</span>}</header>
+    <TotalsView totals={meal.totals} />
+    <ol className="meal-foods">{meal.lines.map((line, index) => <li key={line.id}><div className="record-heading"><strong>{line.name}</strong><span className="muted">{line.quantity === null ? 'Целая порция · количество неизвестно' : `${line.quantity} ${line.unit === 'g' ? 'г' : 'мл'}`}</span></div>
       {line.portion && <p>Порция: {line.portion.name} · {line.portion.quantity} {line.unit === 'g' ? 'г' : 'мл'}</p>}
-      <p>{nutrients.map(([key, label, unit]) => `${label}: ${line.totals[key] ?? 'неизвестно'}${line.totals[key] === null ? '' : ` ${unit}`}`).join('; ')}</p>
+      {meal.lines.length > 1 && <div className="nutrient-chips">{nutrients.map(([key, label, unit]) => <span key={key}>{label}: <strong>{line.totals[key] ?? 'неизвестно'}{line.totals[key] === null ? '' : ` ${unit}`}</strong></span>)}</div>}
+      <details className="explanation"><summary>Исходные данные — {line.name}</summary>
+        <p>Основа: {line.basis_quantity === null ? 'исходная порция без известного количества' : `${line.basis_quantity} ${line.unit === 'g' ? 'г' : 'мл'}`} · {nutrients.map(([key, label, unit]) => `${label}: ${line[key] ?? 'неизвестно'}${line[key] === null ? '' : ` ${unit}`}`).join('; ')}</p>
+        <p className="muted">Редакция приёма: {meal.revision}. {moscowLabel(meal.occurred_at)}</p>
+      </details>
       {line.kind === 'one_off' && onProduct && <button disabled={productDisabled} onClick={() => { const { totals, ...snapshot } = line; onProduct(snapshot) }}>Сохранить как продукт — строка {index + 1}</button>}
-    </li>)}</ol><TotalsView totals={meal.totals} /></>
+    </li>)}</ol></>
 }
 
 export function Nutrition({ authorized, visible, summaryVisible, catalogVisible, day, onDay, csrfToken }: { authorized: boolean; visible: boolean; summaryVisible: boolean; catalogVisible: boolean; day: string; onDay: (day: string, open?: boolean) => void; csrfToken: () => Promise<string> }) {
