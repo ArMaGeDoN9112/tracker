@@ -43,6 +43,10 @@ test('month calendar opens the complete Moscow day without losing the draft', as
   await expect(details).toContainText('Сахар: 5.6 ммоль/л')
   await expect(details).toContainText('Подколка: 1.2 ед.')
   await expect(details).toContainText('Запись календаря')
+  await expect(details).not.toContainText('Известных строк')
+  await expect(details).not.toContainText('Основа:')
+  await expect(details).not.toContainText('редакция')
+  await expect(details.getByRole('img', { name: 'График базы с 00 до 24 часов, Москва' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`section=calendar&day=${day}`))
   await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
   await expect(calendar).toBeHidden()
@@ -75,4 +79,59 @@ test('month calendar opens the complete Moscow day without losing the draft', as
   await expect(page.getByRole('link', { name: 'Календарь', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(calendar).toBeVisible()
   await expect(page.getByRole('region', { name: 'Ввод записи', exact: true })).toBeHidden()
+})
+
+test('calendar shows basal gaps and zero rates, meal results and water volumes', async ({ page }, info) => {
+  await page.goto('/')
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  const total = (value: string | null, incomplete = false) => ({ value, incomplete, known_count: value === null ? 0 : 1, unknown_count: incomplete || value === null ? 1 : 0 })
+  const totals = { calories: total('350', true), protein: total('15'), fat: total(null), carbohydrate: total('40') }
+  await page.route('**/api/nutrition-day?*', route => route.fulfill({ json: {
+    day: '2026-10-20', totals, meals: [{ id: 'meal', occurred_at: '2026-10-20T09:00:00Z', category: 'lunch', totals,
+      lines: [{ id: 'food', name: 'Рис с овощами', quantity: '250', unit: 'g' }] }],
+    water_total_ml: 750, water: [{ id: 'water-1', occurred_at: '2026-10-20T06:00:00Z', volume_ml: 250 }, { id: 'water-2', occurred_at: '2026-10-20T09:00:00Z', volume_ml: 500 }],
+  } }))
+  await page.route('**/api/day?*', route => route.fulfill({ json: {
+    basal: '0.50', temporary_percent: null, entries: [], temporary_basals: [],
+    basal_changes: [{ occurred_at: '2026-10-19T22:40:00Z', basal: '0.60' }, { occurred_at: '2026-10-20T03:00:00Z', basal: null }, { occurred_at: '2026-10-20T09:00:00Z', basal: '0.00' }, { occurred_at: '2026-10-20T15:00:00Z', basal: '0.80' }],
+  } }))
+  await page.getByRole('link', { name: 'Календарь', exact: true }).click()
+  await page.getByLabel('Месяц — Москва').fill('2026-10')
+  await page.getByRole('button', { name: 'Открыть сводку за 2026-10-20:' }).click()
+  const details = page.getByRole('region', { name: 'Подробная сводка дня', exact: true })
+  for (const text of ['Обед', 'Рис с овощами', '350 ккал', 'Неполные данные', 'Неизвестно']) await expect(details.getByRole('article')).toContainText(text)
+  await expect(details).not.toContainText('Известных строк')
+  await expect(details).not.toContainText('Основа:')
+  await expect(details).toContainText('750 мл')
+  await expect(details.getByRole('img')).toBeVisible()
+  await details.getByText('Интервалы и скорости', { exact: true }).click()
+  for (const interval of ['00:00–01:40 · 0,50 ед/ч', '01:40–06:00 · 0,60 ед/ч', '06:00–12:00 · неизвестна', '12:00–18:00 · 0,00 ед/ч', '18:00–24:00 · 0,80 ед/ч']) {
+    await expect(details.getByRole('listitem').filter({ hasText: interval })).toBeVisible()
+  }
+  const bars = details.locator('.water-bar-track>span')
+  const small = await bars.nth(0).boundingBox()
+  const large = await bars.nth(1).boundingBox()
+  expect(large!.width / small!.width).toBeCloseTo(2, 1)
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    if (process.env.DIARY_ACCEPTANCE_DIR) await details.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/summary-${info.project.name}-${width}.png` })
+  }
+  await page.route('**/api/day?*', route => route.fulfill({ json: {
+    basal: '0.50', temporary_percent: null, entries: [], temporary_basals: [], basal_changes: [
+      { occurred_at: '2014-10-25T21:15:00Z', basal: '1.00' },
+      { occurred_at: '2014-10-25T21:45:00Z', basal: '0.50' },
+      { occurred_at: '2014-10-25T22:15:00Z', basal: '1.00' },
+      { occurred_at: '2014-10-25T22:45:00Z', basal: '0.50' },
+    ],
+  } }))
+  await page.getByLabel('Месяц — Москва').fill('2014-10')
+  await page.getByRole('button', { name: 'Открыть сводку за 2014-10-26:' }).click()
+  await expect(details).toContainText('В этот день переводились часы')
+  await expect(details.getByRole('img')).toHaveCount(0)
+  await expect(details).toContainText('GMT+04:00')
+  await expect(details).toContainText('GMT+03:00')
+  await expect(details.getByRole('listitem').filter({ hasText: 'ед/ч' })).toHaveCount(5)
 })

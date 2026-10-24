@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { privateFetch } from './access'
-import { MealDetails, TotalsView, type Day as NutritionDay, type Totals } from './Nutrition'
+import { type Day as NutritionDay, type Totals } from './Nutrition'
+import { nutrients } from './ProductCatalog'
+import { BasalDayChart } from './BasalDayChart'
 import type { TemporaryPeriod } from './TemporaryBasal'
 import { basalText, localMinute, moscowLabel } from './time'
 
@@ -12,6 +14,15 @@ type DiaryDay = {
   entries: { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null }[]
 }
 const reasons: Record<string, string> = { food: 'Еда', correction: 'Коррекция', food_and_correction: 'Еда и коррекция' }
+const categories: Record<string, string> = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', snack: 'Перекус' }
+
+function SummaryTotals({ totals }: { totals: Totals }) {
+  return <dl className="calendar-nutrients">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, unit]) => <div key={key}>
+    <dt>{label}</dt><dd>{totals[key].value === null ? <span className="muted">Неизвестно</span> : <>{totals[key].value} <small>{unit}</small></>}
+      {totals[key].incomplete && totals[key].value !== null && <small className="nutrient-incomplete">Неполные данные</small>}
+    </dd>
+  </div>)}</dl>
+}
 
 async function read<T,>(path: string): Promise<T> {
   const response = await privateFetch(path)
@@ -24,6 +35,7 @@ function DaySummary({ active, day, generation, onClose }: { active: boolean; day
   const [data, setData] = useState<{ nutrition: NutritionDay; diary: DiaryDay } | null>(null)
   const [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
+  const maxWater = data?.nutrition.water.reduce((maximum, event) => Math.max(maximum, event.volume_ml), 1) ?? 1
   useEffect(() => { heading.current?.focus() }, [])
   useEffect(() => {
     let cancelled = false
@@ -41,13 +53,24 @@ function DaySummary({ active, day, generation, onClose }: { active: boolean; day
     {error ? <p role="alert" className="error">{error}</p> : !data ? <p role="status">Загружаем сводку дня…</p> : <>
       <h4>Питание</h4>
       {!data.nutrition.meals.length ? <p>Нет записей еды.</p> : <>
-        <TotalsView totals={data.nutrition.totals} />
-        {data.nutrition.meals.map(meal => <article className="meal-history" key={meal.id}><MealDetails meal={meal} /></article>)}
+        <div className="calendar-day-totals"><span className="eyebrow">ИТОГО ЗА ДЕНЬ</span><SummaryTotals totals={data.nutrition.totals} /></div>
+        <div className="calendar-meals">{data.nutrition.meals.map(meal => <article className="calendar-meal" key={meal.id}>
+          <header><h5>{categories[meal.category ?? ''] ?? 'Приём пищи'}</h5><time dateTime={meal.occurred_at}>{localMinute(meal.occurred_at).slice(11)}</time></header>
+          <ul className="calendar-foods">{meal.lines.map(line => <li key={line.id}><strong>{line.name}</strong>
+            {line.quantity !== null && <span className="muted">{line.quantity} {line.unit === 'g' ? 'г' : 'мл'}</span>}
+          </li>)}</ul>
+          <SummaryTotals totals={meal.totals} />
+        </article>)}</div>
       </>}
       <h4>Вода</h4>
       {data.nutrition.water_total_ml === null ? <p>Нет записей воды.</p> : <>
-        <p>Всего: {data.nutrition.water_total_ml} мл</p>
-        <ul>{data.nutrition.water.map(event => <li key={event.id}>{moscowLabel(event.occurred_at)} · {event.volume_ml} мл</li>)}</ul>
+        <div className="calendar-water-summary"><p><strong>{data.nutrition.water_total_ml} мл</strong><span className="muted">Всего за день</span></p>
+          <ul className="calendar-water-events">{data.nutrition.water.map(event => <li key={event.id}>
+            <time dateTime={event.occurred_at}>{localMinute(event.occurred_at).slice(11)}</time>
+            <span className="water-bar-track" aria-hidden="true"><span style={{ width: `${event.volume_ml / maxWater * 100}%` }} /></span>
+            <strong>{event.volume_ml} мл</strong>
+          </li>)}</ul>
+        </div>
       </>}
       <h4>Сахар и подколки</h4>
       {!data.diary.entries.length && <p>Нет записей сахара и подколок.</p>}
@@ -58,9 +81,10 @@ function DaySummary({ active, day, generation, onClose }: { active: boolean; day
         <p>База: {basalText(entry.basal)} · по расписанию</p>
       </article>)}
       <h4>База · по расписанию</h4>
-      <p>На начало дня: {basalText(data.diary.basal)}; {data.diary.temporary_percent === null ? 'обычное расписание' : `временная база ${data.diary.temporary_percent}%`}.</p>
-      <ul>{data.diary.basal_changes.map(change => <li key={change.occurred_at}>{moscowLabel(change.occurred_at)} · {basalText(change.basal)}</li>)}</ul>
-      {data.diary.temporary_basals.map(period => <p key={period.id}>Временная база {period.percent}% · с {moscowLabel(period.starts_at)} · до {moscowLabel(period.effective_ends_at)} (не включая). Исходная длительность: {period.duration_minutes} мин.; заданное окончание: {moscowLabel(period.ends_at)}.</p>)}
+      <BasalDayChart basal={data.diary.basal} changes={data.diary.basal_changes} />
+      {data.diary.temporary_basals.length > 0 && <details className="calendar-temporary"><summary>Временная база</summary>
+        {data.diary.temporary_basals.map(period => <p key={period.id}>{period.percent}% · {moscowLabel(period.starts_at)} — {moscowLabel(period.effective_ends_at)} (не включая)</p>)}
+      </details>}
     </>}
   </section>
 }
