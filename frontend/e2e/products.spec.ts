@@ -161,7 +161,7 @@ test('save paused at CSRF cannot automatically continue under a new session', as
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await captured
   await context.clearCookies()
-  await page.getByRole('link', { name: 'Графики', exact: true }).click()
+  await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await signIn(page)
   await page.getByRole('link', { name: 'Каталог', exact: true }).click()
@@ -173,13 +173,13 @@ test('save paused at CSRF cannot automatically continue under a new session', as
   expect(writes).toBe(0)
 })
 
-test('six navigation items, long Cyrillic names and keyboard form fit A at all specified widths', async ({ page }, testInfo) => {
+test('seven navigation items, long Cyrillic names and keyboard form fit A at all specified widths', async ({ page }, testInfo) => {
   await newDraft(page)
   await page.getByLabel('Название продукта', { exact: true }).fill('Длинное название продукта '.repeat(8))
   for (const width of [375, 390, 768, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     const navigation = page.getByRole('navigation', { name: 'Разделы', exact: true })
-    await expect(navigation.getByRole('link')).toHaveCount(6)
+    await expect(navigation.getByRole('link')).toHaveCount(7)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
     for (const link of await navigation.getByRole('link').all()) {
       const box = await link.boundingBox()
@@ -219,7 +219,7 @@ test('own photo persists after reload, appears in picker, and can be removed wit
   await expect(card.getByRole('img')).toHaveAttribute('src', photo!)
   const exported = await (await page.request.get('/api/export')).json()
   expect(exported.products.find((row: { name: string }) => row.name === name).photo).toBe(photo)
-  await page.getByRole('link', { name: 'Питание', exact: true }).click()
+  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
   await expect(page.getByLabel('Время приёма — Москва')).not.toHaveValue('')
   await page.getByLabel('Время приёма — Москва').fill('2026-10-19T12:34')
   await page.getByLabel('Категория приёма').selectOption('lunch')
@@ -241,6 +241,6 @@ test('own photo persists after reload, appears in picker, and can be removed wit
   await page.getByRole('button', { name: 'Убрать фото', exact: true }).click()
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await expect(card.getByRole('img')).toHaveAttribute('aria-label', 'Иллюстрация еды')
-  await page.getByRole('link', { name: 'Питание', exact: true }).click()
+  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
   await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveValue(name)
 })

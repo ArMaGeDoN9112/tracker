@@ -49,7 +49,7 @@ test('create immutable schedule, retry a lost response and inspect a historical 
   await expect(page.getByRole('status').filter({ hasText: 'Расписание сохранено.' })).toBeVisible()
   expect(writes).toHaveLength(beforeLogin + 1)
   expect(writes.every(body => body === writes[0])).toBe(true)
-  await page.getByRole('link', { name: 'Дневник', exact: true }).click()
+  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
   await expect(page.locator('.entries > .entry')).toContainText('0,50 ед/ч · по расписанию')
   await expect(page.getByTestId('day-basal')).toContainText('неизвестна')
   await expect(page.locator('.basal-change')).toContainText(['0,50 ед/ч', '0,80 ед/ч'])

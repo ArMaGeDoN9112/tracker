@@ -49,7 +49,7 @@ test('one-off portion, explicit card preview, mixed meal and independent repeat 
   await page.getByLabel('Углеводы, г на 100 г', { exact: true }).fill('99')
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await expect(cardForm).toBeHidden()
-  await page.getByRole('link', { name: 'Питание', exact: true }).click()
+  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
   let draft: { occurred_at: string; lines: { id: string }[] } | undefined
   const response = page.waitForResponse(r => r.url().endsWith('/repeat-form'))
   await saved.getByRole('button', { name: 'Повторить приём', exact: true }).click()

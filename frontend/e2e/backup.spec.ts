@@ -20,7 +20,7 @@ test('settings show backup delay, local-only copy and sanitized failure', async 
   await expect(backup.getByRole('alert')).toHaveCount(3)
   await expect(backup).toContainText('26 часов')
   await expect(backup).toContainText('Проверка восстановления не прошла')
-  await page.getByRole('link', { name: 'Дневник', exact: true }).click()
+  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Черновик перед проверкой копий')
 })
 
@@ -50,7 +50,7 @@ test('backup state loads once and stays unchanged while the page is open', async
   await page.clock.fastForward(60001)
   await expect(backup).toContainText('19.10.2026, 15:00:00 МСК')
   expect(reads).toBe(1)
-  await page.getByRole('link', { name: 'Дневник', exact: true }).click()
+  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
   await expect(page.getByRole('link', { name: 'Проверить резервирование' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()

@@ -73,7 +73,7 @@ export function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; 
     </li>)}</ol><TotalsView totals={meal.totals} /></>
 }
 
-export function Nutrition({ authorized, visible, catalogVisible, day, onDay, csrfToken }: { authorized: boolean; visible: boolean; catalogVisible: boolean; day: string; onDay: (day: string) => void; csrfToken: () => Promise<string> }) {
+export function Nutrition({ authorized, visible, summaryVisible, catalogVisible, day, onDay, csrfToken }: { authorized: boolean; visible: boolean; summaryVisible: boolean; catalogVisible: boolean; day: string; onDay: (day: string, open?: boolean) => void; csrfToken: () => Promise<string> }) {
   const [lines, setLines] = useState<DraftLine[]>([])
   const [localTime, setLocalTime] = useState('')
   const [category, setCategory] = useState('')
@@ -335,10 +335,6 @@ export function Nutrition({ authorized, visible, catalogVisible, day, onDay, csr
           <Water authorized={authorized} visible={visible} day={day} csrfToken={csrfToken} />
         </section>
       </div>
-      <NutritionSummary active={authorized && visible} generation={summaryGeneration} onDay={selected => {
-        onDay(selected)
-        requestAnimationFrame(() => document.getElementById('nutrition-history')?.focus())
-      }} />
       {conversion && <section className="meal-conversion" aria-label="Создание продукта из еды">
         <h2 id="conversion-title" tabIndex={-1}>Сохранить как продукт: {conversion.name}</h2>
         <p>Пересчёт исходных значений на 100 г/мл; карточка округляется до сотых, половина вверх. Исходный приём не меняется.</p>
@@ -349,6 +345,13 @@ export function Nutrition({ authorized, visible, catalogVisible, day, onDay, csr
         <button disabled={locked || catalogEditing} onClick={() => { setProductSeed({ name: conversion.name, unit: conversionUnit, protein: null, fat: null, carbohydrate: null, calories: null }); setConversion(null); setChoosingProduct(true) }}>Заполнить карточку независимо</button>
         <button disabled={busy} onClick={() => setConversion(null)}>Отменить создание карточки</button>
       </section>}
+    </div>
+    <div hidden={!authorized || !summaryVisible}>
+      <NutritionSummary active={authorized && summaryVisible} generation={summaryGeneration} onDay={selected => {
+        setChoosingProduct(false)
+        onDay(selected, true)
+        requestAnimationFrame(() => document.getElementById('nutrition-history')?.focus())
+      }} />
     </div>
     <div hidden={!authorized || !(catalogVisible || (visible && choosingProduct))}>
       {visible && choosingProduct && <>
