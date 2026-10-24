@@ -39,11 +39,13 @@ test('every screen keeps readable cards, unknown values and usable controls at a
       await expect(history.locator('.water-record')).toHaveCount(2)
     }
     if (section === 'Аналитика сахара') {
+      await page.getByLabel('Начало периода — Москва', { exact: true }).fill(day)
       await page.getByLabel('Конец периода — Москва', { exact: true }).fill(day)
       await page.getByRole('button', { name: 'Показать период', exact: true }).click()
       await expect(page.getByTestId('period-average')).toContainText('5,6')
     }
     if (section === 'Аналитика питания') {
+      await page.getByLabel('Начало периода питания — Москва').fill(day)
       await page.getByLabel('Конец периода питания — Москва').fill(day)
       await page.getByRole('button', { name: 'Показать период питания' }).click()
       await expect(page.getByTestId('nutrition-average-calories')).toContainText('300.00 ккал')

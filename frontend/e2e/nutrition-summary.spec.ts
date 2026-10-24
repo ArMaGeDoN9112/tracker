@@ -14,7 +14,6 @@ async function start(page: Page) {
 }
 
 async function period(page: Page, start: string, end: string) {
-  await summary(page).getByLabel('Период питания', { exact: true }).selectOption('custom')
   await summary(page).getByLabel('Начало периода питания — Москва').fill(start)
   await summary(page).getByLabel('Конец периода питания — Москва').fill(end)
   await summary(page).getByRole('button', { name: 'Показать период питания' }).click()
@@ -95,17 +94,26 @@ test('known days, zero, draft-safe keyboard day navigation and refreshed edits/m
   }
 })
 
-test('7/30 days, older history, empty and invalid periods', async ({ page }) => {
+test('two dates default to seven days and allow older, empty and invalid periods', async ({ page }) => {
   await start(page)
   await expect(summary(page).getByRole('row')).toHaveCount(8)
-  await summary(page).getByLabel('Период питания', { exact: true }).selectOption('month')
+  const defaults = await (await page.request.get('/api/nutrition-summary?period=week')).json()
+  await expect(summary(page).getByRole('combobox')).toHaveCount(0)
+  await expect(summary(page).getByLabel('Начало периода питания — Москва')).toHaveValue(defaults.start)
+  await expect(summary(page).getByLabel('Конец периода питания — Москва')).toHaveValue(defaults.end)
+  await summary(page).getByLabel('Начало периода питания — Москва').fill('1901-01-04')
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('link', { name: 'Аналитика питания', exact: true }).click()
+  await expect(summary(page).getByLabel('Начало периода питания — Москва')).toHaveValue('1901-01-04')
+  await expect(summary(page).getByLabel('Конец периода питания — Москва')).toHaveValue(defaults.end)
+  await expect(summary(page).getByLabel('Начало периода питания — Москва')).toHaveAttribute('required', '')
+  await expect(summary(page).getByLabel('Конец периода питания — Москва')).toHaveAttribute('required', '')
   await summary(page).getByLabel('Конец периода питания — Москва').fill('1901-02-02')
   await summary(page).getByRole('button', { name: 'Показать период питания' }).click()
   await expect(summary(page).getByRole('row')).toHaveCount(31)
   await expect(summary(page).getByTestId('nutrition-bounds')).toHaveText('1901-01-04 — 1901-02-02 · Москва · обе даты включены')
   await expect(summary(page).getByRole('status')).toHaveText('В этом периоде нет записей еды.')
   await expect(summary(page).getByTestId('nutrition-average-protein')).toContainText('известных дней: 0; неполных дней: 0; дней с едой: 0')
-  await summary(page).getByLabel('Период питания', { exact: true }).selectOption('custom')
   await summary(page).getByLabel('Начало периода питания — Москва').fill('1901-02-03')
   await summary(page).getByRole('button', { name: 'Показать период питания' }).click()
   await expect(summary(page).getByRole('alert')).toContainText('Укажите начало периода не позже окончания')

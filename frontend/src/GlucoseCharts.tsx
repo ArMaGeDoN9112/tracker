@@ -1,5 +1,5 @@
 import { privateFetch } from './access'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Dot, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, type DotItemDotProps } from 'recharts'
 
 type GlucoseDay = { day: string; count: number; average: string | null; minimum: string | null; maximum: string | null }
@@ -9,7 +9,7 @@ const glucoseText = (value: string | null) => value === null ? '—' : value.rep
 export function GlucoseCharts({ active, generation, onDay }: {
   active: boolean; generation: number; onDay: (day: string) => void
 }) {
-  const [period, setPeriod] = useState('week')
+  const initialRange = useRef<{ start: string; end: string } | null>(null)
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [query, setQuery] = useState('period=week')
@@ -22,13 +22,18 @@ export function GlucoseCharts({ active, generation, onDay }: {
     setSummary(null); setError('')
     async function load() {
       try {
-        const response = await privateFetch(`/api/glucose-summary?${query}`, { cache: 'no-store' })
+        const params = query === 'period=week' && initialRange.current ? new URLSearchParams({ period: 'custom', ...initialRange.current }).toString() : query
+        const response = await privateFetch(`/api/glucose-summary?${params}`, { cache: 'no-store' })
         const result = await response.json()
         if (cancelled) return
         if (!response.ok) {
           throw new Error(result.message)
         }
         setSummary(result)
+        if (!initialRange.current) {
+          initialRange.current = { start: result.start, end: result.end }
+          setStart(value => value || result.start); setEnd(value => value || result.end)
+        }
       } catch (failure) {
         if (!cancelled) setError(failure instanceof Error ? failure.message : 'Не удалось загрузить сводку. Повторите запрос.')
       }
@@ -39,9 +44,7 @@ export function GlucoseCharts({ active, generation, onDay }: {
 
   function show(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const params = new URLSearchParams({ period })
-    if (period === 'custom') params.set('start', start)
-    if (end) params.set('end', end)
+    const params = new URLSearchParams({ period: 'custom', start, end })
     setQuery(params.toString())
   }
 
@@ -55,16 +58,11 @@ export function GlucoseCharts({ active, generation, onDay }: {
     <span className="eyebrow">СВОДКИ · МОСКВА</span>
     <h2>Сахар за период</h2>
     <form className="glucose-period" onSubmit={show}>
-      <div><label htmlFor="glucose-period">Период</label>
-      <select id="glucose-period" value={period} onChange={event => setPeriod(event.target.value)}>
-        <option value="week">7 дней</option><option value="month">30 дней</option><option value="custom">Период</option>
-      </select></div>
-      {period === 'custom' && <div><label htmlFor="glucose-start">Начало периода — Москва</label>
-        <input id="glucose-start" type="date" required value={start} onChange={event => setStart(event.target.value)} /></div>}
+      <div><label htmlFor="glucose-start">Начало периода — Москва</label>
+        <input id="glucose-start" type="date" required value={start} onChange={event => setStart(event.target.value)} /></div>
       <div><label htmlFor="glucose-end">Конец периода — Москва</label>
-      <input id="glucose-end" type="date" aria-describedby="glucose-period-hint" value={end} onChange={event => setEnd(event.target.value)} /></div>
+      <input id="glucose-end" type="date" required value={end} onChange={event => setEnd(event.target.value)} /></div>
       <button type="submit">Показать период</button>
-      <p id="glucose-period-hint" className="muted">Если конец не выбран, используется сегодня по Москве.</p>
     </form>
     {error ? <p role="alert" className="error">Не удалось загрузить сводку. {error} Перезагрузите страницу.</p>
       : !summary && <p role="status">Загружаем сводку…</p>}
