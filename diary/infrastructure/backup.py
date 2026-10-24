@@ -20,7 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from diary.application.backup import BackupFailure, BackupKind, BackupStatus, Manifest, Snapshot
 from diary.application.export import ExportData
-from diary.db import database_engine
+from diary.infrastructure.database import database_engine
 from diary.infrastructure.export import SqliteExport
 from diary.domain.time import MOSCOW
 from diary.tables import pre_session, session

@@ -62,7 +62,7 @@ def test_login_limit_survives_restart_and_expires(tmp_path, monkeypatch):
     migrate(database)
     create_account(database, "owner", PASSWORD)
     clock = 1_800_000_000_000
-    monkeypatch.setattr("diary.app.now_ms", lambda: clock)
+    monkeypatch.setattr("diary.infrastructure.security.now_ms", lambda: clock)
     with TestClient(create_app(database, ORIGIN), base_url=ORIGIN) as client:
         for _ in range(5):
             assert login(client, password="incorrect").status_code == 401
@@ -79,7 +79,7 @@ def test_devices_rotation_reset_and_expiry(tmp_path, monkeypatch):
     migrate(database)
     create_account(database, "owner", PASSWORD)
     clock = 1_800_000_000_000
-    monkeypatch.setattr("diary.app.now_ms", lambda: clock)
+    monkeypatch.setattr("diary.infrastructure.security.now_ms", lambda: clock)
     app = create_app(database, ORIGIN)
     with TestClient(app, base_url=ORIGIN) as phone, TestClient(app, base_url=ORIGIN) as desktop:
         assert login(phone).status_code == 200
@@ -167,7 +167,7 @@ def test_pre_csrf_expiry_and_validation_dont_disclose_secrets(tmp_path, monkeypa
     database = tmp_path / "diary.sqlite3"
     migrate(database)
     clock = 1_800_000_000_000
-    monkeypatch.setattr("diary.app.now_ms", lambda: clock)
+    monkeypatch.setattr("diary.infrastructure.security.now_ms", lambda: clock)
     with TestClient(create_app(database, ORIGIN), base_url=ORIGIN) as client:
         csrf = client.get("/api/auth/csrf").json()["csrf_token"]
         headers = {"Origin": ORIGIN, "X-CSRF-Token": csrf}

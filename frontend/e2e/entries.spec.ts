@@ -69,8 +69,8 @@ test('confirmed entry deletion keeps explicit recovery when its follow-up read f
 test('move, keyboard undo and conflict preserve the draft for comparison', async ({ page, browser, context }, testInfo) => {
   await page.goto('/')
   await signIn(page)
-  const day = testInfo.project.name === 'phone' ? '2026-11-23' : '2026-10-23'
-  const nextDay = testInfo.project.name === 'phone' ? '2026-11-24' : '2026-10-24'
+  const day = testInfo.project.name === 'phone' ? '2083-01-23' : '2082-01-23'
+  const nextDay = testInfo.project.name === 'phone' ? '2083-01-24' : '2082-01-24'
   await page.getByLabel('Время события — Москва').fill(`${day}T12:00`)
   await page.getByLabel('Сахар, ммоль/л').fill('6,2')
   await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()

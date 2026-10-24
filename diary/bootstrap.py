@@ -1,10 +1,13 @@
 from pathlib import Path
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
 if TYPE_CHECKING:
     from diary.application.backup import RunBackup
     from diary.infrastructure.backup import FileBackupStorage
+    from diary.interfaces.cli.admin import AdminUseCases
 
 from fastapi import FastAPI
 from sqlalchemy import Engine
@@ -15,7 +18,9 @@ from diary.application.water import (
 )
 from diary.infrastructure.water import water_uow
 from diary.interfaces.http.water import WaterUseCases, register_water
-from diary.security import now_ms
+from diary.infrastructure.security import now_ms
+from diary.infrastructure.database import database_engine as database_engine
+from diary.infrastructure.access import check_access_database as check_access_database
 from diary.application.basal import (
     BasalOperations, CreateSchedule, CreateTemporaryBasal, DeleteTemporaryBasal,
     EditTemporaryBasal, GetBasal, GetSchedules, GetTemporaryBasal, GetTemporaryBasals,
@@ -133,3 +138,41 @@ def register_backup_status_http(app: FastAPI, database: "Path") -> None:
     from diary.interfaces.http.backup import register_backup_status
 
     register_backup_status(app, GetBackupStatus(backup_storage(database), lambda: datetime.now(timezone.utc)))
+
+
+def register_access_http(app: FastAPI, engine: Engine, origin: str) -> None:
+    from diary.application.access import CheckCsrf, GetCsrf, GetSession, Login, Logout
+    from diary.infrastructure.access import access_uow
+    from diary.infrastructure import security
+    from diary.interfaces.http.access import AccessUseCases, register_access
+
+    reads = lambda: access_uow(engine)
+    writes = lambda: access_uow(engine, write=True)
+    clock = lambda: security.now_ms()
+    crypto = security.CryptographicSecurity()
+    dummy_hash = crypto.hash_password(crypto.new_token())
+    register_access(app, AccessUseCases(
+        login=Login(writes, clock, crypto, dummy_hash), logout=Logout(writes, crypto),
+        session=GetSession(reads, clock, crypto), csrf=GetCsrf(writes, clock, crypto),
+        check_csrf=CheckCsrf(reads, clock, crypto),
+    ), origin)
+
+
+@contextmanager
+def admin_use_cases(database: Path) -> Generator["AdminUseCases"]:
+    from diary.application.admin import CreateAccount, MigrateDatabase, ResetPassword
+    from diary.infrastructure.access import access_uow
+    from diary.infrastructure.database import migrate
+    from diary.infrastructure.security import CryptographicSecurity
+    from diary.interfaces.cli.admin import AdminUseCases
+
+    engine = database_engine(database)
+    try:
+        writes = lambda: access_uow(engine, write=True)
+        security = CryptographicSecurity()
+        yield AdminUseCases(
+            create=CreateAccount(writes, lambda: now_ms(), security), reset=ResetPassword(writes, security),
+            migrate=MigrateDatabase(lambda: migrate(database)),
+        )
+    finally:
+        engine.dispose()

@@ -233,7 +233,7 @@ def test_export_rejects_expired_and_revoked_sessions(diary, monkeypatch, revocat
     cookies = dict(client.cookies)
     if revocation == "expired":
         future = now_ms() + SESSION_SECONDS * 1000 + 1
-        monkeypatch.setattr("diary.app.now_ms", lambda: future)
+        monkeypatch.setattr("diary.infrastructure.security.now_ms", lambda: future)
     elif revocation == "logout":
         assert client.post("/api/auth/logout").status_code == 204
     else:

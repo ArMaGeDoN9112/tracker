@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from diary.application.access import SessionOutput as SessionOutput
+
 
 class ErrorOutput(BaseModel):
     code: str
@@ -14,10 +16,6 @@ class ScheduleConflictOutput(ErrorOutput):
 
 class CsrfOutput(BaseModel):
     csrf_token: str
-
-
-class SessionOutput(BaseModel):
-    login: str
 
 
 class LoginOutput(SessionOutput, CsrfOutput):
