@@ -257,7 +257,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? `${name}-error` : undefined })
   const fieldError = (name: string) => field === name && error ? <p id={`${name}-error`} role="alert" className="error field-error">{error}</p> : null
   return <div hidden={!active}>
-    <div hidden={section !== 'diary'}><DayCalendar active={active && section === 'diary'} day={day} generation={entryGeneration + basalGeneration} onDay={onDay} /></div>
+    <div hidden={section !== 'calendar'}><DayCalendar active={active && section === 'calendar'} day={day} generation={entryGeneration + basalGeneration} onDay={onDay} /></div>
     <div hidden={section !== 'diary'} className="diary-layout">
     <section className="diary-composer" aria-label="Ввод записи">
     <span className="eyebrow">БЫСТРЫЙ ВВОД</span>

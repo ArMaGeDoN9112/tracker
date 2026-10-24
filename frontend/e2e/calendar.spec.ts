@@ -10,7 +10,7 @@ test('month calendar opens the complete Moscow day without losing the draft', as
   await expect(page.getByLabel('Время события — Москва')).not.toHaveValue('')
   const calendar = page.getByRole('region', { name: 'Календарь дней', exact: true })
   const server = await (await page.request.get('/api/entry-form')).json()
-  await expect(calendar.getByLabel('Месяц — Москва')).toHaveValue(server.local_time.slice(0, 7))
+  await expect(calendar).toBeHidden()
   const day = info.project.name === 'phone' ? '2024-02-29' : '2024-02-28'
   const csrf = (await (await page.request.get('/api/auth/csrf')).json()).csrf_token
   const headers = { Origin: 'https://localhost:5173', 'X-CSRF-Token': csrf }
@@ -22,6 +22,11 @@ test('month calendar opens the complete Moscow day without losing the draft', as
     expect((await page.request.post(path, { headers, data: { operation_id: crypto.randomUUID(), occurred_at: `${day}T23:59:59.999+03:00`, ...data } })).ok()).toBeTruthy()
   }
   await page.getByLabel('Комментарий', { exact: true }).fill('Черновик остаётся')
+  await page.getByRole('link', { name: 'Календарь', exact: true }).click()
+  await expect(page).toHaveURL(/section=calendar/)
+  await expect(page.getByRole('heading', { name: 'Календарь', exact: true, level: 1 })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Ввод записи', exact: true })).toBeHidden()
+  await expect(calendar.getByLabel('Месяц — Москва')).toHaveValue(server.local_time.slice(0, 7))
   await calendar.getByLabel('Месяц — Москва').fill('2024-02')
   const days = calendar.locator('.calendar-day')
   await expect(days).toHaveCount(29)
@@ -38,7 +43,13 @@ test('month calendar opens the complete Moscow day without losing the draft', as
   await expect(details).toContainText('Сахар: 5.6 ммоль/л')
   await expect(details).toContainText('Подколка: 1.2 ед.')
   await expect(details).toContainText('Запись календаря')
+  await expect(page).toHaveURL(new RegExp(`section=calendar&day=${day}`))
+  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await expect(calendar).toBeHidden()
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Черновик остаётся')
+  await page.goBack()
+  await expect(calendar).toBeVisible()
+  await expect(details).toContainText('Запись календаря')
   for (const width of [375, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -60,4 +71,8 @@ test('month calendar opens the complete Moscow day without losing the draft', as
   await expect(details).toContainText('Нет записей еды')
   await expect(details).toContainText('Нет записей воды')
   await expect(details).toContainText('Нет записей сахара и подколок')
+  await page.reload()
+  await expect(page.getByRole('link', { name: 'Календарь', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(calendar).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Ввод записи', exact: true })).toBeHidden()
 })

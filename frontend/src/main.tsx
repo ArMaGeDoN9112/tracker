@@ -12,14 +12,14 @@ async function csrfToken(request: (path: string, options?: RequestInit) => Promi
   return (await response.json()).csrf_token
 }
 
-type Section = 'diary' | 'charts' | 'basal' | 'nutrition' | 'nutrition-summary' | 'catalog' | 'settings'
+type Section = 'diary' | 'charts' | 'basal' | 'nutrition' | 'nutrition-summary' | 'catalog' | 'calendar' | 'settings'
 type Route = { section: Section; day: string; temporary: boolean; error: string }
 function readRoute(): Route {
   const params = new URLSearchParams(location.search)
   const section = params.get('section') ?? 'diary'
   const day = params.get('day') ?? ''
   const valid = !day || (/^\d{4}-\d{2}-\d{2}$/.test(day) && day >= '0001-01-01' && day <= '9999-12-31' && Number.isFinite(Date.parse(`${day}T00:00:00Z`)) && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day)
-  return { section: ['diary', 'charts', 'basal', 'nutrition', 'nutrition-summary', 'catalog', 'settings'].includes(section) ? section as Section : 'diary', day: valid ? day : '', temporary: params.get('view') === 'temporary', error: valid ? '' : 'Некорректная дата в адресе. Открыт текущий московский день.' }
+  return { section: ['diary', 'charts', 'basal', 'nutrition', 'nutrition-summary', 'catalog', 'calendar', 'settings'].includes(section) ? section as Section : 'diary', day: valid ? day : '', temporary: params.get('view') === 'temporary', error: valid ? '' : 'Некорректная дата в адресе. Открыт текущий московский день.' }
 }
 function routeUrl(route: Route) {
   const params = new URLSearchParams({ section: route.section })
@@ -130,10 +130,10 @@ function App() {
   return <main className={login ? "app-shell" : "login-screen"}>
     <p className="eyebrow">ДНЕВНИК ДИАБЕТА</p>
     <section className="workspace">
-      <h1 id="title" ref={heading} tabIndex={-1}>{login ? ({ diary: 'Ввод сахара', charts: 'Аналитика сахара', basal: 'База', nutrition: 'Ввод питания', 'nutrition-summary': 'Аналитика питания', catalog: 'Каталог еды', settings: 'Настройки' }[route.section]) : 'Вход в дневник'}</h1>
+      <h1 id="title" ref={heading} tabIndex={-1}>{login ? ({ diary: 'Ввод сахара', charts: 'Аналитика сахара', basal: 'База', nutrition: 'Ввод питания', 'nutrition-summary': 'Аналитика питания', catalog: 'Каталог еды', calendar: 'Календарь', settings: 'Настройки' }[route.section]) : 'Вход в дневник'}</h1>
       {loading ? <p role="status">Проверяем вход…</p> : login ? <>
         <nav className="main-nav" aria-label="Разделы">
-          {([['diary', 'Ввод сахара'], ['charts', 'Аналитика сахара'], ['basal', 'База'], ['nutrition', 'Ввод питания'], ['nutrition-summary', 'Аналитика питания'], ['catalog', 'Каталог'], ['settings', 'Настройки']] as const).map(([section, label]) => <a key={section} href={routeUrl({ ...route, section })} aria-current={route.section === section ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section }) } }}>{label}</a>)}
+          {([['diary', 'Ввод сахара'], ['charts', 'Аналитика сахара'], ['basal', 'База'], ['nutrition', 'Ввод питания'], ['nutrition-summary', 'Аналитика питания'], ['catalog', 'Каталог'], ['calendar', 'Календарь'], ['settings', 'Настройки']] as const).map(([section, label]) => <a key={section} href={routeUrl({ ...route, section })} aria-current={route.section === section ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section }) } }}>{label}</a>)}
         </nav>
         <div className="account-row"><p className="account">Вы вошли как <strong>{login}</strong>.</p>
         <button type="button" onClick={logout} disabled={busy}>{busy ? 'Выходим…' : 'Выйти'}</button></div>

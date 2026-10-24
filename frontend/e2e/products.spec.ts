@@ -173,13 +173,13 @@ test('save paused at CSRF cannot automatically continue under a new session', as
   expect(writes).toBe(0)
 })
 
-test('seven navigation items, long Cyrillic names and keyboard form fit A at all specified widths', async ({ page }, testInfo) => {
+test('eight navigation items, long Cyrillic names and keyboard form fit A at all specified widths', async ({ page }, testInfo) => {
   await newDraft(page)
   await page.getByLabel('Название продукта', { exact: true }).fill('Длинное название продукта '.repeat(8))
   for (const width of [375, 390, 768, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     const navigation = page.getByRole('navigation', { name: 'Разделы', exact: true })
-    await expect(navigation.getByRole('link')).toHaveCount(7)
+    await expect(navigation.getByRole('link')).toHaveCount(8)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
     for (const link of await navigation.getByRole('link').all()) {
       const box = await link.boundingBox()

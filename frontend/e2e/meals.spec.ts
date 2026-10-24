@@ -35,6 +35,7 @@ async function choose(page: Page, name: string) {
   await expect(card).toBeVisible()
   if (!await card.getByRole('button', { name: 'Добавить в приём', exact: true }).isVisible()) await card.locator('summary').click()
   await card.getByRole('button', { name: 'Добавить в приём', exact: true }).click()
+  await expect(page.locator('#meal-form-title')).toBeFocused()
 }
 const form = (page: Page) => page.getByRole('region', { name: 'Форма приёма пищи', exact: true })
 const history = (page: Page) => page.getByRole('region', { name: 'День питания', exact: true })
