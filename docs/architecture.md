@@ -97,5 +97,15 @@ CLI/backup/restore/verify проверены полным backend-набором
 зашифрованным restic. Независимое ревью Standards/Spec — **0/0 замечаний**.
 Остались прежние предупреждения Starlette/httpx и Pydantic alias.
 Внешнее хранилище, VPS, реальный iPhone и отказы оборудования этой приёмкой
-не покрыты; оставшиеся эксплуатационные проверки ведутся в
-[release-readiness](../.scratch/release-readiness/spec.md).
+не покрыты. Требования остаются в [общей спецификации](../.scratch/tracker/spec.md),
+а состояние внешних копий и учений — в [инструкции резервирования](backup.md).
+
+Завершённый план, карта решений и тикеты 01–09 сохранены в Git-ревизии
+`0ed8b3aee0c28a0d3bdf44fdbbe477ee633fff21` в `.scratch/clean-architecture/`.
+Каталог удалён из рабочего дерева после переноса результатов сюда;
+незавершённых критериев архитектурного перехода нет. Прочитать исходный план:
+
+```sh
+git show 0ed8b3a:.scratch/clean-architecture/spec.md
+git show 0ed8b3a:.scratch/clean-architecture/issues/09-completion.md
+```

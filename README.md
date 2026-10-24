@@ -7,7 +7,7 @@
 
 - [Правила дневника и интерфейса](docs/diabetes-diary.md).
 - [План следующих этапов](docs/roadmap.md).
-- [Оставшаяся приёмка](.scratch/release-readiness/spec.md).
+- [Требования приёмки](.scratch/tracker/spec.md) и [состояние резервирования](docs/backup.md).
 - [Формат JSON-экспорта](docs/export/README.md) и [резервирование](docs/backup.md).
 - [Архитектура бэкенда и перечень сценариев](docs/architecture.md).
 
