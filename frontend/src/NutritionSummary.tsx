@@ -73,7 +73,6 @@ export function NutritionSummary({ active, generation, onDay }: {
           <details className="explanation"><summary>Данные для среднего</summary><small>Знаменатель — известных дней: {average.known_days}; неполных дней: {average.incomplete_days}; дней с едой: {summary.food_days}</small></details>
         </dd></div>
       })}</dl>
-      <details className="explanation"><summary>Как считается среднее</summary><p className="muted">Сумма точных известных вкладов делится на число дней с известным значением каждого показателя. Известный ноль учитывается; пустые и полностью неизвестные дни не становятся нулями. Любое неизвестное значение делает среднее неполным. Средние округляются независимо от дневных итогов до сотых, половина вверх. Вода не учитывается.</p></details>
       <div className="glucose-table" tabIndex={0} role="region" aria-label="Дневные итоги питания">
         <table><caption>Дневные итоги · «—» — нет записей еды. Нажмите на день для просмотра приёмов.</caption>
           <thead><tr><th scope="col">День</th><th scope="col">Приёмов</th>{nutrients.map(([key, label, unit]) => <th key={key} scope="col">{label}, {unit}</th>)}</tr></thead>

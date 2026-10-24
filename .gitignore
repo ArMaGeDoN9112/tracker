@@ -13,3 +13,4 @@ frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
 .local/
+.tmp/

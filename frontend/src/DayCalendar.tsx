@@ -135,7 +135,6 @@ export function DayCalendar({ active, day, generation, onDay }: { active: boolea
       <div><label htmlFor="calendar-month">Месяц — Москва</label><input id="calendar-month" type="month" min="0001-01" max="9999-11" value={month} onChange={event => selectMonth(event.target.value)} /></div>
       <button disabled={month === '9999-11'} onClick={() => moveMonth(1)} aria-label="Следующий месяц">→</button>
     </div>
-    <p className="muted calendar-legend">В каждом дне: калории, ккал · вода, мл · средний сахар, ммоль/л.<br />«—» — нет записей; «?» — калории неизвестны; «*» — калории неполные.</p>
     {error ? <p role="alert" className="error">{error}</p> : !days ? <p role="status">Загружаем календарь…</p> : <>
       <div className="calendar-grid">
         {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(label => <span className="calendar-weekday" key={label}>{label}</span>)}

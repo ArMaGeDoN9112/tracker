@@ -17,45 +17,6 @@ export type Day = { day: string; meals: Meal[]; totals: Totals; water: { id: str
 type Pending = { path: string; method: string; body: string; action: 'save' | 'delete' | 'restore' }
 const categories = [['breakfast', 'Завтрак'], ['lunch', 'Обед'], ['dinner', 'Ужин'], ['snack', 'Перекус']]
 
-// Catalog inputs use hundredths; keep products exact until each independent display rounding.
-function hundredths(value: string): bigint {
-  const normalized = value.trim().replace(',', '.')
-  if (!/^\+?\d+(?:\.\d+)?$/.test(normalized)) throw new Error()
-  const [whole, fraction = ''] = normalized.replace(/^\+/, '').split('.')
-  if (fraction.slice(2).replace(/0/g, '') || whole.replace(/^0+/, '').length > 8) throw new Error()
-  const amount = BigInt(whole) * 100n + BigInt((fraction + '00').slice(0, 2))
-  if (amount > 2147483647n) throw new Error()
-  return amount
-}
-function rounded(numerator: bigint, denominator: bigint): string {
-  const result = (2n * numerator + denominator) / (2n * denominator)
-  return `${result / 100n}.${(result % 100n).toString().padStart(2, '0')}`
-}
-function preview(lines: DraftLine[]): Totals | null {
-  try {
-    for (const line of lines) {
-      if (line.quantity !== null && hundredths(line.quantity) === 0n) return null
-      if (line.kind === 'product' && line.quantity === null) return null
-      if (line.basis_quantity && hundredths(line.basis_quantity) === 0n) return null
-    }
-    return Object.fromEntries(nutrients.map(([key]) => {
-      const known = lines.filter(line => line[key] !== null && line[key]!.trim() !== '')
-      let numerator = 0n, denominator = 1n
-      for (const line of known) {
-        const basis = line.basis_quantity === undefined ? line.quantity : line.basis_quantity
-        const divisor = basis && line.quantity ? hundredths(basis) : 1n
-        const value = hundredths(line[key]!) * (basis && line.quantity ? hundredths(line.quantity) : 1n)
-        numerator = numerator * divisor + value * denominator
-        denominator *= divisor
-        let a = numerator, b = denominator
-        while (b) [a, b] = [b, a % b]
-        numerator /= a; denominator /= a
-      }
-      return [key, { value: known.length ? rounded(numerator, denominator) : null,
-        known_count: known.length, unknown_count: lines.length - known.length, incomplete: known.length < lines.length }]
-    })) as Totals
-  } catch { return null }
-}
 export function TotalsView({ totals }: { totals: Totals }) {
   return <dl className="meal-totals metric-grid">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, unit]) => <div key={key}><dt>{label}</dt><dd>
     {totals[key].value === null ? <span className="unknown-value">Неизвестно</span> : `${totals[key].incomplete ? 'Известно ' : ''}${totals[key].value} ${unit}`}
@@ -270,7 +231,6 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   }
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? 'meal-error' : undefined })
   const inlineError = (name: string) => field === name && error ? <p className="error">{error}</p> : null
-  const totals = preview(lines)
   const locked = busy || !!pending
   const undoTarget = document.getElementById('global-undo')
   return <>
@@ -296,7 +256,6 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
               {lines.map((line, index) => {
                 const unit = line.unit === 'g' ? 'г' : line.unit === 'ml' ? 'мл' : 'г/мл'
                 const set = (changes: Partial<DraftLine>) => setLines(current => current.map(row => row.id === line.id ? { ...row, ...changes } : row))
-                const lineTotals = preview([line])
                 return <fieldset className="meal-line" key={line.id}><legend>Строка {index + 1}: {line.name}</legend>
                   <label htmlFor={`meal-name-${line.id}`}>Название строки {index + 1}</label><input id={`meal-name-${line.id}`} required maxLength={200} value={line.name} onChange={e => set({ name: e.target.value })} {...invalid(`lines.${index}.name`)} />{inlineError(`lines.${index}.name`)}
                   {inlineError(`lines.${index}`)}
@@ -310,12 +269,10 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
                     {nutrients.map(([key, label, nutrientUnit]) => <div key={key}><label htmlFor={`meal-${key}-${line.id}`}>{label} строки {index + 1}, {nutrientUnit} {line.kind === 'product' ? `на 100 ${unit}` : 'за исходную порцию'}</label><input id={`meal-${key}-${line.id}`} inputMode="decimal" value={line[key] ?? ''} onChange={e => set({ [key]: e.target.value })} {...invalid(`lines.${index}.${key}`)} />{inlineError(`lines.${index}.${key}`)}</div>)}
                   </details>
                   {line.kind === 'one_off' && <button type="button" disabled={catalogEditing} onClick={() => openProduct(line)}>Сохранить как продукт — строка {index + 1}</button>}
-                  {lineTotals ? <TotalsView totals={lineTotals} /> : <p>Проверьте количество и исходные значения: до двух знаков после запятой, максимум 21474836,47.</p>}
                   <div className="catalog-actions"><button type="button" disabled={index === 0} onClick={() => { const reordered = [...lines]; [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]]; setLines(reordered) }}>Выше — строка {index + 1}</button><button type="button" onClick={() => setLines(current => current.filter(row => row.id !== line.id))}>Убрать строку {index + 1}</button></div>
                 </fieldset>
               })}
-              {!!lines.length && totals && <><h3>Калькулятор приёма</h3><TotalsView totals={totals} /></>}
-              <p className="muted">Строка, приём и день округляются независимо до сотых: половина округляется вверх. Сумма отображённых строк может отличаться на 0,01 от итога. Пустое значение — неизвестно; 0 — известный ноль. Калории с этикетки независимы от БЖУ.</p>
+              <p className="muted">Пустое значение — неизвестно; 0 — известный ноль. Калории с этикетки независимы от БЖУ.</p>
             </fieldset>
             {pending?.action === 'save' && <p role="status">{confirmed ? 'Сохранение подтверждено.' : 'Результат запроса неизвестен.'} Явный повтор отправит прежние данные, время и UUID.</p>}
             <button type="submit" disabled={busy || !!conflict || (!!pending && pending.action !== 'save') || !localTime}>{busy ? 'Сохраняем…' : pending?.action === 'save' ? 'Повторить сохранение приёма' : 'Сохранить приём пищи'}</button>

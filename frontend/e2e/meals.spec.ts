@@ -40,13 +40,13 @@ async function choose(page: Page, name: string) {
 const form = (page: Page) => page.getByRole('region', { name: 'Форма приёма пищи', exact: true })
 const history = (page: Page) => page.getByRole('region', { name: 'День питания', exact: true })
 
-test('catalog composition, independent product creation, frozen draft, calculator, editing and global undo', async ({ page }) => {
+test('catalog composition, independent product creation, frozen draft, totals after saving, editing and global undo', async ({ page }) => {
   await start(page)
   const name = await createProduct(page)
   await choose(page, name)
   await page.getByLabel('Порция строки 1', { exact: true }).selectOption({ label: 'Упаковка · 180.00 г' })
   await page.getByLabel('Количество строки 1, г', { exact: true }).fill('90')
-  await expect(form(page)).toContainText('162.00 ккал')
+  await expect(form(page).locator('.meal-totals')).toHaveCount(0)
   // Editing the card cannot rewrite a product already picked into the meal.
   const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
   await page.getByRole('link', { name: 'Каталог', exact: true }).click()
@@ -54,7 +54,7 @@ test('catalog composition, independent product creation, frozen draft, calculato
   await page.getByLabel('Калории, ккал на 100 г', { exact: true }).fill('200')
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
-  await expect(form(page)).toContainText('162.00 ккал')
+  await expect(form(page).locator('.meal-totals')).toHaveCount(0)
   const second = await createProduct(page)
   await expect(page.getByLabel('Количество строки 1, г')).toHaveValue('90')
   await choose(page, second)
@@ -156,7 +156,7 @@ test('field errors, confirmed save with refresh failure and real revision confli
   await expect(saved).toContainText('162.00 ккал')
 })
 
-test('exact half-up preview, historical milliseconds, movement between days and late day response', async ({ page }) => {
+test('exact half-up saved totals, historical milliseconds, movement between days and late day response', async ({ page }) => {
   await start(page)
   const name = await createProduct(page)
   const products = await (await page.request.get('/api/products')).json()
@@ -173,8 +173,11 @@ test('exact half-up preview, historical milliseconds, movement between days and 
   const saved = history(page).getByRole('article').filter({ hasText: name })
   await expect(saved).toContainText('0.01 г')
   await saved.getByRole('button', { name: 'Изменить приём', exact: true }).click()
-  const preview = form(page).getByRole('definition').filter({ hasText: '0.01 г' })
-  await expect(preview).toHaveCount(3) // two rows and independently rounded whole meal
+  await expect(saved.getByRole('listitem')).toHaveCount(2)
+  await expect(saved.getByRole('listitem').nth(0)).toContainText('Углеводы: 0.01 г')
+  await expect(saved.getByRole('listitem').nth(1)).toContainText('Углеводы: 0.01 г')
+  await expect(saved.getByRole('definition').filter({ hasText: '0.01 г' })).toHaveCount(1)
+  await expect(form(page).locator('.meal-totals')).toHaveCount(0)
   await page.getByLabel('Категория приёма').selectOption('lunch')
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await expect(saved).toContainText('15:00:12,123')

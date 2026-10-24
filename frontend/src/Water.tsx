@@ -211,7 +211,6 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
           <label htmlFor="water-amount">Объём воды, мл</label><input id="water-amount" inputMode="numeric" required value={amount} onChange={e => setAmount(e.target.value)} {...invalid('volume_ml')} />
           <label htmlFor="water-time">Время воды — Москва</label><input id="water-time" type="datetime-local" step="60" required value={localTime} onChange={e => { timeInitialized.current = true; setLocalTime(e.target.value); setInstant(''); setCandidates([]) }} {...invalid('occurred_at')} />
           {candidates.length > 1 && <><label htmlFor="water-offset">Смещение времени воды</label><select id="water-offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение UTC</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
-          <details className="explanation"><summary>Об учёте воды</summary><p className="muted">Только явно внесённая вода. Целые мл от 1 до 2147483647 — технический предел, без дневной цели.</p></details>
           <button type="submit" disabled={!!conflict}>Сохранить воду</button><button type="button" onClick={clear}>Отменить ввод воды</button>
         </fieldset>
       </form>
