@@ -11,7 +11,7 @@ import { localMinute, basalText, moscowLabel } from './time'
 type Entry = { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null; revision: number; deleted_at: string | null }
 type PendingAction = { path: string; body: string; action: 'delete' | 'restore' }
 const reasons: Record<string, string> = { food: 'Еда', correction: 'Коррекция', food_and_correction: 'Еда и коррекция' }
-const moscowTime = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' })
+const moscowTime = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
 export function Diary({ active, section, day, temporary, onDay, onView, csrfToken }: { active: boolean; section: string; day: string; temporary: boolean; onDay: (day: string, open?: boolean) => void; onView: (temporary: boolean) => void; csrfToken: () => Promise<string> }) {
   const [localTime, setLocalTime] = useState('')

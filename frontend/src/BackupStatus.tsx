@@ -1,5 +1,6 @@
 import { privateFetch } from './access'
 import { useEffect, useState } from 'react'
+import { moscowLabel } from './time'
 
 type Status = {
   last_external_success: string | null
@@ -10,7 +11,7 @@ type Status = {
   overdue: boolean
 }
 
-const when = (value: string | null) => value ? new Date(value).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) + ' МСК' : 'ещё не было'
+const when = (value: string | null) => value ? moscowLabel(value) : 'ещё не было'
 
 export function useBackupStatus(active: boolean) {
   const [status, setStatus] = useState<Status | null>(null)

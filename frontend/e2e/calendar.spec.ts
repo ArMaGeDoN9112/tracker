@@ -95,7 +95,7 @@ test('calendar shows basal gaps and zero rates, meal results and water volumes',
   } }))
   await page.route('**/api/day?*', route => route.fulfill({ json: {
     basal: '0.50', temporary_percent: null, entries: [], temporary_basals: [],
-    basal_changes: [{ occurred_at: '2026-10-19T22:40:00Z', basal: '0.60' }, { occurred_at: '2026-10-20T03:00:00Z', basal: null }, { occurred_at: '2026-10-20T09:00:00Z', basal: '0.00' }, { occurred_at: '2026-10-20T15:00:00Z', basal: '0.80' }],
+    basal_changes: [{ occurred_at: '2026-10-19T22:40:12.345Z', basal: '0.60' }, { occurred_at: '2026-10-20T03:00:00Z', basal: null }, { occurred_at: '2026-10-20T09:00:00Z', basal: '0.00' }, { occurred_at: '2026-10-20T15:00:00Z', basal: '0.80' }],
   } }))
   await page.getByRole('link', { name: 'Календарь', exact: true }).click()
   await page.getByLabel('Месяц — Москва').fill('2026-10')
@@ -150,7 +150,7 @@ test('calendar shows basal gaps and zero rates, meal results and water volumes',
   await page.getByRole('button', { name: 'Открыть сводку за 2014-10-26:' }).click()
   await expect(details).toContainText('В этот день переводились часы')
   await expect(details.getByRole('group', { name: 'График базы с 00 до 24 часов, Москва' })).toHaveCount(0)
-  await expect(details).toContainText('GMT+04:00')
-  await expect(details).toContainText('GMT+03:00')
+  await expect(details).toContainText('26.10.2014, 01:15')
+  await expect(details).not.toContainText(/GMT|МСК|\d{2}:\d{2}:\d{2}/)
   await expect(details.getByRole('listitem').filter({ hasText: 'ед/ч' })).toHaveCount(5)
 })
