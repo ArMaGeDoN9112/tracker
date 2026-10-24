@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from test_entries import diary, entry
 from test_access import ORIGIN
 from diary.app import create_app
-from diary.db import migrate
+from diary.infrastructure.database import migrate
 
 
 def test_edit_and_move_preserve_creation_and_untouched_time(diary):

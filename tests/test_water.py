@@ -28,7 +28,7 @@ def test_quick_water_uses_server_time_and_replays_without_duplicates(diary, monk
 import pytest
 from fastapi.testclient import TestClient
 from diary.app import create_app
-from diary.db import migrate
+from diary.infrastructure.database import migrate
 from test_access import ORIGIN, login
 
 
@@ -176,8 +176,8 @@ def test_upgrade_previous_schema_preserves_diary_and_meals(tmp_path):
     from pathlib import Path
     from alembic import command
     from alembic.config import Config
-    from diary.db import database_engine
-    from diary.admin import create_account
+    from diary.infrastructure.database import database_engine
+    from admin_setup import create_account
     from test_access import PASSWORD
     from test_entries import entry
     from test_meals import meal

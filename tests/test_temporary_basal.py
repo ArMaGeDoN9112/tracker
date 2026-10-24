@@ -76,7 +76,7 @@ def test_invalid_temporary_basal_is_not_saved(diary, changes):
 def test_maximum_values_and_normalized_replay_survive_restart(diary):
     from fastapi.testclient import TestClient
     from diary.app import create_app
-    from diary.db import migrate
+    from diary.infrastructure.database import migrate
     from test_access import ORIGIN
 
     client, database = diary
@@ -187,9 +187,9 @@ def test_migration_from_schedule_schema_preserves_existing_history(diary):
     from alembic.config import Config
     from pathlib import Path
     from fastapi.testclient import TestClient
-    from diary.admin import create_account
+    from admin_setup import create_account
     from diary.app import create_app
-    from diary.db import database_engine, migrate
+    from diary.infrastructure.database import database_engine, migrate
     from test_access import ORIGIN, PASSWORD, login
 
     _, database = diary

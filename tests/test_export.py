@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from sqlalchemy import Engine, event
 
 from diary.app import create_app
-from diary.db import database_engine
+from diary.infrastructure.database import database_engine
 
 from test_access import ORIGIN
 from test_entries import diary, entry
@@ -190,8 +190,8 @@ def test_v3_contract_and_example_match_application_dto():
 def test_upgrade_stage_one_to_nutrition_and_repeated_migrations_preserve_old_data(tmp_path):
     from alembic import command
     from alembic.config import Config
-    from diary.admin import create_account
-    from diary.db import migrate
+    from admin_setup import create_account
+    from diary.infrastructure.database import migrate
     from test_access import PASSWORD, login
     database = tmp_path / "stage-one.sqlite3"
     engine = database_engine(database)
@@ -225,8 +225,9 @@ def test_upgrade_stage_one_to_nutrition_and_repeated_migrations_preserve_old_dat
 
 @pytest.mark.parametrize("revocation", ["expired", "logout", "reset"])
 def test_export_rejects_expired_and_revoked_sessions(diary, monkeypatch, revocation):
-    from diary.admin import reset_password
-    from diary.security import SESSION_SECONDS, now_ms
+    from admin_setup import reset_password
+    from diary.application.access import SESSION_SECONDS
+    from diary.infrastructure.security import now_ms
     from test_access import PASSWORD
 
     client, database = diary

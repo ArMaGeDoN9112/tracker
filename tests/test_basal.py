@@ -166,7 +166,7 @@ def test_concurrent_versions_with_occupied_start_are_serialized(diary):
 def test_history_and_replays_survive_migration_and_restart(diary):
     from fastapi.testclient import TestClient
     from diary.app import create_app
-    from diary.db import migrate
+    from diary.infrastructure.database import migrate
     from test_access import ORIGIN
 
     client, database = diary
@@ -185,9 +185,9 @@ def test_migration_from_previous_schema_keeps_entries_and_session(tmp_path):
     from alembic.config import Config
     from pathlib import Path
     from fastapi.testclient import TestClient
-    from diary.admin import create_account
+    from admin_setup import create_account
     from diary.app import create_app
-    from diary.db import database_engine, migrate
+    from diary.infrastructure.database import database_engine, migrate
     from test_access import ORIGIN, PASSWORD, login
 
     database = tmp_path / "previous.sqlite3"

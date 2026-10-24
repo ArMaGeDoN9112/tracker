@@ -2,11 +2,11 @@ import pytest
 from sqlalchemy import event
 from sqlalchemy.exc import SQLAlchemyError
 
-from diary.admin import create_account
+from admin_setup import create_account
 from diary.application.access import Credentials, GetSession, Login, LoginCommand, TokenInput
 from diary.application.admin import ResetPassword, ResetPasswordInput
 from diary.application.errors import Unavailable
-from diary.db import database_engine, migrate
+from diary.infrastructure.database import database_engine, migrate
 from diary.infrastructure.access import access_uow
 from diary.infrastructure.security import CryptographicSecurity
 

@@ -9,7 +9,7 @@ from sqlalchemy.exc import OperationalError
 
 from diary.application.errors import Unavailable
 from diary.application.reads import GetNutritionSummary, SummaryQuery
-from diary.db import database_engine, migrate
+from diary.infrastructure.database import database_engine, migrate
 from diary.infrastructure.reads import read_uow
 from test_basal import schedule
 from test_entries import diary, entry

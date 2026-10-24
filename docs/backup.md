@@ -50,6 +50,8 @@ docker compose run --rm -T backup python -m diary.backup --database /data/diary.
 единый снимок через `ExportDiary`; общий сериализатор `diary/interfaces/export.py`
 используется HTTP и проверкой резервной копии. Все новые модули входят в bundle
 вместе с пакетом `diary`; формат JSON и команды не меняются.
+Полная [структура бэкенда](architecture.md) описывает сборку и классы сценариев;
+возврат прежнего кода после этого переноса не требует обратной миграции БД.
 
 Команда использует SQLite Online Backup API, проверяет integrity/foreign keys и чтение
 текущими DTO приложения. Снимок включает всю SQLite (включая служебные таблицы и

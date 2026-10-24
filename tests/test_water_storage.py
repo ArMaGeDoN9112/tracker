@@ -3,7 +3,7 @@ from sqlalchemy import event
 from sqlalchemy.exc import OperationalError
 
 from diary.application.errors import Unavailable
-from diary.db import database_engine, migrate
+from diary.infrastructure.database import database_engine, migrate
 from diary.infrastructure.water import SqliteWater
 
 

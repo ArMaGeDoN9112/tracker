@@ -3,9 +3,9 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from diary.admin import create_account
+from admin_setup import create_account
 from diary.app import create_app
-from diary.db import migrate
+from diary.infrastructure.database import migrate
 from test_access import ORIGIN, PASSWORD, login
 
 
@@ -111,7 +111,7 @@ def test_upgrade_previous_schema_preserves_account_and_session(tmp_path):
     from alembic import command
     from alembic.config import Config
     from pathlib import Path
-    from diary.db import database_engine
+    from diary.infrastructure.database import database_engine
 
     database = tmp_path / "previous.sqlite3"
     config = Config()

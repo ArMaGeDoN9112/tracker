@@ -19,7 +19,7 @@ from diary.application.operations import RevisionInput
 from diary.domain.basal import BasalSchedule, TemporaryBasalPeriod
 from diary.domain.precision import rate_string
 from diary.domain.time import milliseconds
-from diary.dto import ErrorOutput, ScheduleConflictOutput
+from diary.interfaces.http.dto import ErrorOutput, ScheduleConflictOutput
 from diary.interfaces.http.entries import TemporaryBasalOutput
 from diary.interfaces.http.outputs import ReceiptOutput, receipt_output, timestamp
 

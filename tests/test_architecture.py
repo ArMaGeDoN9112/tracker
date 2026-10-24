@@ -13,7 +13,13 @@ PURE_IMPORTS = {
 
 
 def violations(source: str, module: str, package: str) -> list[str]:
-    allowed_layers = ("diary.domain",) if module.startswith("diary.domain") else ("diary.domain", "diary.application")
+    layer = module.split(".")[1]
+    allowed_layers = {
+        "domain": ("diary.domain",),
+        "application": ("diary.domain", "diary.application"),
+        "infrastructure": ("diary.domain", "diary.application", "diary.infrastructure", "diary.tables"),
+        "interfaces": ("diary.domain", "diary.application", "diary.interfaces"),
+    }[layer]
     errors = []
     for node in ast.walk(ast.parse(source)):
         imports = []
@@ -23,6 +29,11 @@ def violations(source: str, module: str, package: str) -> list[str]:
             name = resolve_name("." * node.level + (node.module or ""), package) if node.level else node.module or ""
             imports = [name, *(name + "." + alias.name for alias in node.names)]
         for name in imports:
+            if layer in {"infrastructure", "interfaces"} and name.split(".")[0] != "diary":
+                continue
+            # CLI composes dependencies lazily, after argparse; HTTP receives use cases.
+            if module.startswith("diary.interfaces.cli.") and (name == "diary.bootstrap" or name.startswith("diary.bootstrap.")):
+                continue
             if name.split(".")[0] in PURE_IMPORTS:
                 continue
             if any(name == layer or name.startswith(layer + ".") for layer in allowed_layers):
@@ -33,10 +44,10 @@ def violations(source: str, module: str, package: str) -> list[str]:
     return errors
 
 
-def test_core_dependency_direction():
+def test_package_dependency_direction():
     root = Path(__file__).resolve().parents[1]
     errors = []
-    for layer in ("domain", "application"):
+    for layer in ("domain", "application", "infrastructure", "interfaces"):
         files = list((root / "diary" / layer).rglob("*.py"))
         assert files, f"Missing {layer} package"
         for path in files:
@@ -66,6 +77,21 @@ def test_guard_rejects_external_and_legacy_dependencies(source):
     ("diary.application", "diary.application", "from . import entries"),
     ("diary.application.entries", "diary.application", "from ..domain import time"),
     ("diary.application.entries", "diary.application", "def helper():\n    from .operations import OperationInput"),
+    ("diary.infrastructure.access", "diary.infrastructure", "from diary.tables import account"),
+    ("diary.infrastructure.reads", "diary.infrastructure", "from .water import SqliteWater"),
+    ("diary.interfaces.http.access", "diary.interfaces.http", "from .dto import LoginOutput"),
+    ("diary.interfaces.cli.admin", "diary.interfaces.cli", "def main():\n    from diary.bootstrap import admin_use_cases"),
 ])
 def test_guard_allows_core_dependencies(module, package, source):
     assert violations(source, module, package) == []
+
+
+@pytest.mark.parametrize("module,source", [
+    ("diary.infrastructure.database", "from diary.interfaces.http import errors"),
+    ("diary.infrastructure.access", "from diary import db"),
+    ("diary.interfaces.http.access", "from diary.infrastructure import access"),
+    ("diary.interfaces.http.access", "from ... import tables"),
+    ("diary.interfaces.http.access", "from diary.dto import LoginOutput"),
+])
+def test_guard_rejects_adapter_cross_dependencies(module, source):
+    assert violations(source, module, module.rpartition(".")[0])

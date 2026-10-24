@@ -164,9 +164,9 @@ def test_upgrade_preserves_catalog_meals_deletions_receipts_and_session(tmp_path
     from alembic import command
     from alembic.config import Config
     from fastapi.testclient import TestClient
-    from diary.admin import create_account
+    from admin_setup import create_account
     from diary.app import create_app
-    from diary.db import database_engine, migrate
+    from diary.infrastructure.database import database_engine, migrate
     from test_access import ORIGIN, PASSWORD, login
     from test_entries import entry
     from test_products import legacy_product

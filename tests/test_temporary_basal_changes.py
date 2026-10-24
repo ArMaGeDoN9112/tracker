@@ -62,7 +62,7 @@ def test_delete_b_undo_deadline_and_preserved_history(diary, monkeypatch, elapse
         assert restored.json()['code'] == 'undo_expired'
         assert client.get(path).json()['revision'] == 2
     assert client.post(path + '/delete', json=deletion).json()['undo_remaining_ms'] == max(0, 30000 - elapsed)
-    from diary.db import migrate
+    from diary.infrastructure.database import migrate
     from diary.app import create_app
     from fastapi.testclient import TestClient
     from test_access import ORIGIN

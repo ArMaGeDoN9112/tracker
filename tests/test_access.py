@@ -1,9 +1,9 @@
 from fastapi.testclient import TestClient
 
 from diary.app import create_app
-from diary.db import migrate
-from diary.admin import create_account
-from diary.admin import reset_password
+from diary.infrastructure.database import migrate
+from admin_setup import create_account
+from admin_setup import reset_password
 import pytest
 
 ORIGIN = "https://diary.test"

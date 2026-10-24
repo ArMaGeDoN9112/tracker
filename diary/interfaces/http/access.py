@@ -11,7 +11,7 @@ from diary.application.access import (
     CsrfInput, GetCsrf, GetSession, Login, LoginCommand, Logout, SessionOutput, TokenInput,
 )
 from diary.application.errors import ApplicationError
-from diary.dto import CsrfOutput, LoginOutput
+from diary.interfaces.http.dto import CsrfOutput, LoginOutput
 from diary.interfaces.http.errors import application_failure, failure
 
 

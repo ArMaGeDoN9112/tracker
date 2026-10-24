@@ -15,7 +15,7 @@ from diary.application.operations import RevisionInput
 from diary.domain.entries import EntryRecord, Reason
 from diary.domain.precision import decimal_string
 from diary.domain.time import milliseconds
-from diary.dto import EntryFormOutput, MoscowTimeOutput
+from diary.interfaces.http.dto import EntryFormOutput, MoscowTimeOutput
 from diary.interfaces.http.outputs import ReceiptOutput, receipt_output, timestamp
 
 

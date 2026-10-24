@@ -13,7 +13,7 @@ def product(**changes):
 
 def legacy_product(database):
     from sqlalchemy import MetaData, Table, insert
-    from diary.db import database_engine
+    from diary.infrastructure.database import database_engine
     from diary.tables import product_portion
     identifier, portion_id = str(uuid4()), str(uuid4())
     engine = database_engine(database)
@@ -77,7 +77,7 @@ def test_photo_is_preserved_for_older_clients_and_can_be_removed(diary):
     assert client.post('/api/products', json=payload).json()['replayed'] is True
     assert client.put(path, json=product(expected_revision=1)).status_code == 200
     assert client.get(path).json()['photo'] == photo
-    from diary.db import migrate
+    from diary.infrastructure.database import migrate
     migrate(database)
     assert client.get('/api/export').json()['products'][0]['photo'] == photo
     assert client.put(path, json=product(expected_revision=2, photo=None)).status_code == 200
@@ -102,7 +102,7 @@ def test_edit_portions_and_old_receipts(diary):
     assert client.post('/api/products', json=payload).json()['replayed'] is True
     assert client.put(path, json=edit).json()['replayed'] is True
     assert client.get(path).json()['revision'] == 3
-    from diary.db import migrate
+    from diary.infrastructure.database import migrate
     migrate(database)
     migrate(database)
     assert client.get(path).json()['portions'] == [{**portions[0], 'quantity': '180.00'}]
@@ -234,9 +234,9 @@ def test_upgrade_existing_diary_preserves_history_and_session(tmp_path):
     from alembic.config import Config
     from pathlib import Path
     from fastapi.testclient import TestClient
-    from diary.admin import create_account
+    from admin_setup import create_account
     from diary.app import create_app
-    from diary.db import database_engine, migrate
+    from diary.infrastructure.database import database_engine, migrate
     from test_access import ORIGIN, PASSWORD, login
     from test_entries import entry
     database = tmp_path / 'previous.sqlite3'
@@ -269,9 +269,9 @@ def test_remove_archive_keeps_products_photos_portions_and_history(tmp_path, pre
     from fastapi.testclient import TestClient
     from sqlalchemy import Engine, MetaData, Table, event, inspect, update
     from sqlalchemy.exc import IntegrityError
-    from diary.admin import create_account
+    from admin_setup import create_account
     from diary.app import create_app
-    from diary.db import database_engine, migrate
+    from diary.infrastructure.database import database_engine, migrate
     from diary.tables import product as product_table
     from test_access import ORIGIN, PASSWORD, login
     from test_meals import meal

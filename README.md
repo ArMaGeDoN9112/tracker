@@ -9,6 +9,7 @@
 - [План следующих этапов](docs/roadmap.md).
 - [Оставшаяся приёмка](.scratch/release-readiness/spec.md).
 - [Формат JSON-экспорта](docs/export/README.md) и [резервирование](docs/backup.md).
+- [Архитектура бэкенда и перечень сценариев](docs/architecture.md).
 
 ## Навигация и сохранение состояния
 

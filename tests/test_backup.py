@@ -195,7 +195,7 @@ def test_backup_while_writing_restores_a_consistent_point(diary, tmp_path):
 def test_invalid_nutrition_snapshot_cannot_advance_verification(diary, tmp_path, fault):
     from diary.infrastructure.backup import GROUP, checksum
     from diary.bootstrap import backup_storage
-    from diary.db import database_engine
+    from diary.infrastructure.database import database_engine
     from diary.tables import meal_line, product, product_portion, water, water_settings
     client, database = diary
     historical = nutrition_history(client)

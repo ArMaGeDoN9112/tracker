@@ -51,11 +51,6 @@ class WaterQuery(BaseModel):
     water_id: str
 
 
-class WaterPeriod(BaseModel):
-    start: int
-    end: int
-
-
 class EditWaterCommand(EditWaterInput):
     water_id: str
 
@@ -64,13 +59,9 @@ class WaterRevisionCommand(RevisionInput):
     water_id: str
 
 
-class WaterReader(Protocol):
+class WaterStore(Protocol):
     def get(self, water_id: str) -> WaterRecord | None: ...
-    def day(self, start: int, end: int) -> list[WaterRecord]: ...
     def get_settings(self) -> WaterSettingsOutput: ...
-
-
-class WaterStore(WaterReader, Protocol):
     def save(self, record: WaterRecord, *, create: bool) -> None: ...
     def save_settings(self, settings: WaterSettingsOutput) -> None: ...
 
@@ -104,14 +95,6 @@ class GetWaterSettings:
     def execute(self) -> WaterSettingsOutput:
         with self.uow() as uow:
             return uow.water.get_settings()
-
-
-@dataclass
-class GetDayWater:
-    reader: WaterReader
-
-    def execute(self, period: WaterPeriod) -> list[WaterRecord]:
-        return self.reader.day(period.start, period.end)
 
 
 @dataclass

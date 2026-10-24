@@ -13,7 +13,7 @@ from diary.bootstrap import (
 )
 from diary.interfaces.http.errors import failure, register_application_errors
 from diary.interfaces.http.access import validate_origin
-from diary.body_limit import BodyLimit
+from diary.interfaces.http.body_limit import BodyLimit
 
 
 def create_app(database: Path, origin: str) -> FastAPI:

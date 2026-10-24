@@ -3,8 +3,8 @@
 ## Notes
 
 - Запрос и открытые решения: [spec.md](spec.md).
-- `diary/app.py` собирает приложение, выполняет SQL для доступа и сессий,
-  задаёт middleware и преобразование ошибок в HTTP.
+- `diary/app.py` собирает приложение и задаёт HTTP-валидацию;
+  SQL доступа/сессий находится в инфраструктуре.
 - Вода, дневник и база перенесены в application/domain/infrastructure/interfaces;
   зависимости подключает `bootstrap.py`. Старые `diary/water.py`, `diary/entries.py`
   и `diary/basal.py` удалены; экспорт перенесён на этапе 07.
@@ -107,6 +107,16 @@
   в свежем образе; mypy — 61 файл, сборки checks/e2e/front успешны.
   Ревью Standards/Spec — 0/0 замечаний. Временные мосты перечислены в тикете;
   зависимость этапа 09 разрешена.
+
+- Этап [09](issues/09-completion.md) завершён: удалены временные мосты db/security,
+  HTTP DTO/middleware размещены в interfaces, admin сохранён как CLI entrypoint,
+  e2e setup вызывает сценарии через сборку. Неиспользуемый GetDayWater удалён;
+  вода читается в общем снимке GetNutritionDay. Контроль импортов охватывает
+  все четыре слоя; полный перечень классов — в `docs/architecture.md`.
+  Docker Compose: 469 backend, 130 e2e, mypy — 59 файлов; все образы собраны,
+  app:from_env и CLI/backup restore проверены на синтетических данных.
+  Standards/Spec — 0/0. Миграции/форматы не менялись. Все критерии усилия
+  выполнены, эксплуатационная приёмка остаётся отдельной задачей.
 
 ## Fog
 

@@ -1,7 +1,7 @@
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.responses import JSONResponse
 
-from diary.dto import ErrorOutput
+from diary.interfaces.http.dto import ErrorOutput
 
 
 class BodyLimit:

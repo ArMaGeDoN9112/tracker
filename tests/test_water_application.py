@@ -7,8 +7,8 @@ import pytest
 
 from diary.application.errors import NotFound, OperationConflict, RevisionConflict, Unavailable, UndoExpired
 from diary.application.water import (
-    CreateWater, DeleteWater, EditWater, EditWaterCommand, EditWaterSettings, GetDayWater,
-    GetWater, GetWaterSettings, RestoreWater, WaterInput, WaterOperations, WaterPeriod,
+    CreateWater, DeleteWater, EditWater, EditWaterCommand, EditWaterSettings,
+    GetWater, GetWaterSettings, RestoreWater, WaterInput, WaterOperations,
     WaterQuery, WaterRevisionCommand, WaterSettingsInput, WaterSettingsOutput,
 )
 
@@ -23,11 +23,6 @@ class MemoryWater:
 
     def save(self, record, *, create):
         self.records[record.id] = deepcopy(record)
-
-    def day(self, start, end):
-        return sorted((deepcopy(r) for r in self.records.values()
-                       if r.deleted_at is None and start <= r.occurred_at < end),
-                      key=lambda r: (r.occurred_at, r.created_at, r.id))
 
     def get_settings(self):
         return deepcopy(self.settings)
@@ -96,8 +91,7 @@ def test_edit_moves_water_between_days_and_rejects_stale_revision(water_app):
     edit = EditWaterCommand(operation_id=str(uuid4()), water_id=receipt.result_id, expected_revision=1,
                             volume_ml=500, occurred_at='2026-10-20T00:00:00+03:00')
     assert EditWater(operations).execute(edit).receipt.revision == 2
-    assert GetDayWater(store.water).execute(WaterPeriod(start=1792400000000, end=1792443600000)) == []
-    record, = GetDayWater(store.water).execute(WaterPeriod(start=1792443600000, end=1792530000000))
+    record = GetWater(store.open).execute(WaterQuery(water_id=receipt.result_id))
     assert (record.volume_ml, record.occurred_at) == (500, 1792443600000)
     with pytest.raises(RevisionConflict):
         EditWater(operations).execute(edit.model_copy(update={'operation_id': str(uuid4())}))
@@ -143,6 +137,8 @@ def test_settings_keep_order_and_empty_list_and_replay_does_not_revert(water_app
 @pytest.mark.parametrize('settings', [False, True])
 def test_failed_receipt_rolls_back_change_and_allows_retry(water_app, monkeypatch, settings):
     store, clock, operations = water_app
+    water_id = str(uuid4())
+    operations = WaterOperations(store.open, lambda: clock[0], lambda: water_id)
     payload = (WaterSettingsInput(operation_id=str(uuid4()), expected_revision=1, volumes_ml=[])
                if settings else WaterInput(operation_id=str(uuid4()), volume_ml=250))
     case = EditWaterSettings(operations) if settings else CreateWater(operations)
@@ -152,7 +148,8 @@ def test_failed_receipt_rolls_back_change_and_allows_retry(water_app, monkeypatc
         patch.setattr(MemoryReceipts, 'add', lambda self, receipt: fail(receipt))
         with pytest.raises(Unavailable):
             case.execute(payload)
-    assert GetDayWater(store.water).execute(WaterPeriod(start=0, end=clock[0] + 1)) == []
+    with pytest.raises(NotFound):
+        GetWater(store.open).execute(WaterQuery(water_id=water_id))
     assert GetWaterSettings(store.open).execute().revision == 1
     assert case.execute(payload).replayed is False
 

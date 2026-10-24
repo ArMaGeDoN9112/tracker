@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from diary.application.errors import ApplicationError
-from diary.dto import ErrorOutput
+from diary.interfaces.http.dto import ErrorOutput
 
 
 def failure(code: str, message: str, status: int, field: str | None = None) -> JSONResponse:
