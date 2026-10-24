@@ -1,4 +1,10 @@
+from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
+
+if TYPE_CHECKING:
+    from diary.application.backup import RunBackup
+    from diary.infrastructure.backup import FileBackupStorage
 
 from fastapi import FastAPI
 from sqlalchemy import Engine
@@ -89,3 +95,41 @@ def register_reads_http(app: FastAPI, engine: Engine) -> None:
         glucose=GetGlucoseSummary(reads, clock), nutrition=GetNutritionSummary(reads, clock),
         nutrition_day=GetNutritionDay(reads),
     ))
+
+
+def register_export_http(app: FastAPI, engine: Engine) -> None:
+    from diary.application.export import ExportDiary
+    from diary.infrastructure.export import export_uow
+    from diary.interfaces.http.export import register_export
+
+    clock = lambda: now_ms()
+    register_export(app, ExportDiary(lambda: export_uow(engine), clock), clock)
+
+
+def backup_storage(database: "Path") -> "FileBackupStorage":
+    import os
+    from diary.application.export import ExportData
+    from diary.infrastructure.backup import FileBackupStorage
+    from diary.interfaces.export import full_export
+
+    def validate(data: ExportData) -> None:
+        full_export(data)
+
+    repository = os.environ.get("RESTIC_REPOSITORY", "")
+    return FileBackupStorage(database, validate, repository.startswith(("s3:", "sftp:", "rest:", "rclone:", "azure:", "gs:", "b2:")))
+
+
+def backup_runner(database: "Path") -> "RunBackup":
+    import time
+    from datetime import datetime, timezone
+    from diary.application.backup import RunBackup
+
+    return RunBackup(backup_storage(database), lambda: datetime.now(timezone.utc), time.monotonic)
+
+
+def register_backup_status_http(app: FastAPI, database: "Path") -> None:
+    from datetime import datetime, timezone
+    from diary.application.backup import GetBackupStatus
+    from diary.interfaces.http.backup import register_backup_status
+
+    register_backup_status(app, GetBackupStatus(backup_storage(database), lambda: datetime.now(timezone.utc)))

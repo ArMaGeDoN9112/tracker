@@ -9,7 +9,7 @@
 
 Контракт: [schema-v2.json](schema-v2.json), JSON Schema draft 2020-12;
 [синтетический пример v2](example-v2.json). Схема генерируется из `FullExport`
-в `diary/export.py`; тест сравнивает её с DTO и проверяет пример обоими способами.
+в `diary/interfaces/export.py`; тест сравнивает её с DTO и проверяет пример обоими способами.
 Сохранены [описание v1](README-v1.md), [схема v1](schema-v1.json) и
 [пример v1](example-v1.json). Endpoint выдаёт только v2; JSON-импорта нет.
 

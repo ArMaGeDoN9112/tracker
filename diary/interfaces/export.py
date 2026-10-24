@@ -1,28 +1,18 @@
-import json
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import FastAPI, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import Connection, Engine, select
 
+from diary.application.export import ExportData
 from diary.application.basal import IntervalInput
 from diary.interfaces.http.basal import ScheduleOutput, temporary_output
-from diary.infrastructure.diary import schedules, temporary_basals
-from diary.domain.basal import TemporaryBasalPeriod
-from diary.domain.entries import EntryRecord, Reason
-from diary.domain.nutrition import MealRecord
+from diary.domain.entries import Reason
 from diary.domain.precision import rate_string
-from diary.domain.products import ProductRecord
 from diary.interfaces.http.entries import entry_output
 from diary.interfaces.http.outputs import timestamp
 from diary.interfaces.http.meals import MealLineOutput, MealOutput, meal_output
-from diary.infrastructure.nutrition import SqliteProducts, meal_lines
 from diary.interfaces.http.products import ProductOutput, product_output
-from diary.security import now_ms
-from diary.tables import account, entry, meal, product, temporary_basal, water, water_settings
 from diary.application.water import WaterSettingsInput, WaterSettingsOutput
-from diary.domain.water import WaterRecord
 from diary.interfaces.http.water import WaterOutput, water_output
 
 
@@ -148,45 +138,22 @@ class FullExport(BaseModel):
     water: list[ExportWater]
 
 
-def full_export(connection: Connection) -> FullExport:
-    owner = connection.execute(select(account.c.id, account.c.login, account.c.created_at)).mappings().one()
-    exported_at = now_ms()
-    settings = connection.execute(select(water_settings)).mappings().one()
-    versions = schedules(connection)
-    active = {row.id: row.effective_ends_at for row in temporary_basals(connection)}
+def full_export(data: ExportData) -> FullExport:
+    versions = data.schedules
     return FullExport(
-        exported_at=timestamp(exported_at),
-        settings=ExportSettings(water=ExportWaterSettings(
-            volumes_ml=json.loads(settings["volumes_ml"]), revision=settings["revision"])),
-        products=[ExportProduct.model_validate(product_output(SqliteProducts(connection).result(ProductRecord.model_validate(row))).model_dump())
-                  for row in connection.execute(select(product).order_by(product.c.created_at, product.c.id)).mappings()],
-        meals=[ExportMeal.model_validate(meal_output(MealRecord.model_validate(row), meal_lines(connection, row["id"])).model_dump())
-               for row in connection.execute(select(meal).order_by(meal.c.occurred_at, meal.c.created_at, meal.c.id)).mappings()],
-        water=[ExportWater.model_validate(water_output(WaterRecord.model_validate(row)).model_dump())
-               for row in connection.execute(select(water).order_by(water.c.occurred_at, water.c.created_at, water.c.id)).mappings()],
-        account=ExportAccount(id=owner["id"], login=owner["login"], created_at=timestamp(owner["created_at"])),
-        entries=[ExportEntry(**entry_output(EntryRecord.model_validate(row), None).model_dump(exclude={"basal"})) for row in connection.execute(
-            select(entry).order_by(entry.c.occurred_at, entry.c.created_at, entry.c.id)).mappings()],
+        exported_at=timestamp(data.exported_at),
+        settings=ExportSettings(water=ExportWaterSettings.model_validate(data.settings.model_dump())),
+        account=ExportAccount(id=data.account.id, login=data.account.login, created_at=timestamp(data.account.created_at)),
+        products=[ExportProduct.model_validate(product_output(result).model_dump()) for result in data.products],
+        meals=[ExportMeal.model_validate(meal_output(result.record, result.lines).model_dump()) for result in data.meals],
+        water=[ExportWater.model_validate(water_output(record).model_dump()) for record in data.water],
+        entries=[ExportEntry(**entry_output(record, None).model_dump(exclude={"basal"})) for record in data.entries],
         basal_schedules=[ScheduleOutput(
             id=UUID(version.id), starts_at=timestamp(version.starts_at), created_at=timestamp(version.created_at),
             ends_at=timestamp(versions[index + 1].starts_at) if index + 1 < len(versions) else None,
             intervals=[IntervalInput(minute=interval.minute, rate=rate_string(interval.rate)) for interval in version.intervals],
         ) for index, version in enumerate(versions)],
-        temporary_basals=[ExportTemporary(
-            **(temporary_output(TemporaryBasalPeriod(**row, effective_ends_at=active.get(row["id"], row["ends_at"]))).model_dump()
-               | {"effective_ends_at": timestamp(active[row["id"]]) if row["id"] in active else None}),
-        ) for row in connection.execute(select(temporary_basal).order_by(
-            temporary_basal.c.starts_at, temporary_basal.c.created_at, temporary_basal.c.id)).mappings()],
+        temporary_basals=[ExportTemporary(**(temporary_output(record).model_dump() | {
+            "effective_ends_at": timestamp(record.effective_ends_at) if record.deleted_at is None else None,
+        })) for record in data.temporary],
     )
-
-
-def register_export(app: FastAPI, engine: Engine) -> None:
-    @app.get("/api/export", response_class=Response)
-    def download() -> Response:
-        with engine.connect() as connection:
-            # Explicit BEGIN keeps all SELECTs in one SQLite snapshot, including in legacy mode.
-            connection.exec_driver_sql("BEGIN")
-            result = full_export(connection)
-        return Response(result.model_dump_json(indent=2), media_type="application/json", headers={
-            "Content-Disposition": f'attachment; filename="diabetes-diary-{now_ms()}.json"',
-        })

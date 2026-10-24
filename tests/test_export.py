@@ -179,7 +179,7 @@ def test_export_nutrition_preserves_catalog_and_independent_history(diary):
 
 
 def test_v3_contract_and_example_match_application_dto():
-    from diary.export import FullExport
+    from diary.interfaces.export import FullExport
     schema = json.loads(Path("docs/export/schema-v3.json").read_text())
     assert schema == FullExport.model_json_schema()
     example = json.loads(Path("docs/export/example-v3.json").read_text())

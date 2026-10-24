@@ -193,7 +193,8 @@ def test_backup_while_writing_restores_a_consistent_point(diary, tmp_path):
 
 @pytest.mark.parametrize("fault", ["product", "portion", "line", "basis", "relation", "empty_meal", "water", "settings", "schema"])
 def test_invalid_nutrition_snapshot_cannot_advance_verification(diary, tmp_path, fault):
-    from diary.backup import GROUP, checksum, make_bundle
+    from diary.infrastructure.backup import GROUP, checksum
+    from diary.bootstrap import backup_storage
     from diary.db import database_engine
     from diary.tables import meal_line, product, product_portion, water, water_settings
     client, database = diary
@@ -206,7 +207,7 @@ def test_invalid_nutrition_snapshot_cannot_advance_verification(diary, tmp_path,
     with pytest.MonkeyPatch.context() as patch:
         for key in ["DIARY_RECOVERY_CONFIG", "DIARY_RELEASE"]:
             patch.setenv(key, env[key])
-        manifest = make_bundle(database, bundle, datetime.now(timezone.utc))
+        manifest = backup_storage(database).make_bundle(str(bundle), datetime.now(timezone.utc))
     engine = database_engine(bundle / "diary.sqlite3")
     try:
         with engine.begin() as connection:

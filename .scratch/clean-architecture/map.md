@@ -7,9 +7,10 @@
   задаёт middleware и преобразование ошибок в HTTP.
 - Вода, дневник и база перенесены в application/domain/infrastructure/interfaces;
   зависимости подключает `bootstrap.py`. Старые `diary/water.py`, `diary/entries.py`
-  и `diary/basal.py` удалены; совместимые вызовы экспорта остаются до этапа 07.
-- `diary/backup.py` объединяет резервирование, CLI и HTTP статуса;
-  использует `full_export` из `diary/export.py`.
+  и `diary/basal.py` удалены; экспорт перенесён на этапе 07.
+- `diary/backup.py` — совместимая точка входа CLI; экспорт и резервирование
+  разделены между application, infrastructure и interfaces. Общий сериализатор
+  `interfaces/export.py` используется HTTP и проверкой схемы снимка.
 - Уже существуют API-тесты в `tests/`; перенос должен учитывать также
   административные команды и резервирование.
 
@@ -83,6 +84,17 @@
   Docker Compose: 433 backend, 130 e2e (desktop/phone), mypy — 46 файлов
   без ошибок, frontend собран; ревью Standards/Spec — 0 замечаний по каждой оси.
   Зависимость этапа 07 разрешена.
+
+- Этап [07](issues/07-export-backup.md) завершён: экспорт и резервирование
+  перенесены в отдельные классы application, SQLite/files/restic-адаптеры,
+  HTTP и CLI. Общий сериализатор экспорта без SQL переиспользуется проверкой
+  снимка; формат v3, единый снимок, порядок внешних эффектов, pending/verified,
+  manifest/checksum, отзыв сессий, ротация и `python -m diary.backup` сохранены.
+  Docker Compose: 443 backend, отдельно итоговые 11 application, 10 затронутых
+  e2e desktop/phone; mypy — 54 файла, production frontend build успешен.
+  Ревью Standards/Spec — 0 оставшихся замечаний. Пересборки образов остановлены
+  TLS-таймаутами реестров; проверки выполнены в готовых образах с текущими
+  исходниками read-only, подробности в тикете. Зависимость этапа 08 разрешена.
 
 ## Fog
 
