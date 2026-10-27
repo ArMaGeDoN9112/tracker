@@ -1,11 +1,17 @@
 import { useEffect, useId, useState } from 'react'
-import { localMinute, basalText, moscowLabel } from './time'
+import { localMinute, basalText, moscowLabel, moscowDayBounds } from './time'
 
 type Change = { occurred_at: string; basal: string | null }
 const moscowOffset = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Moscow', timeZoneName: 'longOffset' })
 const offset = (date: Date) => moscowOffset.formatToParts(date).find(part => part.type === 'timeZoneName')?.value
 
-export function BasalDayChart({ basal, changes }: { basal: string | null; changes: Change[] }) {
+export function BasalDayChart({ day, basal, changes }: { day?: string; basal: string | null; changes: Change[] }) {
+  if (day) {
+    const [start, end] = moscowDayBounds(day)
+    const duration = (end - start) / 3600000
+    return <BasalChart points={[{ hour: 0, basal }, ...changes.map(change => ({ hour: (Date.parse(change.occurred_at) - start) / 3600000, basal: change.basal }))]}
+      duration={duration} clock={hour => hour === duration ? '24:00' : localMinute(new Date(start + Math.round(hour * 3600000)).toISOString()).slice(11)} />
+  }
   const clockChange = changes.some((change, index) => {
     const before = index === 0 ? new Date(Date.parse(change.occurred_at) - 1) : new Date(changes[index - 1].occurred_at)
     return offset(new Date(change.occurred_at)) !== offset(before)
@@ -22,7 +28,7 @@ export function BasalDayChart({ basal, changes }: { basal: string | null; change
   return <BasalChart points={points} />
 }
 
-export function BasalChart({ points }: { points: { hour: number; basal: string | null }[] }) {
+export function BasalChart({ points, duration = 24, clock }: { points: { hour: number; basal: string | null }[]; duration?: number; clock?: (hour: number) => string }) {
   const [selected, setSelected] = useState<number | null>(null)
   const tooltipId = useId()
   useEffect(() => {
@@ -30,11 +36,12 @@ export function BasalChart({ points }: { points: { hour: number; basal: string |
     document.addEventListener('keydown', dismiss)
     return () => document.removeEventListener('keydown', dismiss)
   }, [])
-  const segments = points.map((point, index) => ({ ...point, end: points[index + 1]?.hour ?? 24 })).filter(point => point.end > point.hour)
+  const segments = points.map((point, index) => ({ ...point, end: points[index + 1]?.hour ?? duration })).filter(point => point.end > point.hour)
   const maximum = Math.max(1, ...segments.map(point => Number(point.basal)))
-  const x = (hour: number) => 40 + hour / 24 * 300
+  const x = (hour: number) => 40 + hour / duration * 300
   const y = (value: string) => 140 - Number(value) / maximum * 108
   const time = (hour: number) => {
+    if (clock) return clock(hour)
     const milliseconds = Math.round(hour * 3600000)
     return `${String(Math.floor(milliseconds / 3600000)).padStart(2, '0')}:${String(Math.floor(milliseconds / 60000) % 60).padStart(2, '0')}`
   }
@@ -44,7 +51,7 @@ export function BasalChart({ points }: { points: { hour: number; basal: string |
     <svg viewBox="0 0 360 180" role="group" aria-label="График базы с 00 до 24 часов, Москва"
       onPointerLeave={event => { if (event.pointerType === 'mouse' && !event.currentTarget.contains(document.activeElement)) setSelected(null) }}>
       <text x="4" y="36">{maximum}</text><text x="24" y="144">0</text>
-      {[0, 6, 12, 18, 24].map(hour => <g key={hour}>
+      {[0, duration / 4, duration / 2, duration * 3 / 4, duration].map(hour => <g key={hour}>
         <line x1={x(hour)} x2={x(hour)} y1="28" y2="140" className="basal-grid" />
         <text x={x(hour)} y="166" textAnchor="middle">{time(hour)}</text>
       </g>)}

@@ -5,6 +5,23 @@ export function localMinute(value: string) {
   return `${parts.year.padStart(4, '0')}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
 }
 
+export function moscowDayBounds(day: string): [number, number] {
+  // Historical Moscow days can repeat or skip hours, including at midnight.
+  const noon = Date.parse(`${day}T12:00:00Z`)
+  function boundary(after: boolean) {
+    let left = noon - 48 * 3600000
+    let right = noon + 48 * 3600000
+    while (left < right) {
+      const middle = Math.floor((left + right) / 2)
+      const date = localMinute(new Date(middle).toISOString()).slice(0, 10)
+      if (date < day || (after && date === day)) left = middle + 1
+      else right = middle
+    }
+    return left
+  }
+  return [boundary(false), boundary(true)]
+}
+
 export function basalText(value: string | null) {
   return value === null ? 'неизвестна' : `${value.replace('.', ',')} ед/ч`
 }

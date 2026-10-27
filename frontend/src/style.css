@@ -114,6 +114,11 @@ button:disabled { opacity: .65; cursor: wait; }
 .basal-day-chart .basal-tooltip text { fill:var(--text); }
 .calendar-temporary summary { cursor:pointer; min-height:44px; padding:10px 0; color:var(--muted); }
 .calendar-temporary { margin-top:8px; }
+.diabetes-day-chart { margin-top:16px; padding:12px; min-width:0; border:1px solid var(--border); border-radius:12px; background:var(--background); }
+.diabetes-day-chart>p { margin:0 0 8px; }
+.diabetes-day-plot { touch-action:pan-y; cursor:crosshair; }
+.diabetes-day-tooltip { min-height:72px; padding:8px; font-variant-numeric:tabular-nums; }
+.diabetes-day-tooltip p { margin:4px 0; }
 @media(max-width:767px) {
   .calendar-nutrients { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .calendar-day-totals,.calendar-meal,.calendar-water-summary,.basal-day-chart { padding:12px; }

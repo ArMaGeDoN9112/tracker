@@ -3,8 +3,9 @@ import { privateFetch } from './access'
 import { type Day as NutritionDay, type Totals } from './Nutrition'
 import { nutrients } from './ProductCatalog'
 import { BasalDayChart } from './BasalDayChart'
+import { DiabetesDayCharts } from './DiabetesDayCharts'
 import type { TemporaryPeriod } from './TemporaryBasal'
-import { basalText, localMinute, moscowLabel } from './time'
+import { localMinute, moscowLabel } from './time'
 import type { GlucoseDay } from './GlucoseCharts'
 
 type CalendarDay = { day: string; meal_count: number; totals: Totals; water_total_ml: number | null; glucose_average: string | null }
@@ -14,7 +15,6 @@ type DiaryDay = {
   temporary_basals: TemporaryPeriod[]
   entries: { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null }[]
 }
-const reasons: Record<string, string> = { food: 'Еда', correction: 'Коррекция', food_and_correction: 'Еда и коррекция' }
 const categories: Record<string, string> = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', snack: 'Перекус' }
 
 function SummaryTotals({ totals }: { totals: Totals }) {
@@ -76,15 +76,9 @@ function DaySummary({ active, day, generation, onClose, onAnalysis, onNutrition 
       </>}
       <h4>Сахар и подколки</h4>
       <a href={`?section=charts&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onAnalysis(day) } }}>Записи диабета</a>
-      {!data.diary.entries.length && <p>Нет записей сахара и подколок.</p>}
-      {data.diary.entries.map(entry => <article className="meal-history" key={entry.id}>
-        <p>{moscowLabel(entry.occurred_at)}</p>
-        <p>Сахар: {entry.glucose === null ? 'не указан' : `${entry.glucose} ммоль/л`} · Подколка: {entry.bolus} ед.</p>
-        {entry.reason && <p>{reasons[entry.reason]}</p>}{entry.comment && <p className="comment">{entry.comment}</p>}
-        <p>База: {basalText(entry.basal)} · по расписанию</p>
-      </article>)}
+      <DiabetesDayCharts day={day} entries={data.diary.entries} />
       <h4>База · по расписанию</h4>
-      <BasalDayChart basal={data.diary.basal} changes={data.diary.basal_changes} />
+      <BasalDayChart day={day} basal={data.diary.basal} changes={data.diary.basal_changes} />
       {data.diary.temporary_basals.length > 0 && <details className="calendar-temporary"><summary>Временная база</summary>
         {data.diary.temporary_basals.map(period => <p key={period.id}>{period.percent}% · {moscowLabel(period.starts_at)} — {moscowLabel(period.effective_ends_at)} (не включая)</p>)}
       </details>}
