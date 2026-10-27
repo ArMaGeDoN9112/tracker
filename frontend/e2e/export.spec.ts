@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { test, expect } from '@playwright/test'
 
 test('settings download readable full JSON with a privacy warning', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await expect(page.getByRole('link', { name: 'Экспорт всех данных' })).toHaveCount(0)
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
@@ -70,7 +70,7 @@ test('settings download readable full JSON with a privacy warning', async ({ pag
 })
 
 test('expired export returns to login and requires an explicit retry', async ({ page, context }) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   const login = async () => {
     await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
     await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))

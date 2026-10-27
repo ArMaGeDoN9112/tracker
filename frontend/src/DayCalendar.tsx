@@ -92,10 +92,10 @@ function DaySummary({ active, day, generation, onClose }: { active: boolean; day
 
 export function DayCalendar({ active, day, generation, onDay }: { active: boolean; day: string; generation: number; onDay: (day: string) => void }) {
   const today = localMinute(new Date().toISOString()).slice(0, 10)
-  const [month, setMonth] = useState(() => today.slice(0, 7))
+  const [month, setMonth] = useState(() => (day || today).slice(0, 7))
   const [days, setDays] = useState<CalendarDay[] | null>(null)
   const [error, setError] = useState('')
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const first = `${month}-01`
   const last = new Date(`${first}T12:00:00Z`)
   last.setUTCMonth(last.getUTCMonth() + 1, 0)
@@ -103,9 +103,13 @@ export function DayCalendar({ active, day, generation, onDay }: { active: boolea
   const weekday = (new Date(`${first}T12:00:00Z`).getUTCDay() + 6) % 7
 
   useEffect(() => {
+    if (active) { setMonth((day || today).slice(0, 7)); setOpen(true) }
+  }, [active, day])
+
+  useEffect(() => {
     let cancelled = false
     setDays(null); setError('')
-    if (!active) return
+    if (!active || month < '0001-02' || month > '9999-11') return
     const period = `period=custom&start=${first}&end=${end}`
     Promise.all([
       read<{ days: Omit<CalendarDay, 'glucose_average'>[] }>(`/api/nutrition-summary?${period}`),
@@ -119,7 +123,7 @@ export function DayCalendar({ active, day, generation, onDay }: { active: boolea
   }, [active, first, end, generation])
 
   function selectMonth(value: string) {
-    if (!/^\d{4}-\d{2}$/.test(value) || value < '0001-01' || value > '9999-11' || Number(value.slice(5)) < 1 || Number(value.slice(5)) > 12) return
+    if (!/^\d{4}-\d{2}$/.test(value) || value < '0001-02' || value > '9999-11' || Number(value.slice(5)) < 1 || Number(value.slice(5)) > 12) return
     setMonth(value); setOpen(false)
   }
   function moveMonth(offset: number) {
@@ -131,8 +135,8 @@ export function DayCalendar({ active, day, generation, onDay }: { active: boolea
   return <section className="day-calendar" aria-label="Календарь дней">
     <span className="eyebrow">ПО ДНЯМ · МОСКВА</span><h2>Календарь</h2>
     <div className="calendar-navigation">
-      <button disabled={month === '0001-01'} onClick={() => moveMonth(-1)} aria-label="Предыдущий месяц">←</button>
-      <div><label htmlFor="calendar-month">Месяц — Москва</label><input id="calendar-month" type="month" min="0001-01" max="9999-11" value={month} onChange={event => selectMonth(event.target.value)} /></div>
+      <button disabled={month === '0001-02'} onClick={() => moveMonth(-1)} aria-label="Предыдущий месяц">←</button>
+      <div><label htmlFor="calendar-month">Месяц — Москва</label><input id="calendar-month" type="month" min="0001-02" max="9999-11" value={month} onChange={event => selectMonth(event.target.value)} /></div>
       <button disabled={month === '9999-11'} onClick={() => moveMonth(1)} aria-label="Следующий месяц">→</button>
     </div>
     {error ? <p role="alert" className="error">{error}</p> : !days ? <p role="status">Загружаем календарь…</p> : <>
@@ -155,7 +159,7 @@ export function DayCalendar({ active, day, generation, onDay }: { active: boolea
       </div>
       <p className="muted">Нажмите на день, чтобы увидеть все записи.</p>
     </>}
-    {open && day && <DaySummary key={day} active={active} day={day} generation={generation} onClose={() => {
+    {active && open && day && <DaySummary key={day} active={active} day={day} generation={generation} onClose={() => {
       setOpen(false); document.getElementById(`calendar-${day}`)?.focus()
     }} />}
   </section>

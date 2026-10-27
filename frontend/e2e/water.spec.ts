@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect, type Page } from '@playwright/test'
 
 async function signIn(page: Page) {
@@ -52,7 +53,7 @@ test('water quick/manual entry, settings, move and global undo survive form rese
   await page.getByLabel('Объём воды, мл', { exact: true }).fill('123')
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await page.getByRole('button', { name: 'Отменить удаление воды', exact: true }).click()
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   await expect(page.getByText('Сумма воды: 444 мл', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Объём воды, мл', { exact: true })).toHaveValue('')
 })
@@ -179,7 +180,7 @@ test('late old-day response, loading/error and layout at specified widths', asyn
     reached(); await gate; await route.fulfill({ response })
   }, { times: 1 })
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   await captured
   await expect(page.getByText('Загружаем воду…', { exact: true })).toBeVisible()
   await page.getByLabel('День питания — Москва').fill('2026-10-18')
@@ -191,11 +192,11 @@ test('late old-day response, loading/error and layout at specified widths', asyn
   await expect(page.getByText('Нет записей воды', { exact: true })).toBeVisible()
   await page.route('**/api/nutrition-day?day=2026-10-18', route => route.abort())
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   await expect(page.getByText('Не удалось загрузить воду. Перезагрузите страницу.', { exact: true })).toBeVisible()
   await page.unroute('**/api/nutrition-day?day=2026-10-18')
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   await expect(page.getByText('Нет записей воды', { exact: true })).toBeVisible()
   await page.getByLabel('Объём воды, мл', { exact: true }).fill('123')
   for (const width of [375, 390, 768, 1280, 1440]) {
@@ -221,7 +222,7 @@ test('late settings response cannot replace acknowledged newer buttons', async (
     const response = await route.fetch()
     reached(); await gate; await route.fulfill({ response })
   }, { times: 1 })
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   await captured
   await page.getByRole('button', { name: 'Настроить кнопки воды', exact: true }).click()
   await page.getByLabel('Объёмы кнопок воды, мл').fill('111, 222')

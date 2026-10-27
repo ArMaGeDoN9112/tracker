@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect, type Page } from '@playwright/test'
 
 async function signIn(page: Page) {
@@ -10,7 +11,7 @@ async function signIn(page: Page) {
 test.use({ timezoneId: 'America/Los_Angeles' })
 
 test('delete receipt replay does not offer stale undo after another device restores', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await signIn(page)
   const day = testInfo.project.name === 'phone' ? '2064-01-02' : '2063-01-02'
   await page.getByLabel('Время события — Москва').fill(`${day}T12:00`)
@@ -37,7 +38,7 @@ test('delete receipt replay does not offer stale undo after another device resto
 })
 
 test('confirmed entry deletion keeps explicit recovery when its follow-up read fails', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await signIn(page)
   const day = testInfo.project.name === 'phone' ? '2069-01-02' : '2070-01-02'
   await page.getByLabel('Время события — Москва').fill(`${day}T12:00`)
@@ -62,12 +63,12 @@ test('confirmed entry deletion keeps explicit recovery when its follow-up read f
   expect(writes).toHaveLength(2)
   expect(writes[1]).toBe(writes[0])
   await page.getByRole('button', { name: 'Отменить удаление', exact: true }).click()
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(page.locator('.entries > .entry')).toHaveCount(1)
 })
 
 test('move, keyboard undo and conflict preserve the draft for comparison', async ({ page, browser, context }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await signIn(page)
   const day = testInfo.project.name === 'phone' ? '2083-01-23' : '2082-01-23'
   const nextDay = testInfo.project.name === 'phone' ? '2083-01-24' : '2082-01-24'
@@ -92,18 +93,18 @@ test('move, keyboard undo and conflict preserve the draft for comparison', async
   }, { times: 1 })
   await page.locator('.entries').getByRole('button', { name: 'Удалить', exact: true }).click()
   await expect(page.locator('.entries > .entry')).toHaveCount(0)
-  await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
+  await openSection(page, 'Аналитика сахара')
   if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/undo-${testInfo.project.name}.png`, fullPage: true })
   const undo = page.getByRole('button', { name: 'Отменить удаление', exact: true })
   await undo.focus()
   await page.keyboard.press('Enter')
   await expect(page.locator('.entries > .entry')).toHaveCount(1)
 
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   const device = await browser.newContext({ storageState: await context.storageState(), baseURL: 'https://localhost:5173', ignoreHTTPSErrors: true, timezoneId: 'Asia/Tokyo' })
   try {
     const other = await device.newPage()
-    await other.goto('/')
+    await other.goto('/?section=diary')
     await other.getByLabel('День — Москва').fill(nextDay)
     await expect(other.locator('.entries > .entry')).toHaveCount(1)
     await other.getByRole('button', { name: 'Изменить', exact: true }).click()
@@ -127,7 +128,7 @@ test('move, keyboard undo and conflict preserve the draft for comparison', async
 })
 
 test('edit preserves milliseconds and all changes retry after a lost committed response', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await signIn(page)
   const day = testInfo.project.name === 'phone' ? '2026-11-25' : '2026-10-25'
   const csrf = (await (await page.request.get('/api/auth/csrf')).json()).csrf_token
@@ -189,7 +190,7 @@ test('edit preserves milliseconds and all changes retry after a lost committed r
 })
 
 test('comma, independent bolus/comment, validation and historical Moscow offset', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await signIn(page)
   const day = testInfo.project.name === 'phone' ? '2026-11-19' : '2026-10-19'
   const time = page.getByLabel('Время события — Москва')
@@ -236,7 +237,7 @@ test('comma, independent bolus/comment, validation and historical Moscow offset'
 })
 
 test('lost committed response retries the same UUID without duplicate', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await signIn(page)
   const day = testInfo.project.name === 'phone' ? '2026-11-20' : '2026-10-20'
   await page.getByLabel('Время события — Москва').fill(`${day}T12:00`)
@@ -253,7 +254,7 @@ test('lost committed response retries the same UUID without duplicate', async ({
   await expect(page.getByRole('button', { name: 'Повторить сохранение' })).toBeVisible()
   await expect(page.getByLabel('Сахар, ммоль/л')).toHaveValue('7,8')
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await page.getByRole('button', { name: 'Повторить сохранение' }).click()
   await expect(page.locator('.entries > .entry')).toHaveCount(1)
   await expect.poll(() => bodies.length).toBe(2)
@@ -261,7 +262,7 @@ test('lost committed response retries the same UUID without duplicate', async ({
 })
 
 test('expired session clears form and requires fresh explicit input after signing in', async ({ page, context }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await signIn(page)
   const day = testInfo.project.name === 'phone' ? '2026-11-21' : '2026-10-21'
   await page.getByLabel('Время события — Москва').fill(`${day}T10:00`)

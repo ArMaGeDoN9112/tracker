@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect, type Page } from '@playwright/test'
 
 async function start(page: Page) {
@@ -44,12 +45,12 @@ test('one-off portion, explicit card preview, mixed meal and independent repeat 
   await saved.getByRole('button', { name: 'Сохранить как продукт — строка 3', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Создание продукта из еды' })).toContainText('фактическое количество исходной порции')
   await page.getByRole('button', { name: 'Отменить создание карточки', exact: true }).click()
-  await page.getByRole('link', { name: 'Каталог', exact: true }).click()
+  await openSection(page, 'Каталог')
   await card.getByRole('button', { name: 'Изменить', exact: true }).click()
   await page.getByLabel('Углеводы, г на 100 г', { exact: true }).fill('99')
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await expect(cardForm).toBeHidden()
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   let draft: { occurred_at: string; lines: { id: string }[] } | undefined
   const response = page.waitForResponse(r => r.url().endsWith('/repeat-form'))
   await saved.getByRole('button', { name: 'Повторить приём', exact: true }).click()

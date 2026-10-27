@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect } from '@playwright/test'
 
 test('settings show backup delay, local-only copy and sanitized failure', async ({ page }) => {
@@ -6,7 +7,7 @@ test('settings show backup delay, local-only copy and sanitized failure', async 
     last_verification: '2026-10-19T01:00:00Z', overdue: true,
     error: 'Запуск не завершён: проверьте хранилище.', verification_error: 'Проверка восстановления не прошла.',
   } }))
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await expect(page.getByRole('heading', { name: 'Резервное копирование' })).toHaveCount(0)
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
@@ -21,7 +22,7 @@ test('settings show backup delay, local-only copy and sanitized failure', async 
   await expect(backup.getByRole('alert')).toHaveCount(3)
   await expect(backup).toContainText('26 часов')
   await expect(backup).toContainText('Проверка восстановления не прошла')
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
 })
 
@@ -36,7 +37,7 @@ test('backup state loads once and stays unchanged while the page is open', async
       last_verification: '2026-10-19T13:00:00Z', overdue: false, error: null, verification_error: null,
     } })
   })
-  await page.goto('/')
+  await page.goto('/?section=diary')
   expect(reads).toBe(0)
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
@@ -51,7 +52,7 @@ test('backup state loads once and stays unchanged while the page is open', async
   await page.clock.fastForward(60001)
   await expect(backup).toContainText('19.10.2026, 15:00')
   expect(reads).toBe(1)
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(page.getByRole('link', { name: 'Проверить резервирование' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()

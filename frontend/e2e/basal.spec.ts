@@ -1,10 +1,11 @@
+import { openSection } from './navigation'
 import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
 test('create immutable schedule, retry a lost response and inspect a historical day', async ({ page }, testInfo) => {
   const day = testInfo.project.name === 'phone' ? '2020-08-17' : '2021-08-17'
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
@@ -12,7 +13,7 @@ test('create immutable schedule, retry a lost response and inspect a historical 
   await page.getByLabel('Сахар, ммоль/л').fill('5,5')
   await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
   await expect(page.locator('.entries > .entry')).toHaveCount(1)
-  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await openSection(page, 'База')
   await page.getByLabel('Начало расписания — Москва').fill(`${day}T06:00`)
   await page.getByLabel('Скорость 1, ед/ч').fill('0,50')
   await page.getByRole('button', { name: 'Добавить интервал', exact: true }).click()
@@ -47,7 +48,7 @@ test('create immutable schedule, retry a lost response and inspect a historical 
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await openSection(page, 'База')
   await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('')
   await expect(page.getByLabel('Скорость 2, ед/ч')).toHaveCount(0)
   await expect(page.getByRole('status').filter({ hasText: 'Затрагиваемый период' })).toHaveCount(0)
@@ -57,7 +58,7 @@ test('create immutable schedule, retry a lost response and inspect a historical 
   await expect(page.getByRole('status').filter({ hasText: 'Расписание сохранено.' })).toBeVisible()
   expect(writes).toHaveLength(beforeLogin + 1)
   expect(writes.every(body => body === writes[0])).toBe(true)
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(page.locator('.entries > .entry')).toContainText('0,50 ед/ч · по расписанию')
   await expect(page.getByTestId('day-basal')).toContainText('неизвестна')
   await expect(page.locator('.basal-change')).toContainText(['0,50 ед/ч', '0,80 ед/ч'])
@@ -66,7 +67,7 @@ test('create immutable schedule, retry a lost response and inspect a historical 
   await page.reload()
   await page.getByLabel('День — Москва').fill(day)
   await expect(page.locator('.entries > .entry')).toContainText('0,50 ед/ч')
-  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await openSection(page, 'База')
   await page.getByLabel('Начало расписания — Москва').fill(`${day}T06:00`)
   await page.getByLabel('Скорость 1, ед/ч').fill('1')
   await page.getByRole('button', { name: 'Проверить период', exact: true }).click()

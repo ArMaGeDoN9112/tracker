@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test('old save paused at CSRF cannot resume automatically under a new login', async ({ page, context }) => {
   await page.clock.install()
-  await page.goto('/')
+  await page.goto('/?section=diary')
   const signIn = async () => {
     await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
     await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))

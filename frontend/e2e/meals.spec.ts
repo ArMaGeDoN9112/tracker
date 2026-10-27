@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect, type Page } from '@playwright/test'
 
 async function signIn(page: Page) {
@@ -49,7 +50,9 @@ test('catalog composition, independent product creation, frozen draft, totals af
   await expect(form(page).locator('.meal-totals')).toHaveCount(0)
   // Editing the card cannot rewrite a product already picked into the meal.
   const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
+  const loaded = page.waitForResponse(response => response.url().endsWith('/api/products') && response.request().method() === 'GET')
   await page.getByRole('button', { name: 'Выбрать из каталога', exact: true }).click()
+  await loaded
   await expect(card).toBeVisible()
   if (!await card.getByRole('button', { name: 'Изменить', exact: true }).isVisible()) await card.locator('summary').click()
   await card.getByRole('button', { name: 'Изменить', exact: true }).click()
@@ -85,7 +88,7 @@ test('catalog composition, independent product creation, frozen draft, totals af
   await choose(page, second)
   await page.getByRole('button', { name: 'Отменить приём', exact: true }).click()
   await expect(page.getByLabel('Количество строки 1, г')).toHaveCount(0)
-  await page.getByRole('link', { name: 'Каталог', exact: true }).click()
+  await openSection(page, 'Каталог')
   await expect(page.getByRole('heading', { name: second, exact: true })).toBeVisible()
 })
 
@@ -167,7 +170,7 @@ test('exact half-up saved totals, historical milliseconds, movement between days
   } })
   expect(created.ok()).toBeTruthy()
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   const saved = history(page).getByRole('article').filter({ hasText: name })
   await expect(saved).toContainText('0.01 г')
   await saved.getByRole('button', { name: 'Изменить приём', exact: true }).click()
@@ -196,7 +199,7 @@ test('exact half-up saved totals, historical milliseconds, movement between days
     reached(); await gate; await route.fulfill({ response })
   }, { times: 1 })
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   await captured
   await page.getByLabel('День питания — Москва').fill('2026-10-21')
   await expect(history(page)).toContainText('Нет записей еды')
@@ -241,10 +244,10 @@ test('expired session during CSRF does not automatically save under a new login'
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await captured
   await context.clearCookies()
-  await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
+  await page.getByRole('link', { name: 'Календарь', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await signIn(page)
-  await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
+  await openSection(page, 'Ввод питания')
   let writes = 0
   page.on('request', request => { if (request.url().endsWith('/api/meals') && request.method() === 'POST') writes++ })
   release()

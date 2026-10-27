@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect, type Page } from '@playwright/test'
 
 async function signIn(page: Page) {
@@ -153,7 +154,7 @@ test('an unknown entry edit retries its original PUT after the editor is discard
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await signIn(page)
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   expect(requests).toHaveLength(1)
   await page.getByRole('button', { name: 'Повторить сохранение', exact: true }).click()
@@ -236,7 +237,7 @@ for (const section of ['diary', 'nutrition', 'catalog', 'basal', 'temporary'] as
     await cleared()
     await fill()
     await context.clearCookies()
-    await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
+    await page.getByRole('link', { name: 'Календарь', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
     await page.goBack()
     await signIn(page)
@@ -293,7 +294,7 @@ for (const kind of ['entries', 'meals', 'water', 'products', 'temporary-basals']
         await signIn(page)
       } else {
         await context.clearCookies()
-        await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
+        await page.getByRole('link', { name: 'Календарь', exact: true }).click()
         await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
         await page.goBack()
         await signIn(page)

@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect } from '@playwright/test'
 
 test('navigation clears forms and keeps the selected day through history', async ({ page }) => {
@@ -9,12 +10,12 @@ test('navigation clears forms and keeps the selected day through history', async
   await expect(page.getByLabel('День — Москва')).toHaveValue('2024-02-29')
   await page.getByLabel('Комментарий', { exact: true }).fill('Черновик дневника')
   const time = await page.getByLabel('Время события — Москва').inputValue()
-  await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
+  await openSection(page, 'Аналитика сахара')
   await expect(page.getByRole('region', { name: 'Графики сахара', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Ввод записи', exact: true })).toBeHidden()
   await page.goBack()
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
-  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await openSection(page, 'База')
   await expect(page.getByLabel('Комментарий', { exact: true })).toBeHidden()
   await page.getByLabel('Скорость 1, ед/ч').fill('0,45')
   await page.getByRole('link', { name: 'Временная база', exact: true }).click()
@@ -24,7 +25,7 @@ test('navigation clears forms and keeps the selected day through history', async
   await expect(page.getByLabel('Процент от расписания')).toHaveValue('100')
   await page.getByRole('link', { name: 'Расписание', exact: true }).click()
   await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('')
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Время события — Москва')).toHaveValue(time)
   await expect(page.getByLabel('День — Москва')).toHaveValue('2024-02-29')
@@ -35,7 +36,7 @@ test('navigation clears forms and keeps the selected day through history', async
   await page.reload()
   await expect(page.getByLabel('День — Москва')).toHaveValue('2024-02-29')
   await page.goto('/?section=unknown&day=2024-02-30')
-  await expect(page.getByRole('link', { name: 'Ввод сахара', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('link', { name: 'Календарь', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('alert').filter({ hasText: 'Некорректная дата' })).toBeVisible()
   await expect(page.getByLabel('День — Москва')).not.toHaveValue('2024-02-30')
 })
@@ -49,14 +50,14 @@ for (const day of ['2024-99-99', '0000-01-01', '2024-01-32']) {
     await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
     await page.getByRole('button', { name: 'Войти', exact: true }).click()
     await expect(page.getByRole('alert').filter({ hasText: 'Некорректная дата' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Аналитика сахара', exact: true })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('link', { name: 'Анализ', exact: true })).toHaveAttribute('aria-current', 'page')
     expect(requests.some(url => url.includes(day))).toBe(false)
   })
 }
 
 test('401 while opening a section hides private sections and clears forms', async ({ page, context }) => {
   await page.clock.install()
-  await page.goto('/')
+  await page.goto('/?section=diary')
   const signIn = async () => {
     await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
     await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
@@ -64,12 +65,12 @@ test('401 while opening a section hides private sections and clears forms', asyn
   }
   await signIn()
   await page.getByLabel('Комментарий', { exact: true }).fill('После входа явно')
-  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await openSection(page, 'База')
   await page.getByLabel('Скорость 1, ед/ч').fill('0,37')
   await page.getByRole('link', { name: 'Временная база', exact: true }).click()
   await page.getByLabel('Процент от расписания').fill('137')
   await context.clearCookies()
-  await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
+  await openSection(page, 'Аналитика сахара')
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await expect(page.getByRole('navigation')).toHaveCount(0)
   await page.goBack()
@@ -81,7 +82,7 @@ test('401 while opening a section hides private sections and clears forms', asyn
   await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('')
   await page.getByRole('link', { name: 'Временная база', exact: true }).click()
   await expect(page.getByLabel('Процент от расписания')).toHaveValue('100')
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   expect(writes).toBe(0)
 })
@@ -89,7 +90,7 @@ test('401 while opening a section hides private sections and clears forms', asyn
 
 test('leaving and returning does not restart the server undo countdown', async ({ page }, testInfo) => {
   await page.clock.install()
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
@@ -100,10 +101,10 @@ test('leaving and returning does not restart the server undo countdown', async (
   await page.locator('.entries').getByRole('button', { name: 'Удалить', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Отменить удаление', exact: true })).toBeVisible()
   await page.clock.fastForward(20000)
-  await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
+  await openSection(page, 'Аналитика сахара')
   await expect(page.getByRole('button', { name: 'Отменить удаление', exact: true })).toBeVisible()
   await page.clock.fastForward(11000)
   await expect(page.getByRole('button', { name: 'Отменить удаление', exact: true })).toHaveCount(0)
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(page.getByRole('button', { name: 'Отменить удаление', exact: true })).toHaveCount(0)
 })

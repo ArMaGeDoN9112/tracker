@@ -1,9 +1,10 @@
+import { openSection } from './navigation'
 import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
 test('month calendar opens the complete Moscow day and clears unfinished input', async ({ page }, info) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
@@ -54,7 +55,7 @@ test('month calendar opens the complete Moscow day and clears unfinished input',
   await expect(details).not.toContainText('редакция')
   await expect(details.getByRole('group', { name: 'График базы с 00 до 24 часов, Москва' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`section=calendar&day=${day}`))
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
+  await openSection(page, 'Ввод сахара')
   await expect(calendar).toBeHidden()
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   await page.goBack()
@@ -90,7 +91,7 @@ test('month calendar opens the complete Moscow day and clears unfinished input',
 })
 
 test('calendar shows basal gaps and zero rates, meal results and water volumes', async ({ page }, info) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()

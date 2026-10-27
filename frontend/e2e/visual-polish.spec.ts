@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect } from '@playwright/test'
 
 test('every screen keeps readable cards, unknown values and usable controls at all widths', async ({ page }, info) => {
@@ -24,7 +25,7 @@ test('every screen keeps readable cards, unknown values and usable controls at a
   }
   await page.reload()
   for (const section of ['Ввод сахара', 'Ввод питания', 'Аналитика сахара', 'Аналитика питания', 'Каталог', 'База', 'Настройки']) {
-    await page.getByRole('link', { name: section, exact: true }).click()
+    await openSection(page, section)
     if (section === 'Ввод сахара') {
       await expect(page.locator('.entry-glucose strong')).toContainText('5,6')
       await page.getByText('График базы за день', { exact: true }).click()
@@ -74,7 +75,7 @@ test('every screen keeps readable cards, unknown values and usable controls at a
       if (process.env.DIARY_ACCEPTANCE_DIR) await page.locator('.workspace').screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/${info.project.name}-${section}-${width}.png` })
     }
   }
-  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await openSection(page, 'База')
   await page.getByRole('link', { name: 'Временная база', exact: true }).click()
   await expect(page.getByLabel('История временной базы').locator('article').filter({ has: page.locator(`time[datetime^="${day}"]`) })).toContainText('133%')
   for (const width of [375, 768, 1280]) {

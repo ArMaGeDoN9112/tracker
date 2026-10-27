@@ -5,6 +5,7 @@ import { Diary } from './Diary'
 import { Nutrition } from './Nutrition'
 import { BackupStatus, useBackupStatus } from './BackupStatus'
 import { privateFetch, setAccess } from './access'
+import { localMinute } from './time'
 
 async function csrfToken(request: (path: string, options?: RequestInit) => Promise<Response> = fetch): Promise<string> {
   const response = await request('/api/auth/csrf', { cache: 'no-store' })
@@ -16,10 +17,12 @@ type Section = 'diary' | 'charts' | 'basal' | 'nutrition' | 'nutrition-summary' 
 type Route = { section: Section; day: string; temporary: boolean; error: string }
 function readRoute(): Route {
   const params = new URLSearchParams(location.search)
-  const section = params.get('section') ?? 'diary'
+  const section = params.get('section') ?? 'calendar'
+  const knownSection = ['diary', 'charts', 'basal', 'nutrition', 'nutrition-summary', 'catalog', 'calendar', 'settings'].includes(section) ? section as Section : 'calendar'
   const day = params.get('day') ?? ''
-  const valid = !day || (/^\d{4}-\d{2}-\d{2}$/.test(day) && day >= '0001-01-01' && day <= '9999-12-31' && Number.isFinite(Date.parse(`${day}T00:00:00Z`)) && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day)
-  return { section: ['diary', 'charts', 'basal', 'nutrition', 'nutrition-summary', 'catalog', 'calendar', 'settings'].includes(section) ? section as Section : 'diary', day: valid ? day : '', temporary: params.get('view') === 'temporary', error: valid ? '' : 'Некорректная дата в адресе. Открыт текущий московский день.' }
+  // The API needs both Moscow day bounds, and calendar summaries need a whole month.
+  const valid = !day || (/^\d{4}-\d{2}-\d{2}$/.test(day) && day > '0001-01-01' && day < '9999-12-31' && (knownSection !== 'calendar' || (day >= '0001-02-01' && day <= '9999-11-30')) && Number.isFinite(Date.parse(`${day}T00:00:00Z`)) && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day)
+  return { section: knownSection, day: (valid ? day : '') || (knownSection === 'calendar' ? localMinute(new Date().toISOString()).slice(0, 10) : ''), temporary: params.get('view') === 'temporary', error: valid ? '' : 'Некорректная дата в адресе. Открыт текущий московский день.' }
 }
 function routeUrl(route: Route) {
   const params = new URLSearchParams({ section: route.section })
@@ -36,7 +39,7 @@ function App() {
   currentRoute.current = route
   function navigate(next: Route, replace = false) {
     history[replace ? 'replaceState' : 'pushState'](null, '', routeUrl(next))
-    setRoute(next)
+    setRoute({ ...readRoute(), temporary: next.temporary })
   }
   useEffect(() => {
     const pop = () => setRoute(readRoute())
@@ -50,6 +53,9 @@ function App() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { if (login) heading.current?.focus() }, [login, route.section, route.temporary])
+  const group = ['diary', 'charts', 'basal'].includes(route.section) ? 'diary' : ['nutrition', 'nutrition-summary', 'catalog'].includes(route.section) ? 'nutrition' : route.section
+  const pages: [Section, string][] = group === 'diary' ? [['diary', 'Ввод'], ['charts', 'Анализ'], ['basal', 'База']] : group === 'nutrition' ? [['nutrition', 'Ввод'], ['nutrition-summary', 'Анализ'], ['catalog', 'Каталог']] : []
   const backup = useBackupStatus(login !== null)
   const [exportBusy, setExportBusy] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -63,7 +69,7 @@ function App() {
   useEffect(() => {
     fetch('/api/auth/session', { cache: 'no-store' })
       .then(async response => {
-        if (response.ok) setLogin((await response.json()).login)
+        if (response.ok) { setRoute(current => ({ ...readRoute(), temporary: current.temporary })); setLogin((await response.json()).login) }
         else if (response.status !== 401) throw new Error()
       })
       .catch(() => setError('Не удалось подключиться. Повторите попытку.'))
@@ -83,6 +89,7 @@ function App() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.message)
+      setRoute(current => ({ ...readRoute(), temporary: current.temporary }))
       setLogin(result.login)
       setPassword('')
       requestAnimationFrame(() => heading.current?.focus())
@@ -133,8 +140,11 @@ function App() {
       <h1 id="title" ref={heading} tabIndex={-1}>{login ? ({ diary: 'Ввод сахара', charts: 'Аналитика сахара', basal: 'База', nutrition: 'Ввод питания', 'nutrition-summary': 'Аналитика питания', catalog: 'Каталог еды', calendar: 'Календарь', settings: 'Настройки' }[route.section]) : 'Вход в дневник'}</h1>
       {loading ? <p role="status">Проверяем вход…</p> : login ? <>
         <nav className="main-nav" aria-label="Разделы">
-          {([['diary', 'Ввод сахара', 'M12 3C9 7 6 10 6 14a6 6 0 0 0 12 0c0-4-3-7-6-11Z'], ['charts', 'Аналитика сахара', 'M3 3v18h18M6 15l4-6 4 4 6-8'], ['basal', 'База', 'M3 18h6v-7h6V5h6'], ['nutrition', 'Ввод питания', 'M5 3v6m3-6v6m3-6v6M5 7h6M8 9v12M19 3v18m0-18c-4 3-4 9 0 9'], ['nutrition-summary', 'Аналитика питания', 'M4 20V10m8 10V4m8 16v-8'], ['catalog', 'Каталог', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'], ['calendar', 'Календарь', 'M5 5h14v16H5zM8 3v4m8-4v4M5 10h14m-10 4h2m2 0h2m-6 3h2'], ['settings', 'Настройки', 'M4 7h16M4 17h16M8 4v6m8 4v6']] as const).map(([section, label, icon]) => <a key={section} href={routeUrl({ ...route, section })} aria-current={route.section === section ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section }) } }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icon} /></svg>{label}</a>)}
+          {([['calendar', 'Календарь', 'M5 5h14v16H5zM8 3v4m8-4v4M5 10h14m-10 4h2m2 0h2m-6 3h2'], ['diary', 'Диабет', 'M12 3C9 7 6 10 6 14a6 6 0 0 0 12 0c0-4-3-7-6-11Z'], ['nutrition', 'Питание', 'M5 3v6m3-6v6m3-6v6M5 7h6M8 9v12M19 3v18m0-18c-4 3-4 9 0 9'], ['settings', 'Настройки', 'M4 7h16M4 17h16M8 4v6m8 4v6']] as const).map(([section, label, icon]) => <a key={section} href={routeUrl({ ...route, section })} aria-current={group === section ? (route.section === section ? 'page' : 'true') : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section }) } }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icon} /></svg>{label}</a>)}
         </nav>
+        {pages.length > 0 && <nav className="basal-nav section-nav" aria-label={group === 'diary' ? 'Страницы диабета' : 'Страницы питания'}>
+          {pages.map(([section, label]) => <a key={section} href={routeUrl({ ...route, section })} aria-current={route.section === section ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section }) } }}>{label}</a>)}
+        </nav>}
         <div className="account-row"><p className="account">Вы вошли как <strong>{login}</strong>.</p>
         <button type="button" onClick={logout} disabled={busy}>{busy ? 'Выходим…' : 'Выйти'}</button></div>
       </> : <>

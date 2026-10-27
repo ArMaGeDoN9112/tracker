@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.use({ timezoneId: 'America/Los_Angeles' })
 
 test('neighbor days and server Today preserve the draft and expose day loading and errors', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
@@ -38,7 +38,7 @@ test('neighbor days and server Today preserve the draft and expose day loading a
 })
 
 test('field errors stay beside the draft and confirmed save differs from failed refresh', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
@@ -64,7 +64,7 @@ test('field errors stay beside the draft and confirmed save differs from failed 
 })
 
 test('full history remains readable at phone, tablet and desktop widths and stale responses cannot replace a day', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
@@ -125,7 +125,7 @@ test('full history remains readable at phone, tablet and desktop widths and stal
 
 
 test('late Today response cannot replace a newer calendar choice', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
@@ -142,7 +142,7 @@ test('late Today response cannot replace a newer calendar choice', async ({ page
 })
 
 test('empty entry validation is attached to the entry fields without requiring sugar', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
