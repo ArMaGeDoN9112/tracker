@@ -1,8 +1,9 @@
+import { openSection } from './navigation'
 import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
-test('neighbor days and server Today preserve the draft and expose day loading and errors', async ({ page }) => {
+test('neighbor days and server Today expose day loading and errors after input is discarded', async ({ page }) => {
   await page.goto('/?section=diary')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
@@ -11,6 +12,7 @@ test('neighbor days and server Today preserve the draft and expose day loading a
   await expect(time).not.toHaveValue('')
   await time.fill('2014-10-26T01:30')
   await page.getByLabel('Комментарий', { exact: true }).fill('Независимый черновик')
+  await openSection(page, 'Аналитика сахара')
   await page.getByLabel('День — Москва').fill('2026-12-31')
   await page.getByRole('button', { name: 'Следующий день', exact: true }).click()
   await expect(page.getByLabel('День — Москва')).toHaveValue('2027-01-01')
@@ -19,8 +21,10 @@ test('neighbor days and server Today preserve the draft and expose day loading a
   const server = await (await page.request.get('/api/entry-form')).json()
   await page.getByRole('button', { name: 'Сегодня', exact: true }).click()
   await expect(page.getByLabel('День — Москва')).toHaveValue(server.local_time.slice(0, 10))
-  await expect(time).toHaveValue('2014-10-26T01:30')
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Независимый черновик')
+  await expect(time).toBeHidden()
+  await openSection(page, 'Ввод сахара')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
+  await openSection(page, 'Аналитика сахара')
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
   await page.route('**/api/day?day=2027-01-03', async route => { await gate; await route.abort() })
@@ -53,13 +57,13 @@ test('field errors stay beside the draft and confirmed save differs from failed 
   const day = testInfo.project.name === 'phone' ? '2028-02-02' : '2028-02-01'
   await page.getByLabel('Время события — Москва').fill(`${day}T12:00`)
   await glucose.fill('5.6')
-  await page.route(`**/api/day?day=${day}`, route => route.abort())
+  await page.route('**/api/entry-form', route => route.abort(), { times: 1 })
   await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
   await expect(page.getByRole('alert').filter({ hasText: 'Запись сохранена, но обновление не удалось' })).toBeVisible()
   await expect(page.getByText('Результат запроса неизвестен.', { exact: false })).toBeHidden()
-  await page.unroute(`**/api/day?day=${day}`)
   await page.getByRole('button', { name: 'Повторить сохранение', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Запись сохранена.' })).toBeVisible()
+  await openSection(page, 'Аналитика сахара')
   await expect(page.locator('.entries > .entry')).toHaveCount(1)
 })
 
@@ -80,9 +84,11 @@ test('full history remains readable at phone, tablet and desktop widths and stal
     expect(response.ok(), await response.text()).toBe(true)
   }
   const expected = (await (await page.request.get(`/api/day?day=${day}`)).json()).entries.map((row: { comment: string }) => row.comment)
+  await openSection(page, 'Аналитика сахара')
   await page.getByLabel('День — Москва').fill(day)
   await expect(page.locator('.entries > .entry')).toHaveCount(25)
   await expect(page.locator('.entries > .entry .comment')).toHaveText(expected)
+  await page.locator('.entries > .entry').first().getByRole('button', { name: 'Изменить', exact: true }).click()
   for (const width of [375, 390, 768, 1280, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
     const form = await page.getByRole('region', { name: 'Ввод записи', exact: true }).boundingBox()
@@ -95,7 +101,7 @@ test('full history remains readable at phone, tablet and desktop widths and stal
     if (width === 375) {
       await page.getByLabel('Комментарий', { exact: true }).focus()
       await page.keyboard.press('Tab')
-      const save = page.getByRole('button', { name: 'Сохранить запись', exact: true })
+      const save = page.getByRole('button', { name: 'Сохранить изменения', exact: true })
       await expect(save).toBeFocused()
       const saveBounds = await save.boundingBox()
       const navBounds = await page.getByRole('navigation', { name: 'Разделы', exact: true }).boundingBox()
@@ -130,9 +136,11 @@ test('late Today response cannot replace a newer calendar choice', async ({ page
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await expect(page.getByLabel('Время события — Москва')).not.toHaveValue('')
+  await openSection(page, 'Аналитика сахара')
+  await expect(page.getByLabel('День — Москва')).toBeEnabled()
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
-  await page.route('**/api/entry-form', async route => { const response = await route.fetch(); await gate; await route.fulfill({ response }) })
+  await page.route('**/api/entry-form', async route => { const response = await route.fetch(); await gate; await route.fulfill({ response }) }, { times: 1 })
   await page.getByRole('button', { name: 'Сегодня', exact: true }).click()
   await page.getByLabel('День — Москва').fill('2029-01-01')
   release()

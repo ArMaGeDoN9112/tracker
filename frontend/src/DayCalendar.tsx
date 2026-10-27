@@ -32,7 +32,7 @@ async function read<T,>(path: string): Promise<T> {
   return result
 }
 
-function DaySummary({ active, day, generation, onClose }: { active: boolean; day: string; generation: number; onClose: () => void }) {
+function DaySummary({ active, day, generation, onClose, onAnalysis }: { active: boolean; day: string; generation: number; onClose: () => void; onAnalysis: (day: string) => void }) {
   const [data, setData] = useState<{ nutrition: NutritionDay; diary: DiaryDay } | null>(null)
   const [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
@@ -74,6 +74,7 @@ function DaySummary({ active, day, generation, onClose }: { active: boolean; day
         </div>
       </>}
       <h4>Сахар и подколки</h4>
+      <a href={`?section=charts&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onAnalysis(day) } }}>Записи диабета</a>
       {!data.diary.entries.length && <p>Нет записей сахара и подколок.</p>}
       {data.diary.entries.map(entry => <article className="meal-history" key={entry.id}>
         <p>{moscowLabel(entry.occurred_at)}</p>
@@ -90,7 +91,7 @@ function DaySummary({ active, day, generation, onClose }: { active: boolean; day
   </section>
 }
 
-export function DayCalendar({ active, day, generation, onDay }: { active: boolean; day: string; generation: number; onDay: (day: string) => void }) {
+export function DayCalendar({ active, day, generation, onDay, onAnalysis }: { active: boolean; day: string; generation: number; onDay: (day: string) => void; onAnalysis: (day: string) => void }) {
   const today = localMinute(new Date().toISOString()).slice(0, 10)
   const [month, setMonth] = useState(() => (day || today).slice(0, 7))
   const [days, setDays] = useState<CalendarDay[] | null>(null)
@@ -159,7 +160,7 @@ export function DayCalendar({ active, day, generation, onDay }: { active: boolea
       </div>
       <p className="muted">Нажмите на день, чтобы увидеть все записи.</p>
     </>}
-    {active && open && day && <DaySummary key={day} active={active} day={day} generation={generation} onClose={() => {
+    {active && open && day && <DaySummary key={day} active={active} day={day} generation={generation} onAnalysis={onAnalysis} onClose={() => {
       setOpen(false); document.getElementById(`calendar-${day}`)?.focus()
     }} />}
   </section>

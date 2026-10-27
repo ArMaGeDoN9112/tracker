@@ -8,7 +8,7 @@ import { BasalDayChart } from './BasalDayChart'
 import { TemporaryBasal, type TemporaryPeriod } from './TemporaryBasal'
 import { localMinute, basalText, moscowLabel } from './time'
 
-type Entry = { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null; revision: number; deleted_at: string | null }
+type Entry = { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null; revision: number; deleted_at: string | null; created_at: string }
 type PendingAction = { path: string; body: string; action: 'delete' | 'restore' }
 const reasons: Record<string, string> = { food: 'Еда', correction: 'Коррекция', food_and_correction: 'Еда и коррекция' }
 const moscowTime = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
@@ -48,11 +48,13 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   const dayRequest = useRef(0)
   const selectedDay = useRef(day)
   selectedDay.current = day
+  const analysisVisible = useRef(false)
+  analysisVisible.current = active && section === 'charts'
 
   useEffect(() => {
     let cancelled = false
     setFormBasal(null)
-    if (!active || section !== 'diary' || !localTime) return
+    if (!active || (section !== 'diary' && !(section === 'charts' && editing)) || !localTime) return
     async function updateBasal() {
       const result = editing && localTime === localMinute(editing.occurred_at) && !instant
         ? { candidates: [editing.occurred_at] }
@@ -79,7 +81,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     setLocalTime(localMinute(row.occurred_at))
     setGlucose(row.glucose ?? ''); setBolus(row.bolus); setReason(row.reason ?? ''); setComment(row.comment)
     setCandidates([]); setInstant(''); setConflictId(null); setLatest(null); setError(''); setField(null); setNotice('')
-    document.getElementById('glucose')?.focus()
+    requestAnimationFrame(() => document.getElementById('glucose')?.focus())
   }
 
   async function cancelEdit() {
@@ -148,6 +150,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   }
 
   async function loadDay(selected: string) {
+    if (!analysisVisible.current) return
     const sequence = ++dayRequest.current
     setDayLoading(true); setDayError('')
     try {
@@ -164,14 +167,22 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   }
 
   const formGeneration = useRef(0)
+  const savedDayNavigation = useRef('')
+  const analysisDay = section === 'charts' ? day : ''
   useEffect(() => {
+    // A confirmed move changes the day without discarding its success feedback.
+    if (active && analysisDay && savedDayNavigation.current === analysisDay) {
+      savedDayNavigation.current = ''
+      return
+    }
+    savedDayNavigation.current = ''
     formGeneration.current++
     setGlucose(''); setBolus(''); setReason(''); setComment(''); setLocalTime('')
     setEditing(null); setCandidates([]); setInstant(''); setConflictId(null); setLatest(null)
     setError(''); setField(null); setNotice('')
     initialized.current = false
-    if (active && section === 'diary') openForm().catch(() => setError('Не удалось открыть форму. Повторите подключение.'))
-  }, [active, section])
+    if (active && (section === 'diary' || section === 'charts')) openForm().catch(() => setError('Не удалось открыть форму. Повторите подключение.'))
+  }, [active, section, analysisDay])
 
   async function openForm() {
     const version = formGeneration.current
@@ -180,14 +191,13 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     if (!initialized.current) setLocalTime(result.local_time)
     if (!selectedDay.current) onDay(result.local_time.slice(0, 10))
     initialized.current = true
-    await loadDay(selectedDay.current || result.local_time.slice(0, 10))
   }
 
   useEffect(() => {
     ++dayRequest.current
     setEntries([]); setDayBasal(null); setBasalChanges([]); setTemporaryBasals([]); setTemporaryPercent(null)
-    if (active && day && initialized.current) loadDay(day).catch(() => {})
-  }, [active, day])
+    if (active && section === 'charts' && day) loadDay(day).catch(() => {})
+  }, [active, day, section])
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -220,6 +230,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       const result = await response.json()
       if (!response.ok) {
         if ([404, 409, 422].includes(response.status)) setPending(null)
+        if (version !== formGeneration.current) return
         if (result.code === 'revision_conflict' && editing) { setConflictId(editing.id); setLatest(null) }
         setField(result.field ?? (response.status === 422 ? 'entry-fields' : null))
         throw new Error(result.message)
@@ -228,7 +239,10 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       setSaveConfirmed(true)
       setEntryGeneration(value => value + 1)
       const savedDay = localMinute(JSON.parse(operation.body).occurred_at).slice(0, 10)
-      if (version === formGeneration.current) onDay(savedDay)
+      if (version === formGeneration.current) {
+        if (analysisVisible.current && savedDay !== selectedDay.current) savedDayNavigation.current = savedDay
+        onDay(savedDay)
+      }
       if (version === formGeneration.current || selectedDay.current === savedDay) await loadDay(savedDay)
       const form = await request('/api/entry-form')
       setPending(null)
@@ -240,6 +254,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       setLocalTime(form.local_time)
       initialized.current = true
     } catch (failure) {
+      if (version !== formGeneration.current) return
       setError(failure instanceof Error ? failure.message : 'Ошибка сети. Повторите сохранение.')
       if (committed) setError('Запись сохранена, но обновление не удалось. Повторите запрос для проверки.')
     } finally {
@@ -271,11 +286,22 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? `${name}-error` : undefined })
   const fieldError = (name: string) => field === name && error ? <p id={`${name}-error`} role="alert" className="error field-error">{error}</p> : null
   return <div hidden={!active}>
-    <div hidden={section !== 'calendar'}><DayCalendar active={active && section === 'calendar'} day={day} generation={entryGeneration + basalGeneration} onDay={onDay} /></div>
-    <div hidden={section !== 'diary'} className="diary-layout">
-    <section className="diary-composer" aria-label="Ввод записи">
+    <div hidden={section !== 'calendar'}><DayCalendar active={active && section === 'calendar'} day={day} generation={entryGeneration + basalGeneration} onDay={onDay} onAnalysis={selected => onDay(selected, true)} /></div>
+    <div hidden={section !== 'charts'}>
+    <GlucoseCharts active={active && section === 'charts'} generation={entryGeneration} onDay={selected => {
+      onDay(selected, true)
+      requestAnimationFrame(() => document.getElementById('day-history')?.focus())
+    }} />
+    </div>
+    <div hidden={section !== 'diary' && section !== 'charts'}>
+    {error && !['glucose', 'bolus', 'occurred_at', 'reason', 'comment', 'entry-fields'].includes(field ?? '') && <p id="entry-error" role="alert" className="error">{error}</p>}
+    {notice && <p role="status" className="entry-notice">{notice}</p>}
+    </div>
+    <div hidden={section !== 'diary' && section !== 'charts'} className="diary-layout">
+    <section hidden={section !== 'diary' && !editing && !conflictId && pending?.method !== 'PUT'} className="diary-composer" aria-label="Ввод записи">
     <span className="eyebrow">БЫСТРЫЙ ВВОД</span>
     <h2>{editing ? 'Изменение записи' : 'Быстрый ввод'}</h2>
+    <div hidden={section === 'charts' && !editing && pending?.method !== 'PUT'}>
     {!localTime ? <button onClick={() => openForm().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение</button> : <form onSubmit={save} aria-busy={busy}>
       <fieldset aria-label="Данные записи" {...invalid('entry-fields')} disabled={busy || pending !== null || pendingAction !== null}>
         <div className="entry-numbers"><div className="glucose-field">
@@ -304,8 +330,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       <button disabled={busy || pendingAction !== null || conflictId === editing?.id} type="submit">{busy ? 'Сохраняем…' : pending ? 'Повторить сохранение' : editing ? 'Сохранить изменения' : 'Сохранить запись'}</button>
       {editing && <button type="button" disabled={busy || pending !== null || pendingAction !== null} onClick={() => cancelEdit().catch(() => setError('Не удалось открыть форму.'))}>Отменить редактирование</button>}
     </form>}
-    {error && !['glucose', 'bolus', 'occurred_at', 'reason', 'comment', 'entry-fields'].includes(field ?? '') && <p id="entry-error" role="alert" className="error">{error}</p>}
-    {notice && <p role="status" className="entry-notice">{notice}</p>}
+    </div>
     {conflictId && <button disabled={busy} onClick={() => { const version = formGeneration.current; void request(`/api/entries/${conflictId}`).then(row => { if (version === formGeneration.current) setLatest(row) }).catch(failure => setError(failure.message)) }}>Загрузить актуальную запись</button>}
     {latest && <section aria-label="Актуальная запись">
       <p>Редакция {latest.revision} · {latest.deleted_at ? 'Удалена' : 'Сохранена'} · Москва {localMinute(latest.occurred_at).replace('T', ' ')}</p>
@@ -316,14 +341,15 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         <button disabled={busy} onClick={() => edit(latest)}>Редактировать актуальную</button>
       </>}
     </section>}
-    {pendingAction && !busy && createPortal(<div>{error && section !== 'diary' && <p role="alert" className="error">{error}</p>}<button onClick={() => change(pendingAction)}>Повторить операцию</button></div>, document.getElementById('global-undo')!)}
+    {pendingAction && !busy && createPortal(<div>{error && section !== 'diary' && section !== 'charts' && <p role="alert" className="error">{error}</p>}<button onClick={() => change(pendingAction)}>Повторить операцию</button></div>, document.getElementById('global-undo')!)}
     {undo && createPortal(<div role="status"><p>Запись удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || pendingAction !== null} onClick={() => entryAction(undo, 'restore')}>Отменить удаление</button></div>, document.getElementById('global-undo')!)}
     </section>
-    <section className="diary-timeline" aria-label="Хронология дня">
+    <section hidden={section !== 'charts'} className="diary-timeline" aria-label="Хронология дня">
     <span className="eyebrow">ХРОНОЛОГИЯ · МОСКВА</span>
     <h2 id="day-history" tabIndex={-1}>Записи дня <span className="entry-count">{entries.length}</span></h2>
+    {!localTime && error && <button onClick={() => openForm().then(() => setError('')).catch(() => setError('Не удалось открыть форму. Повторите подключение.'))}>Повторить подключение</button>}
     <label htmlFor="day">День — Москва</label>
-    <input id="day" type="date" disabled={!localTime} value={day} onChange={e => { if (e.target.value) onDay(e.target.value) }} />
+    <input id="day" type="date" value={day} onChange={e => { if (e.target.value) onDay(e.target.value) }} />
     <div className="day-navigation">
       <button type="button" disabled={!day || day === '0001-01-01'} onClick={() => adjacentDay(-1)}>Предыдущий день</button>
       <button type="button" disabled={todayLoading} onClick={today}>{todayLoading ? 'Получаем сегодня…' : 'Сегодня'}</button>
@@ -357,18 +383,13 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       {row.reason && <p><span className="status-badge">{reasons[row.reason]}</span></p>}
       {row.comment && <p className="comment">{row.comment}</p>}
       <p className="muted">База: {basalText(row.basal)} · по расписанию</p>
+      <p className="muted">Создана: {moscowLabel(row.created_at)}</p>
       <div className="entry-actions"><button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => edit(row)}>Изменить</button>
       <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => entryAction(row, 'delete')}>Удалить</button></div>
     </li> })}</ol>
     {day && !dayLoading && !dayError && entries.length === 0 && <p>Записей нет.</p>}
     </div>
     </section>
-    </div>
-    <div hidden={section !== 'charts'}>
-    <GlucoseCharts active={active && section === 'charts'} generation={entryGeneration} onDay={selected => {
-      onDay(selected, true)
-      requestAnimationFrame(() => document.getElementById('day-history')?.focus())
-    }} />
     </div>
     <div hidden={section !== 'basal'}>
       <nav className="basal-nav" aria-label="Представления базы">

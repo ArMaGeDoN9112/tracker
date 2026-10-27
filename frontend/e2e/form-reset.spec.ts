@@ -97,6 +97,7 @@ test('a late committed entry response cannot change the page or reopen the close
   await expect(page.getByRole('button', { name: 'Сохранить запись', exact: true })).toBeEnabled()
   await page.getByLabel('Комментарий', { exact: true }).fill('Новый ввод')
   await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Новый ввод')
+  await openSection(page, 'Аналитика сахара')
   await expect(page.locator('.entries')).toContainText('Сохраняемая запись')
 })
 
@@ -137,6 +138,8 @@ test('an unknown entry edit retries its original PUT after the editor is discard
   await page.getByLabel('Комментарий', { exact: true }).fill(name)
   await page.getByLabel('Время события — Москва').fill('2048-01-02T10:00')
   await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Запись сохранена.' })).toBeVisible()
+  await openSection(page, 'Аналитика сахара')
   const row = page.locator('.entries > .entry').filter({ hasText: name })
   await row.getByRole('button', { name: 'Изменить', exact: true }).click()
   await page.getByLabel('Комментарий', { exact: true }).fill(name + ' изменена')
@@ -162,6 +165,7 @@ test('an unknown entry edit retries its original PUT after the editor is discard
   expect(requests).toHaveLength(2)
   expect(requests[1]).toEqual(requests[0])
   expect(requests[1].method).toBe('PUT')
+  await openSection(page, 'Аналитика сахара')
   await expect(row).toHaveCount(1)
   await expect(row).toContainText(name + ' изменена')
 })
@@ -269,6 +273,7 @@ for (const kind of ['entries', 'meals', 'water', 'products', 'temporary-basals']
     const original = await (await page.request.get(`/api/${kind}/${id}`)).json()
     await page.reload()
     for (const exit of ['history', 'reload', 'logout', 'expiry']) {
+      if (kind === 'entries') await openSection(page, 'Аналитика сахара')
       if (kind === 'products') {
         const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
         await expect(card).toBeVisible()
@@ -300,7 +305,7 @@ for (const kind of ['entries', 'meals', 'water', 'products', 'temporary-basals']
         await signIn(page)
       }
       if (kind === 'entries') {
-        await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
+        await expect(page.getByLabel('Комментарий', { exact: true })).toBeHidden()
         await expect(page.getByRole('button', { name: 'Сохранить изменения', exact: true })).toHaveCount(0)
       } else if (kind === 'meals') await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveCount(0)
       else if (kind === 'products') await expect(page.getByLabel('Название продукта', { exact: true })).toHaveCount(0)

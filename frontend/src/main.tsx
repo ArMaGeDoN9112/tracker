@@ -39,7 +39,8 @@ function App() {
   currentRoute.current = route
   function navigate(next: Route, replace = false) {
     history[replace ? 'replaceState' : 'pushState'](null, '', routeUrl(next))
-    setRoute({ ...readRoute(), temporary: next.temporary })
+    const parsed = readRoute()
+    setRoute({ ...parsed, temporary: next.temporary, error: replace ? next.error || parsed.error : parsed.error })
   }
   useEffect(() => {
     const pop = () => setRoute(readRoute())
@@ -168,7 +169,7 @@ function App() {
       </aside>}
       <div id="global-undo" hidden={!login} />
       {!loading && <Nutrition authorized={login !== null} visible={route.section === 'nutrition'} summaryVisible={route.section === 'nutrition-summary'} catalogVisible={route.section === 'catalog'} day={route.day} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'nutrition' : currentRoute.current.section }, !currentRoute.current.day)} csrfToken={privateCsrfToken} />}
-      {!loading && <Diary active={login !== null} section={route.section} day={route.day} temporary={route.temporary} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'diary' : currentRoute.current.section }, !currentRoute.current.day)} onView={temporary => navigate({ ...route, temporary })} csrfToken={privateCsrfToken} />}
+      {!loading && <Diary active={login !== null} section={route.section} day={route.day} temporary={route.temporary} onDay={(day, open = false) => navigate({ ...currentRoute.current, day, section: open ? 'charts' : currentRoute.current.section }, !currentRoute.current.day)} onView={temporary => navigate({ ...route, temporary })} csrfToken={privateCsrfToken} />}
       {!loading && login && <section hidden={route.section !== 'settings'} className="settings" aria-labelledby="settings-title">
         <h2 id="settings-title" className="sr-only">Настройки</h2>
         <div className="settings-grid">

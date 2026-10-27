@@ -1,3 +1,4 @@
+import { openSection } from './navigation'
 import { test, expect, type Page } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
@@ -45,6 +46,7 @@ for (const day of ['0001-01-15', '9999-12-01']) {
   test(`transition from diary day ${day} never requests an unsupported calendar month`, async ({ page }) => {
     await page.goto(`/?section=diary&day=${day}`)
     await signIn(page)
+  await openSection(page, 'Аналитика сахара')
     await expect(page.getByLabel('День — Москва')).toHaveValue(day)
     const requests: string[] = []
     page.on('request', request => { if (request.url().includes('-summary?')) requests.push(request.url()) })

@@ -26,11 +26,7 @@ test('every screen keeps readable cards, unknown values and usable controls at a
   await page.reload()
   for (const section of ['Ввод сахара', 'Ввод питания', 'Аналитика сахара', 'Аналитика питания', 'Каталог', 'База', 'Настройки']) {
     await openSection(page, section)
-    if (section === 'Ввод сахара') {
-      await expect(page.locator('.entry-glucose strong')).toContainText('5,6')
-      await page.getByText('График базы за день', { exact: true }).click()
-      await expect(page.getByRole('group', { name: 'График базы с 00 до 24 часов, Москва' })).toBeVisible()
-    }
+    if (section === 'Ввод сахара') await expect(page.getByRole('region', { name: 'Хронология дня' })).toBeHidden()
     if (section === 'Ввод питания') {
       const history = page.getByRole('region', { name: 'День питания', exact: true })
       await expect(history.locator('.metric-grid').first()).toContainText('300.00 ккал')
@@ -40,6 +36,9 @@ test('every screen keeps readable cards, unknown values and usable controls at a
       await expect(history.locator('.water-record')).toHaveCount(2)
     }
     if (section === 'Аналитика сахара') {
+      await expect(page.locator('.entry-glucose strong')).toContainText('5,6')
+      await page.getByText('График базы за день', { exact: true }).click()
+      await expect(page.getByRole('group', { name: 'График базы с 00 до 24 часов, Москва' })).toBeVisible()
       await page.getByLabel('Начало периода — Москва', { exact: true }).fill(day)
       await page.getByLabel('Конец периода — Москва', { exact: true }).fill(day)
       await page.getByRole('button', { name: 'Показать период', exact: true }).click()
