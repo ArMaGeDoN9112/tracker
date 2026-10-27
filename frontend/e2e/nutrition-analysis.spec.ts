@@ -1,0 +1,107 @@
+import { test, expect } from '@playwright/test'
+import { openSection } from './navigation'
+
+test('nutrition input separates history; analysis edits and repeat explicitly creates', async ({ page }, info) => {
+  const day = info.project.name === 'phone' ? '2093-03-02' : '2092-03-02'
+  await page.goto(`/?section=nutrition&day=${day}`)
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'День питания', exact: true })).toBeHidden()
+  await expect(page.getByLabel('История воды')).toBeHidden()
+  await page.getByRole('button', { name: 'Добавить разовую еду' }).click()
+  await page.getByLabel('Название строки 1', { exact: true }).fill('Еда для анализа')
+  await page.getByLabel('Время приёма — Москва').fill(`${day}T12:34`)
+  await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
+  await expect(page.getByText('Приём пищи сохранён.', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/section=nutrition&/)
+  if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/04-input-${info.project.name}.png`, fullPage: true })
+  await openSection(page, 'Аналитика питания')
+  await expect(page.getByLabel('День питания — Москва')).toHaveValue(day)
+  const row = page.getByRole('article').filter({ hasText: 'Еда для анализа' })
+  await expect(row).toHaveCount(1)
+  await expect(page.getByLabel('Время приёма — Москва')).toBeHidden()
+  if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/04-analysis-${info.project.name}.png`, fullPage: true })
+  await row.getByRole('button', { name: 'Изменить приём', exact: true }).click()
+  await page.getByLabel('Название строки 1', { exact: true }).fill('Несохранённое исправление')
+  if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/04-edit-${info.project.name}.png`, fullPage: true })
+  await page.getByLabel('День питания — Москва').fill('2094-03-02')
+  await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveCount(0)
+  await page.goBack()
+  await row.getByRole('button', { name: 'Повторить приём', exact: true }).click()
+  await expect(page).toHaveURL(/section=nutrition&/)
+  await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveValue('Еда для анализа')
+  await expect(page.getByLabel('Время приёма — Москва')).not.toHaveValue(`${day}T12:34`)
+  const before = await (await page.request.get(`/api/nutrition-day?day=${day}`)).json()
+  expect(before.meals).toHaveLength(1)
+  await page.getByLabel('Время приёма — Москва').fill(`${day}T14:00`)
+  await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
+  await expect(page.getByText('Приём пищи сохранён.', { exact: true })).toBeVisible()
+  await openSection(page, 'Аналитика питания')
+  await expect(row).toHaveCount(2)
+  await page.getByRole('link', { name: 'Календарь', exact: true }).click()
+  await page.getByRole('link', { name: 'Записи питания', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`section=nutrition-summary&day=${day}`))
+  await expect(row).toHaveCount(2)
+})
+
+for (const kind of ['meals', 'water'] as const) {
+  test(`${kind}: discarded edit retries the same PUT and undo expires across pages`, async ({ page }, info) => {
+    await page.clock.install()
+    const day = info.project.name === 'phone' ? '2096-05-03' : '2095-05-03'
+    await page.goto(`/?section=nutrition-summary&day=${day}`)
+    await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+    await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+    await page.getByRole('button', { name: 'Войти', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible()
+    const headers = { Origin: 'https://localhost:5173', 'X-CSRF-Token': (await (await page.request.get('/api/auth/csrf')).json()).csrf_token }
+    const name = `Правка ${crypto.randomUUID()}`
+    const created = await page.request.post(`/api/${kind}`, { headers, data: {
+      operation_id: crypto.randomUUID(), occurred_at: `${day}T10:00:00+03:00`,
+      ...(kind === 'meals' ? { lines: [{ id: crypto.randomUUID(), kind: 'one_off', name }] } : { volume_ml: 234 }),
+    } })
+    expect(created.ok(), await created.text()).toBeTruthy()
+    const id = (await created.json()).result_id
+    await page.reload()
+    const row = kind === 'meals' ? page.getByRole('article').filter({ hasText: name }) : page.getByLabel('История воды').getByRole('article')
+    await row.getByRole('button', { name: kind === 'meals' ? 'Изменить приём' : 'Изменить воду', exact: true }).click()
+    await page.getByLabel(kind === 'meals' ? 'Название строки 1' : 'Объём воды, мл', { exact: true }).fill(kind === 'meals' ? name + ' изменена' : '345')
+    if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/04-${kind}-edit-${info.project.name}.png`, fullPage: true })
+    const requests: { method: string; body: string | null }[] = []
+    page.on('request', request => {
+      if (request.url().endsWith(`/api/${kind}/${id}`) && request.method() === 'PUT') requests.push({ method: request.method(), body: request.postData() })
+    })
+    await page.route(`**/api/${kind}/${id}`, async route => {
+      if (route.request().method() !== 'PUT') return route.continue()
+      expect((await route.fetch()).ok()).toBeTruthy()
+      await route.abort()
+    }, { times: 1 })
+    await page.getByRole('button', { name: kind === 'meals' ? 'Сохранить приём пищи' : 'Сохранить воду', exact: true }).click()
+    const retry = page.getByRole('button', { name: kind === 'meals' ? 'Повторить сохранение приёма' : 'Повторить запрос воды', exact: true })
+    await expect(retry).toBeEnabled()
+    await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+    await page.getByRole('button', { name: 'Выйти', exact: true }).click()
+    await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+    await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+    await page.getByRole('button', { name: 'Войти', exact: true }).click()
+    await openSection(page, 'Ввод питания')
+    if (kind === 'meals') await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveCount(0)
+    else await expect(page.getByLabel('Объём воды, мл', { exact: true })).toHaveValue('')
+    expect(requests).toHaveLength(1)
+    await retry.click()
+    await expect(page.getByText(kind === 'meals' ? 'Приём пищи сохранён.' : 'Вода сохранена.', { exact: true })).toBeVisible()
+    expect(requests).toHaveLength(2)
+    expect(requests[1]).toEqual(requests[0])
+    await openSection(page, 'Аналитика питания')
+    const updated = kind === 'meals' ? page.getByRole('article').filter({ hasText: name + ' изменена' }) : row
+    await updated.getByRole('button', { name: kind === 'meals' ? 'Удалить приём' : 'Удалить воду', exact: true }).click()
+    const undo = page.getByRole('button', { name: kind === 'meals' ? 'Отменить удаление приёма' : 'Отменить удаление воды', exact: true })
+    await expect(undo).toBeVisible()
+    await page.clock.fastForward(20_000)
+    await page.getByRole('link', { name: 'Календарь', exact: true }).click()
+    await page.getByRole('link', { name: 'Записи питания', exact: true }).click()
+    await expect(undo).toBeVisible()
+    await page.clock.fastForward(10_001)
+    await expect(undo).toHaveCount(0)
+  })
+}

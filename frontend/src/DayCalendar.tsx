@@ -32,7 +32,7 @@ async function read<T,>(path: string): Promise<T> {
   return result
 }
 
-function DaySummary({ active, day, generation, onClose, onAnalysis }: { active: boolean; day: string; generation: number; onClose: () => void; onAnalysis: (day: string) => void }) {
+function DaySummary({ active, day, generation, onClose, onAnalysis, onNutrition }: { active: boolean; day: string; generation: number; onClose: () => void; onAnalysis: (day: string) => void; onNutrition: (day: string) => void }) {
   const [data, setData] = useState<{ nutrition: NutritionDay; diary: DiaryDay } | null>(null)
   const [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
@@ -53,6 +53,7 @@ function DaySummary({ active, day, generation, onClose, onAnalysis }: { active: 
     <p className="muted">Все события и границы дня — по Москве.</p>
     {error ? <p role="alert" className="error">{error}</p> : !data ? <p role="status">Загружаем сводку дня…</p> : <>
       <h4>Питание</h4>
+      <a href={`?section=nutrition-summary&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onNutrition(day) } }}>Записи питания</a>
       {!data.nutrition.meals.length ? <p>Нет записей еды.</p> : <>
         <div className="calendar-day-totals"><span className="eyebrow">ИТОГО ЗА ДЕНЬ</span><SummaryTotals totals={data.nutrition.totals} /></div>
         <div className="calendar-meals">{data.nutrition.meals.map(meal => <article className="calendar-meal" key={meal.id}>
@@ -91,7 +92,7 @@ function DaySummary({ active, day, generation, onClose, onAnalysis }: { active: 
   </section>
 }
 
-export function DayCalendar({ active, day, generation, onDay, onAnalysis }: { active: boolean; day: string; generation: number; onDay: (day: string) => void; onAnalysis: (day: string) => void }) {
+export function DayCalendar({ active, day, generation, onDay, onAnalysis, onNutrition }: { active: boolean; day: string; generation: number; onDay: (day: string) => void; onAnalysis: (day: string) => void; onNutrition: (day: string) => void }) {
   const today = localMinute(new Date().toISOString()).slice(0, 10)
   const [month, setMonth] = useState(() => (day || today).slice(0, 7))
   const [days, setDays] = useState<CalendarDay[] | null>(null)
@@ -160,7 +161,7 @@ export function DayCalendar({ active, day, generation, onDay, onAnalysis }: { ac
       </div>
       <p className="muted">Нажмите на день, чтобы увидеть все записи.</p>
     </>}
-    {active && open && day && <DaySummary key={day} active={active} day={day} generation={generation} onAnalysis={onAnalysis} onClose={() => {
+    {active && open && day && <DaySummary key={day} active={active} day={day} generation={generation} onAnalysis={onAnalysis} onNutrition={onNutrition} onClose={() => {
       setOpen(false); document.getElementById(`calendar-${day}`)?.focus()
     }} />}
   </section>

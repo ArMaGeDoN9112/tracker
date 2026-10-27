@@ -38,6 +38,7 @@ test('late water comparison cannot reopen a discarded editor', async ({ page }, 
   await page.getByLabel('Объём воды, мл', { exact: true }).fill('234')
   await page.getByLabel('Время воды — Москва', { exact: true }).fill(`${day}T10:00`)
   await page.getByRole('button', { name: 'Сохранить воду', exact: true }).click()
+  await openSection(page, 'Аналитика питания')
   await page.getByRole('button', { name: 'Изменить воду', exact: true }).click()
   const row = (await (await page.request.get(`/api/nutrition-day?day=${day}`)).json()).water[0]
   const headers = { Origin: 'https://localhost:5173', 'X-CSRF-Token': (await (await page.request.get('/api/auth/csrf')).json()).csrf_token }
@@ -66,7 +67,7 @@ test('late water comparison cannot reopen a discarded editor', async ({ page }, 
   await response
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   await expect(page.getByLabel('Актуальная вода', { exact: true })).toHaveCount(0)
-  await expect(page.getByLabel('Объём воды, мл', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Объём воды, мл', { exact: true })).toBeHidden()
 })
 
 test('a late committed entry response cannot change the page or reopen the closed form', async ({ page }) => {
@@ -109,6 +110,7 @@ test('a late repeat response does not refill a meal after leaving it', async ({ 
   await page.getByLabel('Название строки 1', { exact: true }).fill('Еда для повтора')
   await page.getByLabel('Время приёма — Москва').fill(`${day}T10:00`)
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
+  await openSection(page, 'Аналитика питания')
   await expect(page.getByRole('button', { name: 'Повторить приём', exact: true })).toBeVisible()
   let release!: () => void
   let reached!: () => void
@@ -127,7 +129,7 @@ test('a late repeat response does not refill a meal after leaving it', async ({ 
   const response = page.waitForResponse('**/repeat-form')
   release()
   await response
-  await expect(page.getByRole('button', { name: 'Выбрать из каталога', exact: true })).toBeEnabled()
+  await expect(page.getByLabel('Время приёма — Москва')).toBeHidden()
   await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveCount(0)
 })
 
@@ -274,6 +276,7 @@ for (const kind of ['entries', 'meals', 'water', 'products', 'temporary-basals']
     await page.reload()
     for (const exit of ['history', 'reload', 'logout', 'expiry']) {
       if (kind === 'entries') await openSection(page, 'Аналитика сахара')
+      if (kind === 'meals' || kind === 'water') await openSection(page, 'Аналитика питания')
       if (kind === 'products') {
         const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
         await expect(card).toBeVisible()
@@ -309,7 +312,8 @@ for (const kind of ['entries', 'meals', 'water', 'products', 'temporary-basals']
         await expect(page.getByRole('button', { name: 'Сохранить изменения', exact: true })).toHaveCount(0)
       } else if (kind === 'meals') await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveCount(0)
       else if (kind === 'products') await expect(page.getByLabel('Название продукта', { exact: true })).toHaveCount(0)
-      else await expect(page.getByLabel(kind === 'water' ? 'Объём воды, мл' : 'Процент от расписания', { exact: true })).toHaveValue(kind === 'water' ? '' : '100')
+      else if (kind === 'water') await expect(page.getByLabel('Объём воды, мл', { exact: true })).toBeHidden()
+      else await expect(page.getByLabel('Процент от расписания', { exact: true })).toHaveValue('100')
       expect(await (await page.request.get(`/api/${kind}/${id}`)).json()).toEqual(original)
     }
   })

@@ -37,7 +37,7 @@ export function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; 
     </li>)}</ol></>
 }
 
-export function Nutrition({ authorized, visible, summaryVisible, catalogVisible, day, onDay, csrfToken }: { authorized: boolean; visible: boolean; summaryVisible: boolean; catalogVisible: boolean; day: string; onDay: (day: string, open?: boolean) => void; csrfToken: () => Promise<string> }) {
+export function Nutrition({ authorized, visible, summaryVisible, catalogVisible, day, onDay, onInput, csrfToken }: { authorized: boolean; visible: boolean; summaryVisible: boolean; catalogVisible: boolean; day: string; onDay: (day: string, open?: boolean) => void; onInput: () => void; csrfToken: () => Promise<string> }) {
   const [lines, setLines] = useState<FormLine[]>([])
   const [localTime, setLocalTime] = useState('')
   const [category, setCategory] = useState('')
@@ -69,6 +69,12 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   selectedDay.current = day
   const initialized = useRef(false)
 
+  const analysisVisible = useRef(false)
+  analysisVisible.current = authorized && summaryVisible
+  const repeatForm = useRef<{ occurred_at: string; category: string | null; lines: Line[] } | null>(null)
+  const analysisDay = summaryVisible ? day : ''
+  const mealPage = visible || summaryVisible
+
   async function read<T,>(path: string): Promise<T> {
     const response = await privateFetch(path)
     const result = await response.json()
@@ -76,6 +82,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     return result
   }
   async function loadDay(selected: string) {
+    if (!analysisVisible.current) return
     const sequence = ++generation.current
     setLoading(true); setDayError('')
     try {
@@ -93,7 +100,16 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     setConflict(null); setLatest(null); setError(''); setField(null); setNotice('')
     setConversion(null); setConversionQuantity(''); setConversionUnit('g'); setProductSeed(null); setChoosingProduct(false)
     initialized.current = false
-  }, [authorized, visible])
+    if (authorized && visible && repeatForm.current) {
+      const form = repeatForm.current
+      setLines(form.lines); setCategory(form.category ?? '')
+      setLocalTime(localMinute(form.occurred_at)); setInstant(form.occurred_at)
+      initialized.current = true
+      setNotice('Повтор открыт в новой форме. Проверьте состав и время; запись появится после сохранения.')
+      requestAnimationFrame(() => document.getElementById('meal-form-title')?.focus())
+    }
+    repeatForm.current = null
+  }, [authorized, visible, summaryVisible, analysisDay])
 
   async function initialize() {
     const version = formGeneration.current
@@ -104,16 +120,16 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     }
   }
   useEffect(() => {
-    if (authorized && visible && !initialized.current) void initialize().catch(() => setError('Не удалось получить время формы. Повторите подключение.'))
-  }, [authorized, visible])
+    if (authorized && mealPage && !initialized.current) void initialize().catch(() => setError('Не удалось получить время формы. Повторите подключение.'))
+  }, [authorized, visible, summaryVisible, analysisDay])
   useEffect(() => {
     setData(null)
-    if (authorized && visible && day) void loadDay(day).catch(() => {})
+    if (authorized && summaryVisible && day) void loadDay(day).catch(() => {})
     return () => { generation.current++ }
-  }, [authorized, visible, day])
+  }, [authorized, summaryVisible, day])
   useEffect(() => {
-    if (error && authorized && visible) document.getElementById('meal-error')?.focus()
-  }, [error, authorized, visible])
+    if (error && authorized && mealPage) document.getElementById('meal-error')?.focus()
+  }, [error, authorized, visible, summaryVisible])
   useEffect(() => {
     if (!undo) return
     const timer = window.setTimeout(() => setUndo(null), Math.max(0, undo.until - performance.now()))
@@ -150,11 +166,8 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     try {
       const form = await read<{ occurred_at: string; category: string | null; lines: Line[] }>(`/api/meals/${meal.id}/repeat-form`)
       if (version !== formGeneration.current) return
-      setEditing(null); setLines(form.lines); setCategory(form.category ?? '')
-      setLocalTime(localMinute(form.occurred_at)); setInstant(form.occurred_at); setCandidates([])
-      initialized.current = true; setConflict(null); setLatest(null); setField(null)
-      setNotice('Повтор открыт в новой форме. Проверьте состав и время; запись появится после сохранения.')
-      requestAnimationFrame(() => document.getElementById('meal-form-title')?.focus())
+      repeatForm.current = form
+      onInput()
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось открыть повтор. Попробуйте снова.') }
     finally { sending.current = false; setBusy(false) }
   }
@@ -193,9 +206,9 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       const result = await response.json()
       if (!response.ok) {
         if ([404, 409, 413, 422].includes(response.status)) { setPending(null); setConfirmed(false) }
-        if (result.code === 'revision_conflict') { setConflict(request.path.split('/')[3]); setLatest(null) }
+        if (result.code === 'revision_conflict' && version === formGeneration.current) { setConflict(request.path.split('/')[3]); setLatest(null) }
         if (result.code === 'undo_expired' || (request.action === 'restore' && result.code === 'revision_conflict')) setUndo(null)
-        setField(result.field ?? null)
+        if (version === formGeneration.current) setField(result.field ?? null)
         throw new Error(result.message)
       }
       committed = true; setConfirmed(true)
@@ -208,7 +221,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       if (selectedDay.current) await loadDay(selectedDay.current)
       setPending(null); setConfirmed(false); setConflict(null); setLatest(null)
       if (request.action === 'save' && version === formGeneration.current) clear()
-      setNotice(request.action === 'save' ? current.deleted_at ? 'Сохранение подтверждено; приём уже удалён.' : 'Приём пищи сохранён. Показана актуальная история.' : request.action === 'delete' ? 'Удаление подтверждено.' : 'Восстановление подтверждено.')
+      setNotice(request.action === 'save' ? current.deleted_at ? 'Сохранение подтверждено; приём уже удалён.' : 'Приём пищи сохранён.' : request.action === 'delete' ? 'Удаление подтверждено.' : 'Восстановление подтверждено.')
     } catch (failure) {
       setError(committed ? 'Операция подтверждена сервером, но обновление не удалось. Повторите запрос для проверки.' : failure instanceof Error ? failure.message : 'Ошибка сети. Повторите запрос явно.')
     }
@@ -258,13 +271,14 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       {undo && <><p role="status">Приём пищи удалён. Отмена доступна до 30 секунд по серверу.</p><button disabled={locked} onClick={() => void action(undo, 'restore')}>Отменить удаление приёма</button></>}
       {pending && pending.action !== 'save' && <><p role="status">{confirmed ? 'Операция подтверждена.' : 'Результат операции неизвестен.'}</p><button disabled={busy} onClick={() => void retry()}>Повторить операцию с приёмом</button>{error && <p role="alert">{error}</p>}</>}
     </div>, undoTarget)}
-    <div hidden={!authorized || !visible || choosingProduct}>
+    <div hidden={!authorized || !mealPage || choosingProduct}>
+      {error && <p id="meal-error" role="alert" tabIndex={-1} className="error">{error}</p>}
+      {!visible && !editing && notice && <p role="status">{notice}</p>}
       <div className="diary-layout nutrition-layout">
-        <section aria-label="Форма приёма пищи">
+        <section aria-label="Форма приёма пищи" hidden={!visible && !editing && !(pending?.action === 'save' && pending.method === 'PUT')}>
           <span className="eyebrow">СЪЕДЕННАЯ ЕДА</span><h2 id="meal-form-title" tabIndex={-1}>{editing ? 'Изменение приёма пищи' : 'Новый приём пищи'}</h2>
           <p className="muted">Выберите еду по карточкам из каталога или добавьте разовую еду.</p>
           <button id="choose-product" disabled={locked} onClick={() => { setChoosingProduct(true); requestAnimationFrame(() => document.getElementById('catalog-title')?.focus()) }}>Выбрать из каталога</button>
-          {error && <p id="meal-error" role="alert" tabIndex={-1} className="error">{error}</p>}
           {!localTime && <button onClick={() => void initialize().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение питания</button>}
           <form onSubmit={save} aria-busy={busy}>
             <fieldset disabled={locked}>
@@ -304,7 +318,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
           </section>}
           {notice && <p role="status">{notice}</p>}
         </section>
-        <section aria-label="День питания">
+        <section aria-label="День питания" hidden={!summaryVisible}>
           <h2 id="nutrition-history" tabIndex={-1}>История питания</h2>
           <label htmlFor="nutrition-day">День питания — Москва</label><input id="nutrition-day" type="date" value={day} onChange={e => { if (e.target.value) onDay(e.target.value) }} />
           {loading && <p role="status">Загружаем день питания…</p>}
@@ -312,7 +326,6 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
           {!loading && !dayError && data?.day === day && <>{!data.meals.length ? <p>Нет записей еды</p> : <><h3>Итоги дня</h3><TotalsView totals={data.totals} />
             {data.meals.map(row => <article className="meal-history" key={row.id} aria-label={`Приём ${moscowLabel(row.occurred_at)}`}><MealDetails meal={row} onProduct={openProduct} productDisabled={locked || catalogEditing} /><div className="catalog-actions"><button disabled={locked} onClick={() => edit(row)}>Изменить приём</button><button disabled={locked} onClick={() => void repeat(row)}>Повторить приём</button><button disabled={locked} onClick={() => void action(row, 'delete')}>Удалить приём</button></div></article>)}
           </>}</>}
-          <Water authorized={authorized} visible={visible} day={day} csrfToken={csrfToken} />
         </section>
       </div>
       {conversion && <section className="meal-conversion" aria-label="Создание продукта из еды">
@@ -326,6 +339,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
         <button disabled={busy} onClick={() => setConversion(null)}>Отменить создание карточки</button>
       </section>}
     </div>
+    <div hidden={choosingProduct}><Water authorized={authorized} visible={visible} analysis={summaryVisible} day={day} csrfToken={csrfToken} /></div>
     <div hidden={!authorized || !summaryVisible}>
       <NutritionSummary active={authorized && summaryVisible} generation={summaryGeneration} onDay={selected => {
         setChoosingProduct(false)
@@ -333,13 +347,13 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
         requestAnimationFrame(() => document.getElementById('nutrition-history')?.focus())
       }} />
     </div>
-    <div hidden={!authorized || !(catalogVisible || (visible && choosingProduct))}>
-      {visible && choosingProduct && <>
-        <button disabled={locked} onClick={() => { setChoosingProduct(false); requestAnimationFrame(() => document.getElementById('choose-product')?.focus()) }}>Вернуться к приёму пищи</button>
-        <p className="muted">Откройте карточку и нажмите «Добавить в приём». Состав и время приёма сохранятся.</p>
+    <div hidden={!authorized || !(catalogVisible || (mealPage && choosingProduct))}>
+      {mealPage && choosingProduct && <>
+        <button disabled={locked} onClick={() => { setChoosingProduct(false); requestAnimationFrame(() => document.getElementById(visible || editing ? 'choose-product' : 'nutrition-history')?.focus()) }}>Вернуться к приёму пищи</button>
+        <p className="muted">{visible || editing ? 'Откройте карточку и нажмите «Добавить в приём». Состав и время приёма сохранятся.' : 'Сохраните карточку и вернитесь к записям питания.'}</p>
         {error && <p role="alert" className="error">{error}</p>}
       </>}
-      <ProductCatalog catalogPage={catalogVisible} authorized={authorized} visible={catalogVisible || (visible && choosingProduct)} csrfToken={csrfToken} onSelect={visible && choosingProduct ? selectProduct : undefined} selectionDisabled={locked || catalogEditing} seed={productSeed} onEditingChange={setCatalogEditing} />
+      <ProductCatalog catalogPage={catalogVisible} authorized={authorized} visible={catalogVisible || (mealPage && choosingProduct)} csrfToken={csrfToken} onSelect={(visible || !!editing) && choosingProduct ? selectProduct : undefined} selectionDisabled={locked || catalogEditing} seed={productSeed} onEditingChange={setCatalogEditing} />
     </div>
   </>
 }

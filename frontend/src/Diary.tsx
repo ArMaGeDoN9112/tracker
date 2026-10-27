@@ -13,7 +13,7 @@ type PendingAction = { path: string; body: string; action: 'delete' | 'restore' 
 const reasons: Record<string, string> = { food: 'Еда', correction: 'Коррекция', food_and_correction: 'Еда и коррекция' }
 const moscowTime = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
-export function Diary({ active, section, day, temporary, onDay, onView, csrfToken }: { active: boolean; section: string; day: string; temporary: boolean; onDay: (day: string, open?: boolean) => void; onView: (temporary: boolean) => void; csrfToken: () => Promise<string> }) {
+export function Diary({ active, section, day, temporary, onDay, onNutrition, onView, csrfToken }: { active: boolean; section: string; day: string; temporary: boolean; onDay: (day: string, open?: boolean) => void; onNutrition: (day: string) => void; onView: (temporary: boolean) => void; csrfToken: () => Promise<string> }) {
   const [localTime, setLocalTime] = useState('')
   const [glucose, setGlucose] = useState('')
   const [bolus, setBolus] = useState('')
@@ -286,7 +286,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? `${name}-error` : undefined })
   const fieldError = (name: string) => field === name && error ? <p id={`${name}-error`} role="alert" className="error field-error">{error}</p> : null
   return <div hidden={!active}>
-    <div hidden={section !== 'calendar'}><DayCalendar active={active && section === 'calendar'} day={day} generation={entryGeneration + basalGeneration} onDay={onDay} onAnalysis={selected => onDay(selected, true)} /></div>
+    <div hidden={section !== 'calendar'}><DayCalendar active={active && section === 'calendar'} day={day} generation={entryGeneration + basalGeneration} onDay={onDay} onAnalysis={selected => onDay(selected, true)} onNutrition={onNutrition} /></div>
     <div hidden={section !== 'charts'}>
     <GlucoseCharts active={active && section === 'charts'} generation={entryGeneration} onDay={selected => {
       onDay(selected, true)

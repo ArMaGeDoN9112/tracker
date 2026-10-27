@@ -15,7 +15,7 @@ function volume(value: string): number {
   return result
 }
 
-export function Water({ authorized, visible, day, csrfToken }: { authorized: boolean; visible: boolean; day: string; csrfToken: () => Promise<string> }) {
+export function Water({ authorized, visible, analysis, day, csrfToken }: { authorized: boolean; visible: boolean; analysis: boolean; day: string; csrfToken: () => Promise<string> }) {
   const [amount, setAmount] = useState('')
   const [localTime, setLocalTime] = useState('')
   const [instant, setInstant] = useState('')
@@ -44,6 +44,10 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
   const selectedDay = useRef(day)
   selectedDay.current = day
 
+  const analysisVisible = useRef(false)
+  analysisVisible.current = authorized && analysis
+  const analysisDay = analysis ? day : ''
+
   async function read<T,>(path: string): Promise<T> {
     const response = await privateFetch(path)
     const result = await response.json()
@@ -51,6 +55,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
     return result
   }
   async function loadDay(selected: string) {
+    if (!analysisVisible.current) return
     const sequence = ++generation.current
     setLoading(true); setDayError('')
     try {
@@ -67,7 +72,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
     clear(); setLocalTime(''); timeInitialized.current = false
     setSettingsOpen(false); setButtons(''); setSettingsRevision(null); setLatestSettings(null)
     setError(''); setField(null); setNotice('')
-  }, [authorized, visible])
+  }, [authorized, visible, analysis, analysisDay])
 
   async function initialize() {
     const version = formGeneration.current
@@ -82,16 +87,16 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
     setSettings(current => current && current.revision > value.revision ? current : value)
   }
   useEffect(() => {
-    if (authorized && visible) void initialize().catch(() => setError('Не удалось загрузить кнопки или время воды. Повторите подключение.'))
-  }, [authorized, visible])
+    if (authorized && (visible || analysis)) void initialize().catch(() => setError('Не удалось загрузить кнопки или время воды. Повторите подключение.'))
+  }, [authorized, visible, analysis, analysisDay])
   useEffect(() => {
     setData(null)
-    if (authorized && visible && day) void loadDay(day).catch(() => {})
+    if (authorized && analysis && day) void loadDay(day).catch(() => {})
     return () => { generation.current++ }
-  }, [authorized, visible, day])
+  }, [authorized, analysis, day])
   useEffect(() => {
-    if (error && authorized && visible) document.getElementById('water-error')?.focus()
-  }, [error, authorized, visible])
+    if (error && authorized && (visible || analysis)) document.getElementById('water-error')?.focus()
+  }, [error, authorized, visible, analysis])
   useEffect(() => {
     if (!undo) return
     const timer = window.setTimeout(() => setUndo(null), Math.max(0, undo.until - performance.now()))
@@ -118,7 +123,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       const result = await response.json()
       if (!response.ok) {
         if ([404, 409, 413, 422].includes(response.status)) { setPending(null); setConfirmed(false) }
-        if (result.code === 'revision_conflict' && (request.action === 'save' || request.action === 'settings')) {
+        if (version === formGeneration.current && result.code === 'revision_conflict' && (request.action === 'save' || request.action === 'settings')) {
           setConflict(request.action === 'settings' ? 'settings' : 'water'); setLatestWater(null); setLatestSettings(null)
         }
         if (result.code === 'undo_expired' || request.action === 'restore' && result.code === 'revision_conflict') setUndo(null)
@@ -138,7 +143,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
         if (request.action === 'save' && version === formGeneration.current) clear()
       }
       setPending(null); setConfirmed(false); setConflict(null); setLatestWater(null); setLatestSettings(null)
-      setNotice(request.action === 'save' ? 'Вода сохранена. Показана актуальная история.' : request.action === 'settings' ? 'Кнопки воды сохранены.' : request.action === 'delete' ? 'Удаление воды подтверждено.' : 'Вода восстановлена.')
+      setNotice(request.action === 'save' ? 'Вода сохранена.' : request.action === 'settings' ? 'Кнопки воды сохранены.' : request.action === 'delete' ? 'Удаление воды подтверждено.' : 'Вода восстановлена.')
     } catch (failure) {
       setError(committed ? 'Операция подтверждена сервером, но обновление не удалось. Повторите запрос для проверки.' : failure instanceof Error ? failure.message : 'Ошибка сети. Повторите запрос явно.')
     }
@@ -218,11 +223,10 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       {undo && <><p role="status">Вода удалена. Отмена доступна до 30 секунд по серверу.</p><button disabled={locked} onClick={() => action(undo, 'restore')}>Отменить удаление воды</button></>}
       {pending && (pending.action === 'delete' || pending.action === 'restore') && <><p role="status">{confirmed ? 'Операция подтверждена.' : 'Результат операции неизвестен.'}</p><button disabled={busy} onClick={() => void retry()}>Повторить операцию с водой</button>{error && <p role="alert">{error}</p>}</>}
     </div>, undoTarget)}
-    <section className="water-panel" aria-label="Учёт воды" hidden={!authorized || !visible}>
-      <h2>Вода</h2><p className="muted">Быстрые кнопки добавляют воду сейчас. Другое время укажите ниже.</p>
-      {error && <p id="water-error" role="alert" tabIndex={-1} className="error">{error}</p>}
+    <section className="water-panel" aria-label="Учёт воды" hidden={!authorized || !(visible || analysis)}>
+      <h2>Вода</h2><div hidden={!visible && !editing && !(pending?.action === 'save' && pending.method === 'PUT')}><p hidden={!visible} className="muted">Быстрые кнопки добавляют воду сейчас. Другое время укажите ниже.</p>
       {!settings && <button disabled={busy} onClick={() => void initialize().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение воды</button>}
-      <div className="water-buttons">{settings?.volumes_ml.map(value => <button key={value} aria-label={`Добавить ${value} мл`} disabled={locked || !!editing || !!amount} onClick={() => quick(value)}>{value} мл</button>)}</div>
+      <div className="water-buttons" hidden={!visible}>{settings?.volumes_ml.map(value => <button key={value} aria-label={`Добавить ${value} мл`} disabled={locked || !!editing || !!amount} onClick={() => quick(value)}>{value} мл</button>)}</div>
       <form onSubmit={save} aria-label="Форма воды" aria-busy={busy}>
         <h3>{editing ? 'Изменение воды' : 'Произвольный объём воды'}</h3>
         <fieldset disabled={locked}>
@@ -232,12 +236,16 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
           <button type="submit" disabled={!!conflict}>Сохранить воду</button><button type="button" onClick={clear}>Отменить ввод воды</button>
         </fieldset>
       </form>
+      </div>
+      <div hidden={!visible}>
       <button disabled={locked || !settings || settingsOpen} onClick={() => { setSettingsOpen(true); setButtons(settings!.volumes_ml.join(', ')); setSettingsRevision(settings!.revision) }}>Настроить кнопки воды</button>
       {settingsOpen && <form onSubmit={saveSettings} aria-label="Настройки кнопок воды"><fieldset disabled={locked}>
         <label htmlFor="water-buttons">Объёмы кнопок воды, мл</label><input id="water-buttons" value={buttons} onChange={e => setButtons(e.target.value)} {...invalid('volumes_ml')} />
         <p>Целые объёмы через запятую в нужном порядке, без повторов. Пустой набор допустим; произвольный ввод останется.</p>
         <button type="submit" disabled={!!conflict}>Сохранить кнопки воды</button><button type="button" onClick={() => { setSettingsOpen(false); setConflict(null); setLatestSettings(null) }}>Отменить настройку кнопок</button>
       </fieldset></form>}
+      </div>
+      {error && <p id="water-error" role="alert" tabIndex={-1} className="error">{error}</p>}
       {conflict && <button disabled={busy} onClick={() => void compare()}>Загрузить актуальные данные воды</button>}
       {latestWater && <div aria-label="Актуальная вода"><p>{latestWater.volume_ml} мл · {moscowLabel(latestWater.occurred_at)} · редакция {latestWater.revision}{latestWater.deleted_at && ' · Удалена'}</p>
         {!latestWater.deleted_at && <><button onClick={() => edit(latestWater)}>Редактировать актуальную воду</button><button onClick={() => { setEditing(latestWater); setConflict(null); setLatestWater(null) }}>Продолжить с моим вводом воды</button></>}
@@ -248,7 +256,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       </div>}
       {pending && (pending.action === 'save' || pending.action === 'settings') && <><p role="status">{confirmed ? 'Операция подтверждена.' : 'Результат запроса неизвестен.'} Явный повтор отправит прежние данные, время и UUID.</p><button disabled={busy} onClick={() => void retry()}>Повторить запрос воды</button></>}
       {notice && <p role="status">{notice}</p>}
-      <section aria-label="История воды"><h3>Вода за {day}</h3>
+      <section aria-label="История воды" hidden={!analysis}><h3>Вода за {day}</h3>
         {loading && <p role="status">Загружаем воду…</p>}{dayError && <p role="alert">{dayError}</p>}
         {!loading && !dayError && data?.day === day && <>{data.water_total_ml === null ? <p>Нет записей воды</p> : <p className="water-total">Сумма воды: <strong>{data.water_total_ml} мл</strong></p>}
           {data.water.map(row => <article className="meal-history water-record" key={row.id} aria-label={`Вода ${moscowLabel(row.occurred_at)}`}><header className="record-heading"><strong>{row.volume_ml} мл</strong><time dateTime={row.occurred_at}>{localMinute(row.occurred_at).slice(11)}</time></header>

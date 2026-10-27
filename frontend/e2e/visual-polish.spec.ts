@@ -27,13 +27,14 @@ test('every screen keeps readable cards, unknown values and usable controls at a
   for (const section of ['Ввод сахара', 'Ввод питания', 'Аналитика сахара', 'Аналитика питания', 'Каталог', 'База', 'Настройки']) {
     await openSection(page, section)
     if (section === 'Ввод сахара') await expect(page.getByRole('region', { name: 'Хронология дня' })).toBeHidden()
-    if (section === 'Ввод питания') {
+    if (section === 'Ввод питания') await expect(page.getByRole('region', { name: 'День питания', exact: true })).toBeHidden()
+    if (section === 'Аналитика питания') {
       const history = page.getByRole('region', { name: 'День питания', exact: true })
       await expect(history.locator('.metric-grid').first()).toContainText('300.00 ккал')
       await expect(history.locator('.metric-grid').first()).toContainText('Неизвестно')
       await expect(history).not.toContainText('Известных строк')
       await expect(history.getByText('Основа:', { exact: false })).toBeHidden()
-      await expect(history.locator('.water-record')).toHaveCount(2)
+      await expect(page.getByLabel('История воды').locator('.water-record')).toHaveCount(2)
     }
     if (section === 'Аналитика сахара') {
       await expect(page.locator('.entry-glucose strong')).toContainText('5,6')
@@ -66,10 +67,8 @@ test('every screen keeps readable cards, unknown values and usable controls at a
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       if (section === 'Ввод питания') {
         const form = await page.getByRole('region', { name: 'Форма приёма пищи', exact: true }).boundingBox()
-        const history = await page.getByRole('region', { name: 'День питания', exact: true }).boundingBox()
         expect(form).not.toBeNull()
-        expect(history).not.toBeNull()
-        expect(history!.y).toBeGreaterThanOrEqual(form!.y + form!.height)
+        await expect(page.getByRole('region', { name: 'День питания', exact: true })).toBeHidden()
       }
       if (process.env.DIARY_ACCEPTANCE_DIR) await page.locator('.workspace').screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/${info.project.name}-${section}-${width}.png` })
     }
