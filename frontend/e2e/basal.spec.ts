@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
-test('create immutable schedule, retry a lost response and inspect a historical day', async ({ page, context }, testInfo) => {
+test('create immutable schedule, retry a lost response and inspect a historical day', async ({ page }, testInfo) => {
   const day = testInfo.project.name === 'phone' ? '2020-08-17' : '2021-08-17'
   await page.goto('/')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
@@ -22,6 +22,14 @@ test('create immutable schedule, retry a lost response and inspect a historical 
   await expect(page.getByRole('status').filter({ hasText: 'Затрагиваемый период' })).toContainText('06:00')
   await page.getByRole('link', { name: 'Временная база', exact: true }).click()
   await page.getByRole('link', { name: 'Расписание', exact: true }).click()
+  await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('')
+  await expect(page.getByRole('button', { name: 'Сохранить расписание', exact: true })).toHaveCount(0)
+  await page.getByLabel('Начало расписания — Москва').fill(`${day}T06:00`)
+  await page.getByLabel('Скорость 1, ед/ч').fill('0,50')
+  await page.getByRole('button', { name: 'Добавить интервал', exact: true }).click()
+  await page.getByLabel('Начало интервала 2').fill('08:00')
+  await page.getByLabel('Скорость 2, ед/ч').fill('0,80')
+  await page.getByRole('button', { name: 'Проверить период', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Сохранить расписание', exact: true })).toBeVisible()
   const writes: string[] = []
   page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/api/basal-schedules')) writes.push(request.postData()!) })
@@ -31,18 +39,18 @@ test('create immutable schedule, retry a lost response and inspect a historical 
     await route.abort('failed')
   }, { times: 1 })
   await page.getByRole('button', { name: 'Сохранить расписание', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Повторить сохранение расписания', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Повторить сохранение расписания', exact: true })).toBeEnabled()
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.getByRole('link', { name: 'База', exact: true }).click()
-  await context.clearCookies()
-  await page.getByRole('button', { name: 'Повторить сохранение расписания', exact: true }).click()
+  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   const beforeLogin = writes.length
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page.getByLabel('Скорость 2, ед/ч')).toHaveValue('0,80')
-  await expect(page.getByRole('status').filter({ hasText: 'Затрагиваемый период' })).toContainText('06:00')
+  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('')
+  await expect(page.getByLabel('Скорость 2, ед/ч')).toHaveCount(0)
+  await expect(page.getByRole('status').filter({ hasText: 'Затрагиваемый период' })).toHaveCount(0)
   expect(writes).toHaveLength(beforeLogin)
   await page.getByRole('button', { name: 'Повторить сохранение расписания', exact: true }).click()
   await expect(page.getByLabel('История расписаний').locator(`summary time[datetime^="${day}"]`)).toHaveCount(1)

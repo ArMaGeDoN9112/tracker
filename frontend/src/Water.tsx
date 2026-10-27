@@ -61,11 +61,20 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       throw failure
     } finally { if (sequence === generation.current) setLoading(false) }
   }
+  const formGeneration = useRef(0)
+  useEffect(() => {
+    formGeneration.current++
+    clear(); setLocalTime(''); timeInitialized.current = false
+    setSettingsOpen(false); setButtons(''); setSettingsRevision(null); setLatestSettings(null)
+    setError(''); setField(null); setNotice('')
+  }, [authorized, visible])
+
   async function initialize() {
+    const version = formGeneration.current
     const result = await read<Settings>('/api/water-settings')
     acceptSettings(result)
     const form = await read<{ local_time: string }>('/api/entry-form')
-    if (!timeInitialized.current) {
+    if (version === formGeneration.current && !timeInitialized.current) {
       setLocalTime(form.local_time); timeInitialized.current = true
     }
   }
@@ -99,6 +108,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
     requestAnimationFrame(() => document.getElementById('water-amount')?.focus())
   }
   async function send(request: Pending) {
+    const version = formGeneration.current
     const started = performance.now()
     let committed = confirmed && pending?.body === request.body
     try {
@@ -125,7 +135,7 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
           setUndo(current.deleted_at && current.revision === result.revision && until > performance.now() ? { id: current.id, revision: current.revision, until } : null)
         } else if (request.action === 'restore') setUndo(null)
         if (selectedDay.current) await loadDay(selectedDay.current)
-        if (request.action === 'save') clear()
+        if (request.action === 'save' && version === formGeneration.current) clear()
       }
       setPending(null); setConfirmed(false); setConflict(null); setLatestWater(null); setLatestSettings(null)
       setNotice(request.action === 'save' ? 'Вода сохранена. Показана актуальная история.' : request.action === 'settings' ? 'Кнопки воды сохранены.' : request.action === 'delete' ? 'Удаление воды подтверждено.' : 'Вода восстановлена.')
@@ -136,8 +146,10 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
   async function run(build: () => Promise<Pending>) {
     if (sending.current || !authorized || pending) return
     sending.current = true; setBusy(true); setError(''); setField(null); setNotice('')
+    const version = formGeneration.current
     try {
       const request = await build()
+      if (version !== formGeneration.current) return
       setPending(request)
       await send(request)
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Ошибка сети. Повторите явно.') }
@@ -184,10 +196,16 @@ export function Water({ authorized, visible, day, csrfToken }: { authorized: boo
       body: JSON.stringify({ operation_id: crypto.randomUUID(), expected_revision: row.revision }) }))
   }
   async function compare() {
+    const version = formGeneration.current
     setError('')
     try {
-      if (conflict === 'settings') setLatestSettings(await read<Settings>('/api/water-settings'))
-      else if (editing) setLatestWater(await read<WaterEvent>(`/api/water/${editing.id}`))
+      if (conflict === 'settings') {
+        const result = await read<Settings>('/api/water-settings')
+        if (version === formGeneration.current) setLatestSettings(result)
+      } else if (editing) {
+        const result = await read<WaterEvent>(`/api/water/${editing.id}`)
+        if (version === formGeneration.current) setLatestWater(result)
+      }
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось загрузить актуальные данные.') }
   }
   const locked = busy || !!pending

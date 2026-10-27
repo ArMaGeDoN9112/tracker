@@ -20,7 +20,7 @@ async function period(page: Page, start: string, end: string) {
   await expect(summary(page).getByTestId('nutrition-bounds')).toHaveText(`${start} — ${end} · Москва · обе даты включены`)
 }
 
-test('known days, zero, draft-safe keyboard day navigation and refreshed edits/moves/delete/undo', async ({ page }, info) => {
+test('known days, zero, keyboard day navigation clears unfinished input and refreshed edits/moves/delete/undo', async ({ page }, info) => {
   await start(page)
   const month = info.project.name === 'phone' ? '08' : '07'
   const first = `2025-${month}-01`, second = `2025-${month}-02`, third = `2025-${month}-03`, fourth = `2025-${month}-04`
@@ -42,7 +42,6 @@ test('known days, zero, draft-safe keyboard day navigation and refreshed edits/m
   await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
   await page.getByRole('button', { name: 'Добавить разовую еду' }).click()
   await page.getByLabel('Название строки 1', { exact: true }).fill('Сохранённый черновик')
-  const draftTime = await page.getByLabel('Время приёма — Москва').inputValue()
   await page.getByRole('button', { name: 'Выбрать из каталога', exact: true }).click()
   await page.getByRole('link', { name: 'Аналитика питания', exact: true }).click()
   const open = summary(page).getByRole('button', { name: `Открыть питание за ${third}` })
@@ -51,8 +50,9 @@ test('known days, zero, draft-safe keyboard day navigation and refreshed edits/m
   await expect(summary(page)).toBeHidden()
   await expect(page.locator('#nutrition-history')).toBeFocused()
   await expect(history(page)).toContainText('Нет записей еды')
-  await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveValue('Сохранённый черновик')
-  await expect(page.getByLabel('Время приёма — Москва')).toHaveValue(draftTime)
+  await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Добавить разовую еду' }).click()
+  await page.getByLabel('Название строки 1', { exact: true }).fill('Новая еда')
   await page.getByLabel('Время приёма — Москва').fill(`${third}T23:59`)
   await page.getByLabel('Углеводы строки 1, г за исходную порцию').fill('0')
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()

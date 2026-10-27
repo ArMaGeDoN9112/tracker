@@ -15,7 +15,7 @@ async function newDraft(page: Page) {
   return name
 }
 
-test('catalog, Cyrillic search, portions and drafts survive navigation and login', async ({ page }) => {
+test('catalog forms reset on navigation and login; saved products retain portions and search', async ({ page }) => {
   await page.goto('/?section=catalog')
   await signIn(page)
   await expect(page.getByRole('heading', { name: 'Каталог еды', exact: true })).toBeVisible()
@@ -29,11 +29,18 @@ test('catalog, Cyrillic search, portions and drafts survive navigation and login
   await page.getByLabel('Количество порции 1, г', { exact: true }).fill('180')
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await page.goBack()
-  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name)
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await expect(page.getByLabel('Название продукта', { exact: true })).toBeHidden()
   await signIn(page)
-  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name)
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Новый продукт', exact: true }).click()
+  await page.getByLabel('Название продукта', { exact: true }).fill(name)
+  await page.getByLabel('Белки, г на 100 г').fill('10,00')
+  await page.getByLabel('Углеводы, г на 100 г').fill('0')
+  await page.getByRole('button', { name: 'Добавить порцию', exact: true }).click()
+  await page.getByLabel('Название порции 1', { exact: true }).fill('Упаковка')
+  await page.getByLabel('Количество порции 1, г', { exact: true }).fill('180')
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Продукт сохранён' })).toBeVisible()
   await page.getByLabel('Поиск продуктов', { exact: true }).fill(name.toLocaleLowerCase('ru'))
@@ -77,7 +84,7 @@ test('lost response after commit keeps exact request through navigation and logi
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   await expect(page.getByText(name, { exact: true })).toBeHidden()
   await signIn(page)
-  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name)
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveCount(0)
   expect(bodies).toHaveLength(1)
   await page.getByRole('button', { name: 'Повторить сохранение', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Продукт сохранён' })).toBeVisible()
@@ -169,7 +176,7 @@ test('save paused at CSRF cannot automatically continue under a new session', as
   page.on('request', request => { if (request.url().endsWith('/api/products') && request.method() === 'POST') writes++ })
   release()
   await expect(page.getByRole('button', { name: 'Повторить сохранение', exact: true })).toBeEnabled()
-  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveValue(name)
+  await expect(page.getByLabel('Название продукта', { exact: true })).toHaveCount(0)
   expect(writes).toBe(0)
 })
 
@@ -202,7 +209,7 @@ test('eight navigation items, long Cyrillic names and keyboard form fit A at all
   }
 })
 
-test('own photo persists after reload, appears in picker, and can be removed without changing the meal draft', async ({ page }, testInfo) => {
+test('own photo persists after reload, appears in picker, and can be removed after leaving the meal form', async ({ page }, testInfo) => {
   const name = await newDraft(page)
   const png = await page.getByRole('heading', { name: 'Новый продукт', exact: true }).screenshot()
   await page.getByLabel('Фотография еды', { exact: true }).setInputFiles({ name: 'food.png', mimeType: 'image/png', buffer: png })
@@ -242,5 +249,5 @@ test('own photo persists after reload, appears in picker, and can be removed wit
   await page.getByRole('button', { name: 'Сохранить продукт', exact: true }).click()
   await expect(card.getByRole('img')).toHaveAttribute('aria-label', 'Иллюстрация еды')
   await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
-  await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveValue(name)
+  await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveCount(0)
 })

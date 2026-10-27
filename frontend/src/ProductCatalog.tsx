@@ -10,7 +10,7 @@ export type ProductSeed = Pick<Values, 'name' | 'unit' | 'protein' | 'fat' | 'ca
 type Pending = { path: string; method: string; body: string }
 const empty = (): Draft => ({ name: '', unit: 'g', photo: null, protein: '', fat: '', carbohydrate: '', calories: '', portions: [] })
 
-export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selectionDisabled = false, seed, onEditingChange }: { authorized: boolean; visible: boolean; csrfToken: () => Promise<string>; onSelect?: (product: Product) => void; selectionDisabled?: boolean; seed?: ProductSeed | null; onEditingChange?: (editing: boolean) => void }) {
+export function ProductCatalog({ authorized, visible, catalogPage, csrfToken, onSelect, selectionDisabled = false, seed, onEditingChange }: { authorized: boolean; visible: boolean; catalogPage: boolean; csrfToken: () => Promise<string>; onSelect?: (product: Product) => void; selectionDisabled?: boolean; seed?: ProductSeed | null; onEditingChange?: (editing: boolean) => void }) {
   const [products, setProducts] = useState<Product[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
   const [original, setOriginal] = useState<Product | null>(null)
@@ -27,6 +27,12 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
   const [unitConfirmed, setUnitConfirmed] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [latest, setLatest] = useState<Product | null>(null)
+  const formGeneration = useRef(0)
+  useEffect(() => {
+    formGeneration.current++
+    setDraft(null); setOriginal(null); setSearch(''); setError(''); setField(null); setNotice('')
+    setConflict(false); setLatest(null); setUnitConfirmed(false)
+  }, [authorized, visible, catalogPage])
   const sending = useRef(false)
   const generation = useRef(0)
 
@@ -56,6 +62,7 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
   useEffect(() => { onEditingChange?.(!!draft || busy || photoBusy || !!pending) }, [draft, busy, photoBusy, pending, onEditingChange])
 
   async function uploadPhoto(file: File) {
+    const version = formGeneration.current
     setPhotoBusy(true); setError(''); setField(null)
     try {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error('Выберите JPEG, PNG или WebP до 10 МБ.')
@@ -74,6 +81,7 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
           if (photo.length <= 45000) break
         }
         if (photo.length > 45000) throw new Error('Фото слишком детальное. Выберите изображение меньшего размера.')
+        if (version !== formGeneration.current) return
         setDraft(current => current ? { ...current, photo } : null)
       } finally { bitmap.close() }
     } catch (failure) {
@@ -91,15 +99,15 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
     setDraft({ ...draft, unit, protein: '', fat: '', carbohydrate: '', calories: '', portions: [] })
     setUnitConfirmed(false)
   }
-  async function save(event: FormEvent) {
-    event.preventDefault()
-    if (!draft || sending.current || photoBusy) return
+  async function save(event?: FormEvent) {
+    event?.preventDefault()
+    if ((!draft && !pending) || sending.current || photoBusy) return
     sending.current = true; setBusy(true); setError(''); setField(null); setNotice('')
     let committed = confirmed
     try {
       let request = pending
       if (!request) {
-        const { id, revision, name, unit, photo, protein, fat, carbohydrate, calories, portions } = draft
+        const { id, revision, name, unit, photo, protein, fat, carbohydrate, calories, portions } = draft!
         request = { path: id ? `/api/products/${id}` : '/api/products', method: id ? 'PUT' : 'POST', body: JSON.stringify({ name, unit, photo, protein, fat, carbohydrate, calories, portions, operation_id: crypto.randomUUID(), ...(id ? { expected_revision: revision, unit_change_confirmed: unitConfirmed } : {}) }) }
         setPending(request)
       }
@@ -122,11 +130,12 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
     } finally { sending.current = false; setBusy(false) }
   }
   async function loadLatest() {
+    const version = formGeneration.current
     try {
       const response = await privateFetch(`/api/products/${draft!.id}`)
       const result = await response.json()
       if (!response.ok) throw new Error(result.message)
-      setLatest(result)
+      if (version === formGeneration.current) setLatest(result)
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Ошибка сети.') }
   }
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? 'product-error' : undefined })
@@ -168,6 +177,7 @@ export function ProductCatalog({ authorized, visible, csrfToken, onSelect, selec
         </details>
       </article>)}</div>
     </section>
+    {pending && !draft && <><p role="status">Результат запроса нужно проверить. Явный повтор отправит прежние данные и UUID.</p><button disabled={busy} onClick={() => void save()}>Повторить сохранение</button>{error && <p role="alert">{error}</p>}</>}
     <section className="product-editor" aria-label="Карточка продукта" hidden={!draft}>
       {draft && <><h2>{draft.id ? 'Изменение продукта' : 'Новый продукт'}</h2>
         {seed && !draft.id && <p>Предпросмотр на 100 {unit}: значения округлены до сотых, половина вверх. Проверьте и явно сохраните карточку. Исходный приём не изменится.</p>}

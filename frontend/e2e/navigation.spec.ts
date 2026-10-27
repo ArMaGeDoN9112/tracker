@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test('navigation keeps three drafts and a separate selected day through history', async ({ page }) => {
+test('navigation clears forms and keeps the selected day through history', async ({ page }) => {
   await page.goto('/?section=diary&day=2024-02-29')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
@@ -13,7 +13,7 @@ test('navigation keeps three drafts and a separate selected day through history'
   await expect(page.getByRole('region', { name: 'Графики сахара', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Ввод записи', exact: true })).toBeHidden()
   await page.goBack()
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Черновик дневника')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   await page.getByRole('link', { name: 'База', exact: true }).click()
   await expect(page.getByLabel('Комментарий', { exact: true })).toBeHidden()
   await page.getByLabel('Скорость 1, ед/ч').fill('0,45')
@@ -21,11 +21,11 @@ test('navigation keeps three drafts and a separate selected day through history'
   await page.getByLabel('Процент от расписания').fill('125')
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await page.goBack()
-  await expect(page.getByLabel('Процент от расписания')).toHaveValue('125')
+  await expect(page.getByLabel('Процент от расписания')).toHaveValue('100')
   await page.getByRole('link', { name: 'Расписание', exact: true }).click()
-  await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('0,45')
+  await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('')
   await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Черновик дневника')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Время события — Москва')).toHaveValue(time)
   await expect(page.getByLabel('День — Москва')).toHaveValue('2024-02-29')
   await page.getByLabel('День — Москва').fill('2024-03-01')
@@ -54,7 +54,7 @@ for (const day of ['2024-99-99', '0000-01-01', '2024-01-32']) {
   })
 }
 
-test('401 while opening a section hides every private section and keeps all drafts for explicit continuation', async ({ page, context }) => {
+test('401 while opening a section hides private sections and clears forms', async ({ page, context }) => {
   await page.clock.install()
   await page.goto('/')
   const signIn = async () => {
@@ -78,11 +78,11 @@ test('401 while opening a section hides every private section and keeps all draf
   let writes = 0
   page.on('request', request => { if (['POST', 'PUT'].includes(request.method()) && !request.url().includes('/auth/')) writes++ })
   await signIn()
-  await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('0,37')
+  await expect(page.getByLabel('Скорость 1, ед/ч')).toHaveValue('')
   await page.getByRole('link', { name: 'Временная база', exact: true }).click()
-  await expect(page.getByLabel('Процент от расписания')).toHaveValue('137')
+  await expect(page.getByLabel('Процент от расписания')).toHaveValue('100')
   await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('После входа явно')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   expect(writes).toBe(0)
 })
 

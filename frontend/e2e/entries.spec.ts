@@ -114,8 +114,6 @@ test('move, keyboard undo and conflict preserve the draft for comparison', async
     await page.getByLabel('Комментарий', { exact: true }).fill('Мой черновик')
     await page.getByRole('button', { name: 'Сохранить изменения', exact: true }).click()
     await expect(page.getByRole('alert').filter({ hasText: 'другом устройстве' })).toBeVisible()
-    await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-    await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
     await page.getByRole('button', { name: 'Загрузить актуальную запись', exact: true }).click()
     await expect(page.getByLabel('Актуальная запись')).toContainText('Изменение другого устройства')
     if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/conflict-${testInfo.project.name}.png`, fullPage: true })
@@ -262,7 +260,7 @@ test('lost committed response retries the same UUID without duplicate', async ({
   expect(bodies[0]).toBe(bodies[1])
 })
 
-test('expired session keeps draft and requires explicit save after signing in', async ({ page, context }, testInfo) => {
+test('expired session clears form and requires fresh explicit input after signing in', async ({ page, context }, testInfo) => {
   await page.goto('/')
   await signIn(page)
   const day = testInfo.project.name === 'phone' ? '2026-11-21' : '2026-10-21'
@@ -272,7 +270,9 @@ test('expired session keeps draft and requires explicit save after signing in', 
   await page.getByRole('button', { name: 'Сохранить запись', exact: true }).click()
   await expect(page.getByLabel('Пароль', { exact: true })).toBeVisible()
   await signIn(page)
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('После повторного входа')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
+  await page.getByLabel('Время события — Москва').fill(`${day}T10:00`)
+  await page.getByLabel('Комментарий', { exact: true }).fill('После повторного входа')
   await page.getByLabel('День — Москва').fill(day)
   await expect(page.locator('.entries > .entry')).toHaveCount(0)
   await page.getByRole('button', { name: /^(Сохранить запись|Повторить сохранение)$/ }).click()

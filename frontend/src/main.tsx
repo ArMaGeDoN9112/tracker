@@ -56,7 +56,7 @@ function App() {
 
   function expired() {
     setLogin(null)
-    setError('Сессия истекла. Войдите снова; черновики сохранены. Продолжите операцию явно.')
+    setError('Сессия истекла. Войдите снова. Повтор операции доступен только явно.')
   }
   setAccess(login !== null, expired)
 

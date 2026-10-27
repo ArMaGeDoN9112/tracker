@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
-test('month calendar opens the complete Moscow day without losing the draft', async ({ page }, info) => {
+test('month calendar opens the complete Moscow day and clears unfinished input', async ({ page }, info) => {
   await page.goto('/')
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
@@ -56,7 +56,7 @@ test('month calendar opens the complete Moscow day without losing the draft', as
   await expect(page).toHaveURL(new RegExp(`section=calendar&day=${day}`))
   await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
   await expect(calendar).toBeHidden()
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Черновик остаётся')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   await page.goBack()
   await expect(calendar).toBeVisible()
   await expect(details).toContainText('Запись календаря')

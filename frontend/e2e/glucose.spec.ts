@@ -67,7 +67,6 @@ test('glucose periods, gaps, keyboard day navigation and updated summaries', asy
   await page.getByLabel('Подколка, ед.').fill('0,7')
   await page.getByLabel('Причина подколки').selectOption('food')
   await page.getByLabel('Комментарий', { exact: true }).fill('Черновик при просмотре графиков')
-  const draftTime = await page.getByLabel('Время события — Москва').inputValue()
   const month = testInfo.project.name === 'phone' ? '08' : '07'
   const first = `2010-${month}-01`
   const second = `2010-${month}-02`
@@ -119,11 +118,11 @@ test('glucose periods, gaps, keyboard day navigation and updated summaries', asy
   await charts.locator('.recharts-line-dot').last().click()
   await expect(page.getByLabel('День — Москва')).toHaveValue(third)
   await expect(page.getByRole('heading', { name: /^Записи дня/ })).toBeFocused()
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Черновик при просмотре графиков')
-  await expect(page.getByLabel('Время события — Москва')).toHaveValue(draftTime)
-  await expect(page.getByLabel('Сахар, ммоль/л')).toHaveValue('6,5')
-  await expect(page.getByLabel('Подколка, ед.')).toHaveValue('0,7')
-  await expect(page.getByLabel('Причина подколки')).toHaveValue('food')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Время события — Москва')).not.toHaveValue('')
+  await expect(page.getByLabel('Сахар, ммоль/л')).toHaveValue('')
+  await expect(page.getByLabel('Подколка, ед.')).toHaveValue('')
+  await expect(page.getByLabel('Причина подколки')).toHaveValue('')
   await expect(page.locator('.entries > .entry')).toHaveCount(1)
   await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
   if (process.env.DIARY_ACCEPTANCE_DIR) await charts.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/glucose-${testInfo.project.name}.png` })
@@ -139,6 +138,7 @@ test('glucose periods, gaps, keyboard day navigation and updated summaries', asy
   await page.getByLabel('Сахар, ммоль/л').fill('10.0')
   await page.getByLabel('Время события — Москва').fill(`${second}T12:00`)
   await page.getByRole('button', { name: 'Сохранить изменения', exact: true }).click()
+  await expect(page.getByLabel('День — Москва')).toHaveValue(second)
   await page.getByRole('link', { name: 'Аналитика сахара', exact: true }).click()
   await expect(charts.getByTestId('period-average')).toContainText('10,0 ммоль/л · измерений: 3')
   await expect(rows.nth(1)).toContainText('8,0')

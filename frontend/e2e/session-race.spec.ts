@@ -31,6 +31,6 @@ test('old save paused at CSRF cannot resume automatically under a new login', as
   page.on('request', request => { if (request.url().endsWith('/api/entries') && request.method() === 'POST') writes++ })
   release()
   await expect(page.getByRole('button', { name: 'Повторить сохранение', exact: true })).toBeEnabled()
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Не отправлять после входа')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
   expect(writes).toBe(0)
 })

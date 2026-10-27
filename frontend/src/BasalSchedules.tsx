@@ -6,8 +6,8 @@ import { BasalChart } from './BasalDayChart'
 type Version = { id: string; starts_at: string; ends_at: string | null; intervals: { minute: number; rate: string }[] }
 type Preview = { startsAt: string; endsAt: string | null }
 
-export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
-  active: boolean; initialTime: string; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
+export function BasalSchedules({ active, visible, csrfToken, onSaved }: {
+  active: boolean; visible: boolean; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
 }) {
   const [versions, setVersions] = useState<Version[]>([])
   const [start, setStart] = useState('')
@@ -25,6 +25,18 @@ export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
   const [historyError, setHistoryError] = useState('')
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const sending = useRef(false)
+  const formGeneration = useRef(0)
+  const timeInitialized = useRef(false)
+  useEffect(() => {
+    formGeneration.current++
+    timeInitialized.current = false
+    setStart(''); setCandidates([]); setInstant(''); setPreview(null); setError(''); setField(null); setSaved(false)
+    setIntervals([{ time: '00:00', rate: '' }]); setExistingId(null)
+    const version = formGeneration.current
+    if (active && visible) void request('/api/entry-form').then(form => {
+      if (version === formGeneration.current && !timeInitialized.current) { setStart(form.local_time); timeInitialized.current = true }
+    }).catch(() => { if (version === formGeneration.current) setError('Не удалось получить время формы. Перезагрузите страницу.') })
+  }, [active, visible])
 
   async function request(path: string, options?: RequestInit) {
     const response = await privateFetch(path, { cache: 'no-store', ...options })
@@ -53,20 +65,19 @@ export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
   }
 
   useEffect(() => {
-    if (active) loadHistory().catch(() => {})
-  }, [active])
+    if (active && visible) loadHistory().catch(() => {})
+  }, [active, visible])
 
-  useEffect(() => {
-    if (!start && initialTime) setStart(initialTime)
-  }, [initialTime])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (sending.current || !active) return
     sending.current = true; setBusy(true); setError(''); setField(null); setExistingId(null); setSaved(false)
+    const version = formGeneration.current
     try {
       if (!preview && !pending) {
         const result = await request(`/api/moscow-time?local_time=${encodeURIComponent(start)}`)
+        if (version !== formGeneration.current) return
         setCandidates(result.candidates)
         if (result.candidates.length > 1 && !result.candidates.includes(instant)) {
           setField('starts_at')
@@ -75,6 +86,7 @@ export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
         const startsAt = instant || result.candidates[0]
         const history = await loadHistory()
         const next = history.find(version => Date.parse(version.starts_at) > Date.parse(startsAt))
+        if (version !== formGeneration.current) return
         setPreview({ startsAt, endsAt: next?.starts_at ?? null })
       } else {
         const body = pending ?? JSON.stringify({ operation_id: crypto.randomUUID(), starts_at: preview!.startsAt,
@@ -111,7 +123,7 @@ export function BasalSchedules({ active, initialTime, csrfToken, onSaved }: {
     <form onSubmit={submit} onChange={() => { setPreview(null); setSaved(false) }} aria-busy={busy}>
       <fieldset disabled={busy || pending !== null}>
         <label htmlFor="schedule-start">Начало расписания — Москва</label>
-        <input id="schedule-start" type="datetime-local" step="60" required value={start} onChange={e => { setStart(e.target.value); setCandidates([]); setInstant('') }} {...invalid('starts_at')} />
+        <input id="schedule-start" type="datetime-local" step="60" required value={start} onChange={e => { timeInitialized.current = true; setStart(e.target.value); setCandidates([]); setInstant('') }} {...invalid('starts_at')} />
         {candidates.length > 1 && <><label htmlFor="schedule-offset">Смещение UTC расписания</label><select id="schedule-offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
         {intervals.map((interval, index) => <div className="schedule-interval" key={index}>
           <div className="schedule-interval-fields"><div>

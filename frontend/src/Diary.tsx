@@ -37,7 +37,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   const [field, setField] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<string[]>([])
   const [instant, setInstant] = useState('')
-  const [pending, setPending] = useState<string | null>(null)
+  const [pending, setPending] = useState<{ path: string; method: string; body: string } | null>(null)
   const [editing, setEditing] = useState<Entry | null>(null)
   const [conflictId, setConflictId] = useState<string | null>(null)
   const [latest, setLatest] = useState<Entry | null>(null)
@@ -52,11 +52,12 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   useEffect(() => {
     let cancelled = false
     setFormBasal(null)
-    if (!active || !localTime) return
+    if (!active || section !== 'diary' || !localTime) return
     async function updateBasal() {
       const result = editing && localTime === localMinute(editing.occurred_at) && !instant
         ? { candidates: [editing.occurred_at] }
         : await request(`/api/moscow-time?local_time=${encodeURIComponent(localTime)}`)
+      if (cancelled) return
       const at = instant || (result.candidates.length === 1 ? result.candidates[0] : '')
       if (!at) return
       const resultBasal = await request(`/api/basal?at=${encodeURIComponent(at)}`)
@@ -64,7 +65,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     }
     updateBasal().catch(() => { if (!cancelled) setError('Не удалось вычислить базу для выбранного времени.') })
     return () => { cancelled = true }
-  }, [active, localTime, instant, editing, basalGeneration])
+  }, [active, section, localTime, instant, editing, basalGeneration])
 
   useEffect(() => {
     if (!undo) return
@@ -73,6 +74,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   }, [undo])
 
   function edit(row: Entry) {
+    initialized.current = true
     setEditing(row)
     setLocalTime(localMinute(row.occurred_at))
     setGlucose(row.glucose ?? ''); setBolus(row.bolus); setReason(row.reason ?? ''); setComment(row.comment)
@@ -83,8 +85,10 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
   async function cancelEdit() {
     if (sending.current || !active) return
     sending.current = true; setBusy(true)
+    const version = formGeneration.current
     try {
       const form = await request('/api/entry-form')
+      if (version !== formGeneration.current) return
       setEditing(null); setLocalTime(form.local_time)
       setGlucose(''); setBolus(''); setReason(''); setComment(''); setCandidates([]); setInstant('')
       setConflictId(null); setLatest(null); setError(''); setField(null)
@@ -150,7 +154,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       const response = await privateFetch(`/api/day?day=${selected}`, { cache: 'no-store' })
       if (!response.ok) throw new Error('Не удалось загрузить день.')
       const result = await response.json()
-      if (sequence === dayRequest.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes); setTemporaryBasals(result.temporary_basals); setTemporaryPercent(result.temporary_percent) }
+      if (sequence === dayRequest.current && selected === selectedDay.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes); setTemporaryBasals(result.temporary_basals); setTemporaryPercent(result.temporary_percent) }
     } catch (failure) {
       if (sequence === dayRequest.current) setDayError('Не удалось загрузить день. Перезагрузите страницу.')
       if (sequence === dayRequest.current) throw failure
@@ -159,20 +163,25 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     }
   }
 
+  const formGeneration = useRef(0)
+  useEffect(() => {
+    formGeneration.current++
+    setGlucose(''); setBolus(''); setReason(''); setComment(''); setLocalTime('')
+    setEditing(null); setCandidates([]); setInstant(''); setConflictId(null); setLatest(null)
+    setError(''); setField(null); setNotice('')
+    initialized.current = false
+    if (active && section === 'diary') openForm().catch(() => setError('Не удалось открыть форму. Повторите подключение.'))
+  }, [active, section])
+
   async function openForm() {
+    const version = formGeneration.current
     const result = await request('/api/entry-form')
-    setLocalTime(result.local_time)
+    if (version !== formGeneration.current) return
+    if (!initialized.current) setLocalTime(result.local_time)
     if (!selectedDay.current) onDay(result.local_time.slice(0, 10))
     initialized.current = true
     await loadDay(selectedDay.current || result.local_time.slice(0, 10))
   }
-
-  useEffect(() => {
-    if (active && !initialized.current) {
-      openForm().catch(() => setError('Не удалось открыть форму. Повторите подключение.'))
-    }
-    // The draft and its operation UUID stay mounted while the user signs in again.
-  }, [active])
 
   useEffect(() => {
     ++dayRequest.current
@@ -188,10 +197,11 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     setError('')
     setNotice('')
     setField(null)
-    let body = pending
+    const version = formGeneration.current
+    let operation = pending
     let committed = false
     try {
-      if (!body) {
+      if (!operation) {
         const result = editing && localTime === localMinute(editing.occurred_at) && !instant
           ? { candidates: [editing.occurred_at] }
           : await request(`/api/moscow-time?local_time=${encodeURIComponent(localTime)}`)
@@ -200,11 +210,13 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
           setField('occurred_at')
           throw new Error('Московское время повторяется. Выберите смещение UTC.')
         }
-        body = JSON.stringify({ operation_id: crypto.randomUUID(), occurred_at: instant || result.candidates[0], glucose: glucose || null, bolus, reason: reason || null, comment, ...(editing ? { expected_revision: editing.revision } : {}) })
-        setPending(body)
+        const body = JSON.stringify({ operation_id: crypto.randomUUID(), occurred_at: instant || result.candidates[0], glucose: glucose || null, bolus, reason: reason || null, comment, ...(editing ? { expected_revision: editing.revision } : {}) })
+        if (version !== formGeneration.current) return
+        operation = { path: editing ? `/api/entries/${editing.id}` : '/api/entries', method: editing ? 'PUT' : 'POST', body }
+        setPending(operation)
       }
       const csrf = await csrfToken()
-      const response = await privateFetch(editing ? `/api/entries/${editing.id}` : '/api/entries', { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body })
+      const response = await privateFetch(operation.path, { method: operation.method, headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: operation.body })
       const result = await response.json()
       if (!response.ok) {
         if ([404, 409, 422].includes(response.status)) setPending(null)
@@ -215,12 +227,13 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
       committed = true
       setSaveConfirmed(true)
       setEntryGeneration(value => value + 1)
-      const savedDay = localTime.slice(0, 10)
-      onDay(savedDay)
-      await loadDay(savedDay)
+      const savedDay = localMinute(JSON.parse(operation.body).occurred_at).slice(0, 10)
+      if (version === formGeneration.current) onDay(savedDay)
+      if (version === formGeneration.current || selectedDay.current === savedDay) await loadDay(savedDay)
       const form = await request('/api/entry-form')
       setPending(null)
       setSaveConfirmed(false)
+      if (version !== formGeneration.current) return
       setNotice('Запись сохранена.')
       setEditing(null); setConflictId(null); setLatest(null)
       setGlucose(''); setBolus(''); setReason(''); setComment(''); setCandidates([]); setInstant('')
@@ -275,7 +288,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         {fieldError('bolus')}
         </div></div>
         <label htmlFor="occurred_at">Время события — Москва</label>
-        <input id="occurred_at" type="datetime-local" step="60" required value={localTime} onChange={e => { setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />
+        <input id="occurred_at" type="datetime-local" step="60" required value={localTime} onChange={e => { initialized.current = true; setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />
         {fieldError('occurred_at')}
         {candidates.length > 1 && <><label htmlFor="offset">Смещение UTC</label><select id="offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
         <p className="muted" data-testid="form-basal">База: {basalText(formBasal)} · по расписанию</p>
@@ -293,7 +306,7 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
     </form>}
     {error && !['glucose', 'bolus', 'occurred_at', 'reason', 'comment', 'entry-fields'].includes(field ?? '') && <p id="entry-error" role="alert" className="error">{error}</p>}
     {notice && <p role="status" className="entry-notice">{notice}</p>}
-    {conflictId && <button disabled={busy} onClick={() => request(`/api/entries/${conflictId}`).then(setLatest).catch(failure => setError(failure.message))}>Загрузить актуальную запись</button>}
+    {conflictId && <button disabled={busy} onClick={() => { const version = formGeneration.current; void request(`/api/entries/${conflictId}`).then(row => { if (version === formGeneration.current) setLatest(row) }).catch(failure => setError(failure.message)) }}>Загрузить актуальную запись</button>}
     {latest && <section aria-label="Актуальная запись">
       <p>Редакция {latest.revision} · {latest.deleted_at ? 'Удалена' : 'Сохранена'} · Москва {localMinute(latest.occurred_at).replace('T', ' ')}</p>
       <p>Сахар: {latest.glucose ?? 'не указан'} · Подколка: {latest.bolus} · Причина: {latest.reason ? reasons[latest.reason] : 'без причины'}</p>
@@ -363,13 +376,13 @@ export function Diary({ active, section, day, temporary, onDay, onView, csrfToke
         <a href={`?section=basal&view=temporary${day ? `&day=${day}` : ''}`} aria-current={temporary ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); onView(true) } }}>Временная база</a>
       </nav>
     <div hidden={temporary}>
-    <BasalSchedules active={active} initialTime={localTime} csrfToken={csrfToken} onSaved={async () => {
+    <BasalSchedules active={active} visible={section === 'basal' && !temporary} csrfToken={csrfToken} onSaved={async () => {
       setBasalGeneration(value => value + 1)
       if (selectedDay.current) await loadDay(selectedDay.current)
     }} />
     </div>
     <div hidden={!temporary}>
-    <TemporaryBasal active={active} initialTime={localTime} csrfToken={csrfToken} onSaved={async () => {
+    <TemporaryBasal active={active} visible={section === 'basal' && temporary} csrfToken={csrfToken} onSaved={async () => {
       setBasalGeneration(value => value + 1)
       if (selectedDay.current) await loadDay(selectedDay.current)
     }} />

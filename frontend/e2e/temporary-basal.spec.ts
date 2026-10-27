@@ -32,8 +32,8 @@ test('temporary history retries and occupied start compares without losing the d
   await expect(section.getByLabel('Процент от расписания')).toHaveValue('125')
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await page.getByRole('link', { name: 'База', exact: true }).click()
-  await expect(section.getByTestId('temporary-latest')).toBeVisible()
-  await section.getByRole('button', { name: 'Закрыть сравнение' }).click()
+  await expect(section.getByTestId('temporary-latest')).toHaveCount(0)
+  await expect(section.getByLabel('Процент от расписания')).toHaveValue('100')
   await section.getByLabel('Начало временной базы — Москва').fill(`${day}T11:00`)
   await section.getByRole('button', { name: 'Проверить период временной базы', exact: true }).click()
   await expect(section.getByRole('button', { name: 'Сохранить временную базу', exact: true })).toBeEnabled()
@@ -183,7 +183,7 @@ test('correct historical end, compare conflicts, delete and undo temporary basal
   await expect(page.getByRole('button', { name: 'Отменить удаление временной базы' })).toHaveCount(0)
 })
 
-test('create temporary basal, retry lost response after login, replace and inspect next day', async ({ page, context }, testInfo) => {
+test('create temporary basal, retry lost response after login, replace and inspect next day', async ({ page }, testInfo) => {
   const day = testInfo.project.name === 'phone' ? '2036-08-17' : '2035-08-17'
   const tomorrow = day.replace('17', '18')
   await page.goto('/')
@@ -206,17 +206,17 @@ test('create temporary basal, retry lost response after login, replace and inspe
     await route.abort('failed')
   }, { times: 1 })
   await section.getByRole('button', { name: 'Сохранить временную базу', exact: true }).click()
+  await expect(section.getByRole('button', { name: 'Повторить сохранение временной базы', exact: true })).toBeEnabled()
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.getByRole('link', { name: 'База', exact: true }).click()
-  await context.clearCookies()
-  await section.getByRole('button', { name: 'Повторить сохранение временной базы', exact: true }).click()
+  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Вход в дневник' })).toBeVisible()
   const beforeLogin = writes.length
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(section.getByLabel('Процент от расписания')).toHaveValue('120')
-  await expect(section.getByLabel('Длительность, мин')).toHaveValue('240')
+  await page.getByRole('link', { name: 'База', exact: true }).click()
+  await expect(section.getByLabel('Процент от расписания')).toHaveValue('100')
+  await expect(section.getByLabel('Длительность, мин')).toHaveValue('60')
   expect(writes).toHaveLength(beforeLogin)
   await section.getByRole('button', { name: 'Повторить сохранение временной базы', exact: true }).click()
   await expect(section.getByRole('status').filter({ hasText: 'сохранена' })).toBeVisible()

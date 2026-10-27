@@ -22,7 +22,7 @@ test('settings show backup delay, local-only copy and sanitized failure', async 
   await expect(backup).toContainText('26 часов')
   await expect(backup).toContainText('Проверка восстановления не прошла')
   await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
-  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('Черновик перед проверкой копий')
+  await expect(page.getByLabel('Комментарий', { exact: true })).toHaveValue('')
 })
 
 test('backup state loads once and stays unchanged while the page is open', async ({ page }) => {

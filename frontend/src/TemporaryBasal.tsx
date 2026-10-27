@@ -7,8 +7,8 @@ export type TemporaryPeriod = { id: string; starts_at: string; ends_at: string; 
 type Preview = { startsAt: string; endsAt: string; effectiveEnd: string; affectedStart: string; affectedEnd: string }
 type Action = { path: string; method: string; body: string; deleting?: boolean; restoring?: boolean }
 
-export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
-  active: boolean; initialTime: string; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
+export function TemporaryBasal({ active, visible, csrfToken, onSaved }: {
+  active: boolean; visible: boolean; csrfToken: () => Promise<string>; onSaved: () => Promise<void>
 }) {
   const [start, setStart] = useState('')
   const [duration, setDuration] = useState('60')
@@ -34,11 +34,27 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
   const [field, setField] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const sending = useRef(false)
-
-  useEffect(() => { if (!start && initialTime) setStart(initialTime) }, [initialTime])
+  const formGeneration = useRef(0)
+  const timeInitialized = useRef(false)
+  const initialTime = useRef('')
   useEffect(() => {
-    if (active) loadHistory().catch(() => {})
-  }, [active])
+    formGeneration.current++
+    timeInitialized.current = false
+    initialTime.current = ''
+    setStart(''); setCandidates([]); setInstant(''); setPreview(null); setError(''); setField(null); setSaved(false)
+    setDuration('60'); setPercent('100'); setEnd(''); setEditing(null); setDeleting(false)
+    setConflict(null); setLatest(null); setEndCandidates([]); setEndInstant('')
+    const version = formGeneration.current
+    if (active && visible) void request('/api/entry-form').then(form => {
+      if (version !== formGeneration.current) return
+      initialTime.current = form.local_time
+      if (!timeInitialized.current) { setStart(form.local_time); timeInitialized.current = true }
+    }).catch(() => { if (version === formGeneration.current) setError('Не удалось получить время формы. Перезагрузите страницу.') })
+  }, [active, visible])
+
+  useEffect(() => {
+    if (active && visible) loadHistory().catch(() => {})
+  }, [active, visible])
   useEffect(() => {
     if (!undo) return
     const timer = window.setTimeout(() => setUndo(null), Math.max(0, undo.until - performance.now()))
@@ -58,10 +74,11 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
   }
 
   async function loadLatest() {
+    const version = formGeneration.current
     try {
       const row = await request(`/api/temporary-basals/${conflict}`)
       await loadHistory()
-      setLatest(row)
+      if (version === formGeneration.current) setLatest(row)
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось загрузить актуальную временную базу.') }
   }
 
@@ -85,16 +102,19 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
   }
 
   function select(row: TemporaryPeriod, remove = false) {
+    timeInitialized.current = true
     setEditing(row); setDeleting(remove); setStart(localMinute(row.starts_at)); setEnd(localMinute(row.ends_at))
     setPercent(String(row.percent)); setCandidates([]); setInstant(''); setEndCandidates([]); setEndInstant('')
     setPreview(null); setError(''); setSaved(false); setConflict(null); setLatest(null)
   }
 
   function cancel() {
-    setEditing(null); setDeleting(false); setStart(initialTime); setPreview(null); setConflict(null); setLatest(null); setCandidates([]); setInstant(''); setEndCandidates([]); setEndInstant('')
+    timeInitialized.current = false
+    setEditing(null); setDeleting(false); setStart(initialTime.current); setPreview(null); setConflict(null); setLatest(null); setCandidates([]); setInstant(''); setEndCandidates([]); setEndInstant('')
   }
 
   async function save(action: Action) {
+    const version = formGeneration.current
     setPending(action)
     const csrf = await csrfToken()
     const result = await request(action.path, { method: action.method, headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: action.body })
@@ -111,7 +131,7 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
       return
     }
     setPending(null); setPreview(null)
-    if (editing) cancel()
+    if (version === formGeneration.current && editing) cancel()
     if (updates.slice(1).some(update => update.status === 'rejected')) setError('Временная база сохранена, но обновление данных не удалось. Перезагрузите страницу.')
   }
 
@@ -130,6 +150,7 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
     if (sending.current || !active) return
     sending.current = true; setBusy(true); setError(''); setField(null)
     if (!pending) setSaved(false)
+    const version = formGeneration.current
     try {
       if (!preview && !pending) {
         async function resolve(value: string, original: string | undefined, chosen: string, isEnd = false): Promise<string> {
@@ -167,6 +188,7 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
           const newEnd = ends.get(row.id)!
           if (newEnd !== Date.parse(row.effective_ends_at)) boundaries.push(newEnd, Date.parse(row.effective_ends_at))
         }
+        if (version !== formGeneration.current) return
         setPreview({ startsAt, endsAt: new Date(endMs).toISOString(), effectiveEnd: new Date(effectiveEnd).toISOString(),
           affectedStart: new Date(Math.min(...boundaries)).toISOString(), affectedEnd: new Date(Math.max(...boundaries)).toISOString() })
       } else {
@@ -193,7 +215,7 @@ export function TemporaryBasal({ active, initialTime, csrfToken, onSaved }: {
       {editing && <p>{deleting ? 'Удаление временной базы' : 'Исправление / досрочное завершение временной базы'}. Исходная длительность: {editing.duration_minutes} мин.</p>}
       <fieldset disabled={busy || pending !== null || deleting}>
         <label htmlFor="temporary-start">Начало временной базы — Москва</label>
-        <input id="temporary-start" type="datetime-local" step="60" required value={start} onChange={e => { setStart(e.target.value); setCandidates([]); setInstant('') }} {...invalid('starts_at')} />
+        <input id="temporary-start" type="datetime-local" step="60" required value={start} onChange={e => { timeInitialized.current = true; setStart(e.target.value); setCandidates([]); setInstant('') }} {...invalid('starts_at')} />
         {candidates.length > 1 && <><label htmlFor="temporary-offset">Смещение UTC временной базы</label><select id="temporary-offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
         {!editing ? <><label htmlFor="temporary-duration">Длительность, мин</label>
         <input id="temporary-duration" type="number" inputMode="numeric" min="1" max="2147483647" step="1" required value={duration} onChange={e => setDuration(e.target.value)} {...invalid('duration_minutes')} />

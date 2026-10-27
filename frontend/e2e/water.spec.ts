@@ -25,7 +25,7 @@ async function start(page: Page) {
   await expect(page.getByRole('button', { name: 'Добавить 250 мл', exact: true })).toBeVisible()
 }
 
-test('water quick/manual entry, settings, move and global undo preserve draft', async ({ page }) => {
+test('water quick/manual entry, settings, move and global undo survive form reset', async ({ page }) => {
   await start(page)
   await page.getByRole('button', { name: 'Добавить 250 мл', exact: true }).click()
   await expect(page.getByText('Вода сохранена. Показана актуальная история.', { exact: true })).toBeVisible()
@@ -54,7 +54,7 @@ test('water quick/manual entry, settings, move and global undo preserve draft', 
   await page.getByRole('button', { name: 'Отменить удаление воды', exact: true }).click()
   await page.getByRole('link', { name: 'Ввод питания', exact: true }).click()
   await expect(page.getByText('Сумма воды: 444 мл', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Объём воды, мл', { exact: true })).toHaveValue('123')
+  await expect(page.getByLabel('Объём воды, мл', { exact: true })).toHaveValue('')
 })
 
 async function headers(page: Page) {
@@ -116,8 +116,6 @@ test('field error, committed refresh failure and peer water revision preserve in
   } })).ok()).toBeTruthy()
   await page.getByRole('button', { name: 'Сохранить воду', exact: true }).click()
   await expect(page.locator('#water-error')).toContainText('изменена на другом устройстве')
-  await page.getByRole('link', { name: 'Ввод сахара', exact: true }).click()
-  await page.goBack()
   await expect(page.getByLabel('Объём воды, мл', { exact: true })).toHaveValue('444')
   await page.getByRole('button', { name: 'Загрузить актуальные данные воды', exact: true }).click()
   await expect(page.getByLabel('Актуальная вода')).toContainText('555 мл')
@@ -139,8 +137,6 @@ test('settings conflict and lost response keep draft; replay reads latest empty 
   } })).ok()).toBeTruthy()
   await page.getByRole('button', { name: 'Сохранить кнопки воды', exact: true }).click()
   await expect(page.locator('#water-error')).toContainText('изменены на другом устройстве')
-  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
-  await page.goBack()
   await expect(page.getByLabel('Объёмы кнопок воды, мл')).toHaveValue('111, 222')
   await page.getByRole('button', { name: 'Загрузить актуальные данные воды', exact: true }).click()
   await expect(page.getByLabel('Актуальные кнопки воды')).toContainText('777')
@@ -240,7 +236,7 @@ test('late settings response cannot replace acknowledged newer buttons', async (
   await expect(page.getByRole('button', { name: 'Добавить 250 мл', exact: true })).toHaveCount(0)
 })
 
-test('intentionally empty water time survives navigation and login', async ({ page }) => {
+test('intentionally empty water time resets on navigation and login', async ({ page }) => {
   await start(page)
   await expect(page.getByLabel('Время воды — Москва', { exact: true })).not.toHaveValue('')
   await page.getByLabel('Объём воды, мл', { exact: true }).fill('123')
@@ -249,10 +245,10 @@ test('intentionally empty water time survives navigation and login', async ({ pa
   const initialized = page.waitForResponse(response => response.url().endsWith('/api/entry-form'))
   await page.goBack()
   await initialized
-  await expect(page.getByLabel('Время воды — Москва', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Время воды — Москва', { exact: true })).not.toHaveValue('')
   await page.getByRole('button', { name: 'Выйти', exact: true }).click()
   await expect(page.getByLabel('Объём воды, мл', { exact: true })).toBeHidden()
   await signIn(page)
-  await expect(page.getByLabel('Объём воды, мл', { exact: true })).toHaveValue('123')
-  await expect(page.getByLabel('Время воды — Москва', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Объём воды, мл', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Время воды — Москва', { exact: true })).not.toHaveValue('')
 })

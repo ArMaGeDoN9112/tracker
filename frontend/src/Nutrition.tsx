@@ -11,7 +11,7 @@ type Values = Record<Nutrient, string | null>
 type Total = { value: string | null; known_count: number; unknown_count: number; incomplete: boolean }
 export type Totals = Record<Nutrient, Total>
 type Line = Values & { id: string; kind: 'product' | 'one_off'; name: string; unit: 'g' | 'ml' | null; quantity: string | null; basis_quantity: string | null; product_id: string | null; product_revision: number | null; portion: Portion | null }
-type DraftLine = Omit<Line, 'basis_quantity'> & { basis_quantity?: string | null; portions?: Portion[] }
+type FormLine = Omit<Line, 'basis_quantity'> & { basis_quantity?: string | null; portions?: Portion[] }
 type Meal = { id: string; occurred_at: string; category: string | null; revision: number; deleted_at: string | null; lines: (Line & { totals: Values })[]; totals: Totals }
 export type Day = { day: string; meals: Meal[]; totals: Totals; water: { id: string; occurred_at: string; volume_ml: number }[]; water_total_ml: number | null }
 type Pending = { path: string; method: string; body: string; action: 'save' | 'delete' | 'restore' }
@@ -38,7 +38,7 @@ export function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; 
 }
 
 export function Nutrition({ authorized, visible, summaryVisible, catalogVisible, day, onDay, csrfToken }: { authorized: boolean; visible: boolean; summaryVisible: boolean; catalogVisible: boolean; day: string; onDay: (day: string, open?: boolean) => void; csrfToken: () => Promise<string> }) {
-  const [lines, setLines] = useState<DraftLine[]>([])
+  const [lines, setLines] = useState<FormLine[]>([])
   const [localTime, setLocalTime] = useState('')
   const [category, setCategory] = useState('')
   const [editing, setEditing] = useState<Meal | null>(null)
@@ -56,7 +56,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   const [conflict, setConflict] = useState<string | null>(null)
   const [latest, setLatest] = useState<Meal | null>(null)
   const [undo, setUndo] = useState<{ id: string; revision: number; until: number } | null>(null)
-  const [conversion, setConversion] = useState<DraftLine | null>(null)
+  const [conversion, setConversion] = useState<FormLine | null>(null)
   const [conversionQuantity, setConversionQuantity] = useState('')
   const [conversionUnit, setConversionUnit] = useState<'g' | 'ml'>('g')
   const [productSeed, setProductSeed] = useState<ProductSeed | null>(null)
@@ -86,9 +86,19 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       throw failure
     } finally { if (sequence === generation.current) setLoading(false) }
   }
+  const formGeneration = useRef(0)
+  useEffect(() => {
+    formGeneration.current++
+    setLines([]); setCategory(''); setEditing(null); setCandidates([]); setInstant(''); setLocalTime('')
+    setConflict(null); setLatest(null); setError(''); setField(null); setNotice('')
+    setConversion(null); setConversionQuantity(''); setConversionUnit('g'); setProductSeed(null); setChoosingProduct(false)
+    initialized.current = false
+  }, [authorized, visible])
+
   async function initialize() {
+    const version = formGeneration.current
     const form = await read<{ local_time: string }>('/api/entry-form')
-    if (!initialized.current) {
+    if (version === formGeneration.current && !initialized.current) {
       setLocalTime(form.local_time); initialized.current = true
       if (!selectedDay.current) onDay(form.local_time.slice(0, 10))
     }
@@ -113,8 +123,10 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   async function selectProduct(product: Product) {
     if (sending.current || !authorized) return
     sending.current = true; setBusy(true); setError(''); setField(null)
+    const version = formGeneration.current
     try {
       const current = await read<Product>(`/api/products/${product.id}`)
+      if (version !== formGeneration.current) return
       const { id, revision, name, unit, protein, fat, carbohydrate, calories, portions } = current
       setLines(rows => [...rows, { id: crypto.randomUUID(), kind: 'product', name, unit, quantity: '100', basis_quantity: '100.00',
         protein, fat, carbohydrate, calories, product_id: id, product_revision: revision, portion: null, portions }])
@@ -125,6 +137,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     finally { sending.current = false; setBusy(false) }
   }
   function edit(meal: Meal) {
+    initialized.current = true
     setEditing(meal); setLocalTime(localMinute(meal.occurred_at)); setCategory(meal.category ?? '')
     setLines(meal.lines.map(({ totals, ...line }) => line))
     setCandidates([]); setInstant(''); setConflict(null); setLatest(null); setError(''); setField(null); setNotice('')
@@ -133,17 +146,19 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   async function repeat(meal: Meal) {
     if (sending.current || !authorized) return
     sending.current = true; setBusy(true); setError('')
+    const version = formGeneration.current
     try {
-      const draft = await read<{ occurred_at: string; category: string | null; lines: Line[] }>(`/api/meals/${meal.id}/repeat-form`)
-      setEditing(null); setLines(draft.lines); setCategory(draft.category ?? '')
-      setLocalTime(localMinute(draft.occurred_at)); setInstant(draft.occurred_at); setCandidates([])
+      const form = await read<{ occurred_at: string; category: string | null; lines: Line[] }>(`/api/meals/${meal.id}/repeat-form`)
+      if (version !== formGeneration.current) return
+      setEditing(null); setLines(form.lines); setCategory(form.category ?? '')
+      setLocalTime(localMinute(form.occurred_at)); setInstant(form.occurred_at); setCandidates([])
       initialized.current = true; setConflict(null); setLatest(null); setField(null)
-      setNotice('Повтор открыт в новом черновике. Проверьте состав и время; запись появится после сохранения.')
+      setNotice('Повтор открыт в новой форме. Проверьте состав и время; запись появится после сохранения.')
       requestAnimationFrame(() => document.getElementById('meal-form-title')?.focus())
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось открыть повтор. Попробуйте снова.') }
     finally { sending.current = false; setBusy(false) }
   }
-  function openProduct(line: DraftLine) {
+  function openProduct(line: FormLine) {
     const { portions, ...snapshot } = line
     setConversion(snapshot); setConversionQuantity(''); setConversionUnit(line.unit ?? 'g'); setError('')
     requestAnimationFrame(() => document.getElementById('conversion-title')?.focus())
@@ -151,12 +166,14 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   async function convertProduct() {
     if (!conversion || sending.current || catalogEditing || !authorized) return
     sending.current = true; setBusy(true); setError(''); setField(null)
+    const version = formGeneration.current
     try {
       const csrf = await csrfToken()
       const response = await privateFetch('/api/meal-product-preview', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
         body: JSON.stringify({ line: conversion, unit: conversionUnit, basis_quantity: conversionQuantity || null }) })
       const result = await response.json()
       if (!response.ok) { setField(result.field ?? null); throw new Error(result.message) }
+      if (version !== formGeneration.current) return
       setProductSeed(result); setConversion(null); setChoosingProduct(true)
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось рассчитать карточку.') }
     finally { sending.current = false; setBusy(false) }
@@ -167,6 +184,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     void initialize().catch(() => setError('Не удалось получить время формы. Повторите подключение.'))
   }
   async function send(request: Pending) {
+    const version = formGeneration.current
     const started = performance.now()
     let committed = confirmed && pending?.body === request.body
     try {
@@ -189,7 +207,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       } else if (request.action === 'restore') setUndo(null)
       if (selectedDay.current) await loadDay(selectedDay.current)
       setPending(null); setConfirmed(false); setConflict(null); setLatest(null)
-      if (request.action === 'save') clear()
+      if (request.action === 'save' && version === formGeneration.current) clear()
       setNotice(request.action === 'save' ? current.deleted_at ? 'Сохранение подтверждено; приём уже удалён.' : 'Приём пищи сохранён. Показана актуальная история.' : request.action === 'delete' ? 'Удаление подтверждено.' : 'Восстановление подтверждено.')
     } catch (failure) {
       setError(committed ? 'Операция подтверждена сервером, но обновление не удалось. Повторите запрос для проверки.' : failure instanceof Error ? failure.message : 'Ошибка сети. Повторите запрос явно.')
@@ -199,6 +217,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     event.preventDefault()
     if (sending.current || !authorized) return
     sending.current = true; setBusy(true); setError(''); setField(null); setNotice('')
+    const version = formGeneration.current
     try {
       let request = pending
       if (!request) {
@@ -207,6 +226,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
         if (time.candidates.length !== 1 && !time.candidates.includes(instant)) {
           setCandidates(time.candidates); setField('occurred_at'); throw new Error('Выберите смещение UTC для повторяющегося московского времени.')
         }
+        if (version !== formGeneration.current) return
         request = { path: editing ? `/api/meals/${editing.id}` : '/api/meals', method: editing ? 'PUT' : 'POST', action: 'save',
           body: JSON.stringify({ operation_id: crypto.randomUUID(), occurred_at: instant || time.candidates[0], category: category || null,
             lines: lines.map(({ portions, ...line }) => line), ...(editing ? { expected_revision: editing.revision } : {}) }) }
@@ -248,14 +268,14 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
           {!localTime && <button onClick={() => void initialize().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение питания</button>}
           <form onSubmit={save} aria-busy={busy}>
             <fieldset disabled={locked}>
-              <label htmlFor="meal-time">Время приёма — Москва</label><input id="meal-time" type="datetime-local" step="60" required value={localTime} onChange={e => { setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />{inlineError('occurred_at')}
+              <label htmlFor="meal-time">Время приёма — Москва</label><input id="meal-time" type="datetime-local" step="60" required value={localTime} onChange={e => { initialized.current = true; setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />{inlineError('occurred_at')}
               {candidates.length > 1 && <><label htmlFor="meal-offset">Смещение времени приёма</label><select id="meal-offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение UTC</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
               <label htmlFor="meal-category">Категория приёма</label><select id="meal-category" value={category} onChange={e => setCategory(e.target.value)} {...invalid('category')}><option value="">Без категории</option>{categories.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
               <h3>Состав</h3>{!lines.length && <p>Добавьте продукт из каталога или разовую еду.</p>}
               <button type="button" onClick={() => setLines(current => [...current, { id: crypto.randomUUID(), kind: 'one_off', name: '', unit: null, quantity: null, protein: null, fat: null, carbohydrate: null, calories: null, product_id: null, product_revision: null, portion: null }])}>Добавить разовую еду</button>
               {lines.map((line, index) => {
                 const unit = line.unit === 'g' ? 'г' : line.unit === 'ml' ? 'мл' : 'г/мл'
-                const set = (changes: Partial<DraftLine>) => setLines(current => current.map(row => row.id === line.id ? { ...row, ...changes } : row))
+                const set = (changes: Partial<FormLine>) => setLines(current => current.map(row => row.id === line.id ? { ...row, ...changes } : row))
                 return <fieldset className="meal-line" key={line.id}><legend>Строка {index + 1}: {line.name}</legend>
                   <label htmlFor={`meal-name-${line.id}`}>Название строки {index + 1}</label><input id={`meal-name-${line.id}`} required maxLength={200} value={line.name} onChange={e => set({ name: e.target.value })} {...invalid(`lines.${index}.name`)} />{inlineError(`lines.${index}.name`)}
                   {inlineError(`lines.${index}`)}
@@ -278,7 +298,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
             <button type="submit" disabled={busy || !!conflict || (!!pending && pending.action !== 'save') || !localTime}>{busy ? 'Сохраняем…' : pending?.action === 'save' ? 'Повторить сохранение приёма' : 'Сохранить приём пищи'}</button>
             <button type="button" disabled={locked} onClick={clear}>Отменить приём</button>
           </form>
-          {conflict && <button disabled={busy} onClick={() => void read<Meal>(`/api/meals/${conflict}`).then(setLatest).catch(failure => setError(failure.message))}>Загрузить актуальный приём</button>}
+          {conflict && <button disabled={busy} onClick={() => { const version = formGeneration.current; void read<Meal>(`/api/meals/${conflict}`).then(row => { if (version === formGeneration.current) setLatest(row) }).catch(failure => setError(failure.message)) }}>Загрузить актуальный приём</button>}
           {latest && <section aria-label="Актуальный приём"><MealDetails meal={latest} />
             {!latest.deleted_at && <><button onClick={() => edit(latest)}>Редактировать актуальный приём</button>{editing?.id === latest.id && <button onClick={() => { setEditing(latest); setConflict(null); setLatest(null); setError('') }}>Продолжить с моим составом</button>}</>}
           </section>}
@@ -319,7 +339,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
         <p className="muted">Откройте карточку и нажмите «Добавить в приём». Состав и время приёма сохранятся.</p>
         {error && <p role="alert" className="error">{error}</p>}
       </>}
-      <ProductCatalog authorized={authorized} visible={catalogVisible || (visible && choosingProduct)} csrfToken={csrfToken} onSelect={visible && choosingProduct ? selectProduct : undefined} selectionDisabled={locked || catalogEditing} seed={productSeed} onEditingChange={setCatalogEditing} />
+      <ProductCatalog catalogPage={catalogVisible} authorized={authorized} visible={catalogVisible || (visible && choosingProduct)} csrfToken={csrfToken} onSelect={visible && choosingProduct ? selectProduct : undefined} selectionDisabled={locked || catalogEditing} seed={productSeed} onEditingChange={setCatalogEditing} />
     </div>
   </>
 }
