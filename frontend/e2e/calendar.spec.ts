@@ -44,7 +44,7 @@ test('month calendar opens the complete Moscow day and clears unfinished input',
   await open.focus(); await page.keyboard.press('Enter')
   const details = calendar.getByRole('region', { name: 'Подробная сводка дня', exact: true })
   await expect(details.getByRole('heading', { name: `Сводка за ${day}` })).toBeFocused()
-  await expect(details).toContainText('Обед в календаре')
+  await expect(details).not.toContainText('Обед в календаре')
   await expect(details).toContainText('123.45 ккал')
   await expect(details).toContainText('750 мл')
   const glucoseChart = details.getByRole('slider', { name: 'Сахар · ммоль/л' })
@@ -113,7 +113,11 @@ test('calendar shows basal gaps and zero rates, meal results and water volumes',
   await page.getByLabel('Месяц — Москва').fill('2026-10')
   await page.getByRole('button', { name: 'Открыть сводку за 2026-10-20:' }).click()
   const details = page.getByRole('region', { name: 'Подробная сводка дня', exact: true })
-  for (const text of ['Обед', 'Рис с овощами', '350 ккал', 'Неполные данные', 'Неизвестно']) await expect(details.getByRole('article')).toContainText(text)
+  for (const text of ['350 ккал', 'Неполные данные', 'Неизвестно']) await expect(details.locator('.calendar-day-totals')).toContainText(text)
+  await expect(details).not.toContainText('Рис с овощами')
+  await details.getByRole('slider', { name: 'КБЖУ по времени' }).focus()
+  await expect(details.getByRole('tooltip', { name: 'Питание' })).toContainText('12:00')
+  await expect(details.getByRole('tooltip', { name: 'Питание' })).toContainText('Калории: 350 ккал · Неполные данные')
   await expect(details).not.toContainText('Известных строк')
   await expect(details).not.toContainText('Основа:')
   await expect(details).toContainText('750 мл')
@@ -141,10 +145,7 @@ test('calendar shows basal gaps and zero rates, meal results and water volumes',
   await expect(chart.getByRole('tooltip')).toHaveCount(0)
   await chart.getByRole('button', { name: '01:40–06:00 · 0,60 ед/ч', exact: true }).dispatchEvent('click')
   await expect(chart.getByRole('tooltip')).toContainText('0,60 ед/ч')
-  const bars = details.locator('.water-bar-track>span')
-  const small = await bars.nth(0).boundingBox()
-  const large = await bars.nth(1).boundingBox()
-  expect(large!.width / small!.width).toBeCloseTo(2, 1)
+  await expect(details.locator('.calendar-water-events')).toHaveCount(0)
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -338,7 +339,7 @@ test('calendar charts show loading and errors and discard a late response for a 
   const gate = new Promise<void>(resolve => { release = resolve })
   let received!: () => void
   const held = new Promise<void>(resolve => { received = resolve })
-  await page.route('**/api/day?day=2086-01-02', async route => {
+  await page.route('**/api/nutrition-day?day=2086-01-02', async route => {
     const response = await route.fetch()
     received()
     await gate
@@ -348,15 +349,15 @@ test('calendar charts show loading and errors and discard a late response for a 
   await held
   await expect(details).toContainText('Загружаем сводку дня…')
   await expect(details.getByRole('slider')).toHaveCount(0)
-  await page.route('**/api/day?day=2086-01-03', route => route.fulfill({ status: 503, json: { message: 'Synthetic read failure' } }))
+  await page.route('**/api/nutrition-day?day=2086-01-03', route => route.fulfill({ status: 503, json: { message: 'Synthetic read failure' } }))
   await page.getByRole('button', { name: 'Открыть сводку за 2086-01-03:' }).click()
   await expect(details.getByRole('alert')).toContainText('Не удалось загрузить сводку дня.')
-  const late = page.waitForResponse('**/api/day?day=2086-01-02')
+  const late = page.waitForResponse('**/api/nutrition-day?day=2086-01-02')
   release()
   await late
   await expect(details.getByRole('alert')).toBeVisible()
   await expect(details.getByRole('slider')).toHaveCount(0)
-  await page.unroute('**/api/day?day=2086-01-03')
+  await page.unroute('**/api/nutrition-day?day=2086-01-03')
   await page.getByRole('button', { name: 'Открыть сводку за 2086-01-04:' }).click()
   await expect(details.getByRole('slider')).toHaveCount(2)
   await page.getByRole('button', { name: 'Открыть сводку за 2086-01-03:' }).click()

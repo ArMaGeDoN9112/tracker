@@ -4,6 +4,7 @@ import { type Day as NutritionDay, type Totals } from './Nutrition'
 import { nutrients } from './ProductCatalog'
 import { BasalDayChart } from './BasalDayChart'
 import { DiabetesDayCharts } from './DiabetesDayCharts'
+import { NutritionDayChart } from './NutritionDayChart'
 import type { TemporaryPeriod } from './TemporaryBasal'
 import { localMinute, moscowLabel } from './time'
 import type { GlucoseDay } from './GlucoseCharts'
@@ -15,12 +16,11 @@ type DiaryDay = {
   temporary_basals: TemporaryPeriod[]
   entries: { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null }[]
 }
-const categories: Record<string, string> = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', snack: 'Перекус' }
 
 function SummaryTotals({ totals }: { totals: Totals }) {
   return <dl className="calendar-nutrients">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, unit]) => <div key={key}>
     <dt>{label}</dt><dd>{totals[key].value === null ? <span className="muted">Неизвестно</span> : <>{totals[key].value} <small>{unit}</small></>}
-      {totals[key].incomplete && totals[key].value !== null && <small className="nutrient-incomplete">Неполные данные</small>}
+      {totals[key].incomplete && <small className="nutrient-incomplete">Неполные данные</small>}
     </dd>
   </div>)}</dl>
 }
@@ -36,7 +36,6 @@ function DaySummary({ active, day, generation, onClose, onAnalysis, onNutrition 
   const [data, setData] = useState<{ nutrition: NutritionDay; diary: DiaryDay } | null>(null)
   const [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
-  const maxWater = data?.nutrition.water.reduce((maximum, event) => Math.max(maximum, event.volume_ml), 1) ?? 1
   useEffect(() => { heading.current?.focus() }, [])
   useEffect(() => {
     let cancelled = false
@@ -56,24 +55,12 @@ function DaySummary({ active, day, generation, onClose, onAnalysis, onNutrition 
       <a href={`?section=nutrition-summary&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onNutrition(day) } }}>Записи питания</a>
       {!data.nutrition.meals.length ? <p>Нет записей еды.</p> : <>
         <div className="calendar-day-totals"><span className="eyebrow">ИТОГО ЗА ДЕНЬ</span><SummaryTotals totals={data.nutrition.totals} /></div>
-        <div className="calendar-meals">{data.nutrition.meals.map(meal => <article className="calendar-meal" key={meal.id}>
-          <header><h5>{categories[meal.category ?? ''] ?? 'Приём пищи'}</h5><time dateTime={meal.occurred_at}>{localMinute(meal.occurred_at).slice(11)}</time></header>
-          <ul className="calendar-foods">{meal.lines.map(line => <li key={line.id}><strong>{line.name}</strong>
-            {line.quantity !== null && <span className="muted">{line.quantity} {line.unit === 'g' ? 'г' : 'мл'}</span>}
-          </li>)}</ul>
-          <SummaryTotals totals={meal.totals} />
-        </article>)}</div>
+        <NutritionDayChart day={day} meals={data.nutrition.meals} />
       </>}
       <h4>Вода</h4>
-      {data.nutrition.water_total_ml === null ? <p>Нет записей воды.</p> : <>
-        <div className="calendar-water-summary"><p><strong>{data.nutrition.water_total_ml} мл</strong><span className="muted">Всего за день</span></p>
-          <ul className="calendar-water-events">{data.nutrition.water.map(event => <li key={event.id}>
-            <time dateTime={event.occurred_at}>{localMinute(event.occurred_at).slice(11)}</time>
-            <span className="water-bar-track" aria-hidden="true"><span style={{ width: `${event.volume_ml / maxWater * 100}%` }} /></span>
-            <strong>{event.volume_ml} мл</strong>
-          </li>)}</ul>
-        </div>
-      </>}
+      {data.nutrition.water_total_ml === null ? <p>Нет записей воды.</p> : <div className="calendar-water-summary">
+        <p><strong>{data.nutrition.water_total_ml} мл</strong><span className="muted">Всего за день</span></p>
+      </div>}
       <h4>Сахар и подколки</h4>
       <a href={`?section=charts&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onAnalysis(day) } }}>Записи диабета</a>
       <DiabetesDayCharts day={day} entries={data.diary.entries} />
@@ -153,7 +140,7 @@ export function DayCalendar({ active, day, generation, onDay, onAnalysis, onNutr
           </button>
         })}
       </div>
-      <p className="muted">Нажмите на день, чтобы увидеть все записи.</p>
+      <p className="muted">Нажмите на день, чтобы увидеть сводку.</p>
     </>}
     {active && open && day && <DaySummary key={day} active={active} day={day} generation={generation} onAnalysis={onAnalysis} onNutrition={onNutrition} onClose={() => {
       setOpen(false); document.getElementById(`calendar-${day}`)?.focus()
