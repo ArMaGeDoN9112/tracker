@@ -71,7 +71,7 @@ export function GlucoseCharts({ active, generation, onDay }: {
       <p className="glucose-total summary-counts" data-testid="period-average"><span>Среднее за период: <strong>{glucoseText(summary.average)} <small>ммоль/л</small></strong></span> · <span>измерений: <strong>{summary.count}</strong></span></p>
       {summary.count === 0 && <p role="status">В этом периоде нет измерений сахара.</p>}
       <details className="explanation"><summary>Как читать график</summary><p className="muted">Среднее по всем измерениям. Пустые дни — разрывы. Нажмите день графика или кнопку в таблице, чтобы открыть исходные записи.</p></details>
-      <div className="glucose-plot">
+      <div className="period-visuals"><div className="glucose-plot">
         <ResponsiveContainer width="100%" height={320}>
           <ComposedChart data={points} accessibilityLayer title="Дневные сводки сахара и число измерений" margin={{ top: 32, right: 4, bottom: 12, left: 4 }}>
             <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -97,6 +97,7 @@ export function GlucoseCharts({ active, generation, onDay }: {
             <td>{glucoseText(row.minimum)}</td><td>{glucoseText(row.maximum)}</td><td>{row.count}</td>
           </tr>)}</tbody>
         </table>
+      </div>
       </div>
     </>}
   </section>

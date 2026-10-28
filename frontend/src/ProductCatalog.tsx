@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { privateFetch } from './access'
 
 export const nutrients = [['protein', 'Белки', 'г'], ['fat', 'Жиры', 'г'], ['carbohydrate', 'Углеводы', 'г'], ['calories', 'Калории', 'ккал']] as const
@@ -60,6 +60,9 @@ export function ProductCatalog({ authorized, visible, catalogPage, csrfToken, on
     if (seed) open(undefined, seed)
   }, [seed])
   useEffect(() => { onEditingChange?.(!!draft || busy || photoBusy || !!pending) }, [draft, busy, photoBusy, pending, onEditingChange])
+  useLayoutEffect(() => {
+    if (draft) document.getElementById('product-name')?.focus()
+  }, [draft?.id, !!draft])
 
   async function uploadPhoto(file: File) {
     const version = formGeneration.current
@@ -92,7 +95,6 @@ export function ProductCatalog({ authorized, visible, catalogPage, csrfToken, on
   function open(product?: Product, values?: ProductSeed) {
     setDraft(product ?? { ...empty(), ...values }); setOriginal(product ?? null)
     setError(''); setField(null); setNotice(''); setConflict(false); setLatest(null); setUnitConfirmed(false)
-    requestAnimationFrame(() => document.getElementById('product-name')?.focus())
   }
   function changeUnit(unit: 'g' | 'ml') {
     if (!draft || unit === draft.unit) return
@@ -146,8 +148,9 @@ export function ProductCatalog({ authorized, visible, catalogPage, csrfToken, on
     <section aria-label="Каталог продуктов">
       <span className="eyebrow">ЛИЧНЫЙ КАТАЛОГ</span><h2 id="catalog-title" tabIndex={-1}>{onSelect ? 'Выберите еду' : 'Продукты и порции'}</h2>
       <p className="muted">Нажмите на карточку, чтобы посмотреть КБЖУ и порции.</p>
-      <label htmlFor="product-search">Поиск продуктов</label><input id="product-search" type="search" value={search} onChange={event => setSearch(event.target.value)} />
+      <div className="catalog-toolbar"><div><label htmlFor="product-search">Поиск продуктов</label><input id="product-search" type="search" placeholder="Начните вводить название" value={search} onChange={event => setSearch(event.target.value)} /></div>
       <button disabled={!!draft || busy || !!pending} onClick={() => open()}>Новый продукт</button>
+      </div>
       {loading && <p role="status">Загружаем каталог…</p>}
       {loadError && <p role="alert" className="error">{loadError}</p>}
       {!loading && !loadError && rows.length === 0 && <p>{search ? 'Продукты не найдены.' : 'Каталог пуст.'}</p>}
@@ -168,13 +171,14 @@ export function ProductCatalog({ authorized, visible, catalogPage, csrfToken, on
           <h3>{product.name}</h3><span className="food-energy">{product.calories === null ? 'Калории неизвестны' : `${product.calories} ккал`}</span><span className="food-card-hint">{product.unit === 'g' ? '100 г' : '100 мл'} · Подробнее</span>
         </summary>
         <div className="food-details">
+        {product.photo && <img className="food-photo-preview" src={product.photo} alt="" aria-hidden="true" />}
         <p>На 100 {product.unit === 'g' ? 'г' : 'мл'}</p>
-        {onSelect && <button disabled={selectionDisabled || busy || !!pending} onClick={() => onSelect(product)}>Добавить в приём</button>}
         <dl className="metric-grid product-nutrients">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, nutrientUnit]) => <div key={key}><dt>{label}: </dt><dd>{product[key] === null ? 'неизвестно' : `${product[key]} ${nutrientUnit}`}</dd></div>)}</dl>
         <ul className="portion-chips">{product.portions.map(portion => <li key={portion.id}>{portion.name}: {portion.quantity} {product.unit === 'g' ? 'г' : 'мл'}</li>)}</ul>
         <button disabled={!!draft || busy || !!pending} onClick={() => open(product)}>Изменить</button>
         </div>
         </details>
+        {onSelect && <button className="food-select" disabled={selectionDisabled || busy || !!pending} onClick={() => onSelect(product)}>Добавить в приём</button>}
       </article>)}</div>
     </section>
     {pending && !draft && <><p role="status">Результат запроса нужно проверить. Явный повтор отправит прежние данные и UUID.</p><button disabled={busy} onClick={() => void save()}>Повторить сохранение</button>{error && <p role="alert">{error}</p>}</>}

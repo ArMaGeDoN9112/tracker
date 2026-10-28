@@ -53,7 +53,7 @@ test('month calendar opens the complete Moscow day and clears unfinished input',
   await expect(details.getByRole('tooltip', { name: 'Показатели дня' })).toContainText('5,6 ммоль/л')
   await expect(details.getByRole('tooltip', { name: 'Показатели дня' })).toContainText('7,0 ммоль/л')
   await expect(details.getByRole('tooltip', { name: 'Показатели дня' })).toContainText('1,2 ед.')
-  await expect(details).not.toContainText('Запись календаря')
+  await expect(details.locator('.calendar-records')).toContainText('Запись календаря')
   await expect(details).not.toContainText('Известных строк')
   await expect(details).not.toContainText('Основа:')
   await expect(details).not.toContainText('редакция')

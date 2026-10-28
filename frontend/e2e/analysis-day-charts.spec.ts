@@ -53,6 +53,7 @@ test('day diabetes charts share actual times, values and selection with keyboard
 
   // Use the rendered clock marks to exercise the same time on each chart.
   const boxes: number[][] = []
+  const origins: number[] = []
   for (const slider of [glucose, bolus]) {
     await slider.scrollIntoViewIfNeeded()
     const left = await slider.getByText('00:00', { exact: true }).boundingBox()
@@ -60,6 +61,7 @@ test('day diabetes charts share actual times, values and selection with keyboard
     const right = await slider.getByText('24:00', { exact: true }).boundingBox()
     boxes.push([left!.x + left!.width / 2, middle!.x + middle!.width / 2, right!.x + right!.width / 2])
     const area = await slider.boundingBox()
+    origins.push(area!.x)
     const y = area!.y + 80
     if (info.project.name === 'phone') {
       const session = await page.context().newCDPSession(page)
@@ -78,7 +80,7 @@ test('day diabetes charts share actual times, values and selection with keyboard
       await expect(bolusTip).toContainText('3,3 ед.')
     }
   }
-  boxes[0].forEach((x, index) => expect(x).toBeCloseTo(boxes[1][index], 0))
+  boxes[0].forEach((x, index) => expect(x - origins[0]).toBeCloseTo(boxes[1][index] - origins[1], 0))
   for (const slider of [glucose, bolus]) {
     const line = slider.locator('.recharts-line-curve')
     await expect(line).toBeVisible()

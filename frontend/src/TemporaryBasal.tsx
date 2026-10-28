@@ -208,8 +208,7 @@ export function TemporaryBasal({ active, visible, csrfToken, onSaved }: {
   const invalid = (name: string) => ({ 'aria-invalid': field === name, 'aria-describedby': field === name ? 'temporary-error' : undefined })
   return <section className="basal-schedules" aria-label="Временная база">
     <div className="schedule-editor">
-    <span className="eyebrow">ЗАПИСЬ В ДНЕВНИКЕ</span>
-    <h2>Временная база</h2>
+    <header className="panel-heading"><div><span className="eyebrow">ЗАПИСЬ В ДНЕВНИКЕ</span><h2>Временная база</h2></div></header>
     <p className="muted">100% — обычная скорость, 120% — 1,2 от неё, 0% — нулевая скорость при известном расписании. До первого расписания скорость неизвестна. Все значения — по расписанию.</p>
     <form onSubmit={submit} onChange={() => { setPreview(null); setSaved(false) }} aria-busy={busy}>
       {editing && <p>{deleting ? 'Удаление временной базы' : 'Исправление / досрочное завершение временной базы'}. Исходная длительность: {editing.duration_minutes} мин.</p>}
@@ -246,8 +245,7 @@ export function TemporaryBasal({ active, visible, csrfToken, onSaved }: {
     {saved && <p role="status" className="entry-notice">Временная база сохранена.{!busy && !error && ' День и база формы обновлены.'}</p>}
     </div>
     <div className="schedule-history temporary-history" aria-label="История временной базы" aria-busy={historyLoading}>
-    <span className="eyebrow">ПЕРИОДЫ ДЕЙСТВИЯ</span>
-    <h3>История временной базы</h3>
+    <header className="panel-heading"><div><span className="eyebrow">ПЕРИОДЫ ДЕЙСТВИЯ</span><h3>История временной базы</h3></div><span className="entry-count">{history.length}</span></header>
     {historyLoading && <p role="status">Загружаем историю временной базы…</p>}
     {historyError && <p role="alert" className="error">{historyError}</p>}
     {historyLoaded && !historyLoading && !historyError && history.length === 0 && <p>Временная база ещё не задана.</p>}

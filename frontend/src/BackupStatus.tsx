@@ -36,17 +36,17 @@ export function useBackupStatus(active: boolean) {
 }
 
 export function BackupStatus({ status, error }: ReturnType<typeof useBackupStatus>) {
-  return <section aria-labelledby="backup-title">
+  return <section className="backup-panel" aria-labelledby="backup-title">
+    <span className="eyebrow">СОХРАННОСТЬ ДАННЫХ</span>
     <h3 id="backup-title">Резервное копирование</h3>
-    {status ? <>
+    {status ? <div className="backup-content"><div>
       <p className={`backup-state${status.overdue || status.error || status.verification_error ? ' needs-attention' : ''}`}><span aria-hidden="true">{status.overdue || status.error || status.verification_error ? '!' : status.last_external_success ? '✓' : '—'}</span> {status.overdue || status.error || status.verification_error ? 'Требует внимания' : status.last_external_success ? 'Внешняя копия создана' : 'Внешней копии ещё нет'}</p>
-      <dl className="backup-facts"><div><dt>Последняя успешная внешняя копия: </dt><dd>{when(status.last_external_success)}.</dd></div>
-      <div><dt>Последняя успешная проверка восстановления: </dt><dd>{when(status.last_verification)}.</dd></div></dl>
       {status.last_local_success && <p className="muted">Локальная тестовая копия: {when(status.last_local_success)}. Внешняя доставка не подтверждена этим запуском.</p>}
       {status.overdue && <p role="alert" className="error">Нет успешной внешней копии за последние 26 часов. Сохранность последних данных не подтверждена.</p>}
       {status.error && <p role="alert" className="error">{status.error}</p>}
       {status.verification_error && <p role="alert" className="error">{status.verification_error}</p>}
-    </> : !error && <p role="status">Проверяем резервирование…</p>}
+    </div><dl className="backup-facts"><div><dt>Последняя успешная внешняя копия: </dt><dd>{when(status.last_external_success)}.</dd></div>
+      <div><dt>Последняя успешная проверка восстановления: </dt><dd>{when(status.last_verification)}.</dd></div></dl></div> : !error && <p role="status">Проверяем резервирование…</p>}
     {error && <p role="alert" className="error">{error}</p>}
   </section>
 }

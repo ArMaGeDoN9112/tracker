@@ -117,8 +117,7 @@ export function BasalSchedules({ active, visible, csrfToken, onSaved }: {
 
   return <section className="basal-schedules" aria-label="Расписание базы">
     <div className="schedule-editor">
-    <span className="eyebrow">НОВАЯ ВЕРСИЯ</span>
-    <h2>Суточное расписание базы</h2>
+    <header className="panel-heading"><div><span className="eyebrow">НОВАЯ ВЕРСИЯ</span><h2>Суточное расписание базы</h2></div></header>
     <p className="muted">Версии неизменяемы. Для изменения задайте новое начало и полное расписание.</p>
     <form onSubmit={submit} onChange={() => { setPreview(null); setSaved(false) }} aria-busy={busy}>
       <fieldset disabled={busy || pending !== null}>
@@ -144,8 +143,7 @@ export function BasalSchedules({ active, visible, csrfToken, onSaved }: {
     {saved && <p role="status" className="entry-notice">Расписание сохранено.{!busy && !error && ' История и база дня обновлены.'}</p>}
     </div>
     <div className="schedule-history" aria-label="История расписаний" aria-busy={historyLoading}>
-      <span className="eyebrow">СРОКИ ДЕЙСТВИЯ</span>
-      <h3>История расписаний</h3>
+      <header className="panel-heading"><div><span className="eyebrow">СРОКИ ДЕЙСТВИЯ</span><h3>История расписаний</h3></div><span className="entry-count">{versions.length}</span></header>
       {historyLoading && <p role="status">Загружаем историю расписаний…</p>}
       {historyError && <p className="error" role="alert">{historyError}</p>}
       {historyLoaded && !historyLoading && !historyError && versions.length === 0 && <p>Расписание ещё не задано.</p>}

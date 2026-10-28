@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { privateFetch } from './access'
 import { Water } from './Water'
@@ -63,6 +63,13 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   const [productSeed, setProductSeed] = useState<ProductSeed | null>(null)
   const [catalogEditing, setCatalogEditing] = useState(false)
   const [choosingProduct, setChoosingProduct] = useState(false)
+  const focusMealForm = useRef(false)
+  useLayoutEffect(() => {
+    if (!choosingProduct && focusMealForm.current) {
+      focusMealForm.current = false
+      document.getElementById('meal-form-title')?.focus()
+    }
+  }, [choosingProduct])
   const [summaryGeneration, setSummaryGeneration] = useState(0)
   const sending = useRef(false)
   const generation = useRef(0)
@@ -148,8 +155,8 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       setLines(rows => [...rows, { id: crypto.randomUUID(), kind: 'product', name, unit, quantity: '100', basis_quantity: '100.00',
         protein, fat, carbohydrate, calories, product_id: id, product_revision: revision, portion: null, portions }])
       setNotice('Продукт добавлен в состав.')
+      focusMealForm.current = true
       setChoosingProduct(false)
-      requestAnimationFrame(() => document.getElementById('meal-form-title')?.focus())
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Не удалось загрузить продукт. Повторите выбор.') }
     finally { sending.current = false; setBusy(false) }
   }
@@ -267,12 +274,19 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   const inlineError = (name: string) => field === name && error ? <p className="error">{error}</p> : null
   const locked = busy || !!pending
   const undoTarget = document.getElementById('global-undo')
-  return <>
+  return <><div className="nutrition-workspace" data-mode={choosingProduct ? 'catalog' : visible ? 'input' : summaryVisible ? 'analysis' : 'catalog'} hidden={!authorized}>
     {undoTarget && createPortal(<div hidden={!authorized || (!undo && !(pending && pending.action !== 'save'))}>
       {undo && <><p role="status">Приём пищи удалён. Отмена доступна до 30 секунд по серверу.</p><button disabled={locked} onClick={() => void action(undo, 'restore')}>Отменить удаление приёма</button></>}
       {pending && pending.action !== 'save' && <><p role="status">{confirmed ? 'Операция подтверждена.' : 'Результат операции неизвестен.'}</p><button disabled={busy} onClick={() => void retry()}>Повторить операцию с приёмом</button>{error && <p role="alert">{error}</p>}</>}
     </div>, undoTarget)}
-    <div hidden={!authorized || !mealPage || choosingProduct}>
+    <div className="nutrition-period" hidden={!authorized || !summaryVisible}>
+      <NutritionSummary active={authorized && summaryVisible} generation={summaryGeneration} onDay={selected => {
+        setChoosingProduct(false)
+        onDay(selected, true)
+        requestAnimationFrame(() => document.getElementById('nutrition-history')?.focus())
+      }} />
+    </div>
+    <div className="nutrition-meals" hidden={!authorized || !mealPage || choosingProduct}>
       {error && <p id="meal-error" role="alert" tabIndex={-1} className="error">{error}</p>}
       {!visible && !editing && notice && <p role="status">{notice}</p>}
       <div className="diary-layout nutrition-layout">
@@ -341,15 +355,10 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
         <button disabled={busy} onClick={() => setConversion(null)}>Отменить создание карточки</button>
       </section>}
     </div>
-    <div hidden={choosingProduct}><Water authorized={authorized} visible={visible} analysis={summaryVisible} day={day} csrfToken={csrfToken} /></div>
-    <div hidden={!authorized || !summaryVisible}>
-      <NutritionSummary active={authorized && summaryVisible} generation={summaryGeneration} onDay={selected => {
-        setChoosingProduct(false)
-        onDay(selected, true)
-        requestAnimationFrame(() => document.getElementById('nutrition-history')?.focus())
-      }} />
-    </div>
-    <div hidden={!authorized || !(catalogVisible || (mealPage && choosingProduct))}>
+    <aside className="nutrition-water" hidden={choosingProduct || (!visible && !summaryVisible)}><Water authorized={authorized} visible={visible} analysis={summaryVisible} day={day} csrfToken={csrfToken} />
+      <section className="input-help" hidden={!visible}><span className="eyebrow">ВСЁ НА СВОЁМ МЕСТЕ</span><h3>Сейчас — только запись.</h3><p>Просмотр и исправление приёмов пищи и воды находятся в анализе.</p><button onClick={() => onDay(day || localTime.slice(0, 10), true)}>Перейти к анализу ↗</button></section>
+    </aside>
+    <div className="nutrition-catalog" hidden={!authorized || !(catalogVisible || (mealPage && choosingProduct))}>
       {mealPage && choosingProduct && <>
         <button disabled={locked} onClick={() => { setChoosingProduct(false); requestAnimationFrame(() => document.getElementById(visible || editing ? 'choose-product' : 'nutrition-history')?.focus()) }}>Вернуться к приёму пищи</button>
         <p className="muted">{visible || editing ? 'Откройте карточку и нажмите «Добавить в приём». Состав и время приёма сохранятся.' : 'Сохраните карточку и вернитесь к записям питания.'}</p>
@@ -357,5 +366,5 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       </>}
       <ProductCatalog catalogPage={catalogVisible} authorized={authorized} visible={catalogVisible || (mealPage && choosingProduct)} csrfToken={csrfToken} onSelect={(visible || !!editing) && choosingProduct ? selectProduct : undefined} selectionDisabled={locked || catalogEditing} seed={productSeed} onEditingChange={setCatalogEditing} />
     </div>
-  </>
+  </div></>
 }

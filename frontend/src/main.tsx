@@ -136,9 +136,22 @@ function App() {
   }
 
   return <main className={login ? "app-shell" : "login-screen"}>
-    <p className="eyebrow">ДНЕВНИК ДИАБЕТА</p>
+    {login ? <>
+      <aside className="app-sidebar" aria-label="Личный дневник"><div className="app-brand" aria-label="Дневник">д</div><span className="sidebar-caption">Личный<br />дневник</span></aside>
+      <header className="app-topbar"><p>Личное пространство <span>/ {({ diary: 'Диабет', charts: 'Диабет', basal: 'Диабет', nutrition: 'Питание', 'nutrition-summary': 'Питание', catalog: 'Питание', calendar: 'Календарь', settings: 'Настройки' }[route.section])}</span></p>
+        <div className="account-row"><p className="account">Вы вошли как <strong>{login}</strong>.</p><button type="button" onClick={logout} disabled={busy}>{busy ? 'Выходим…' : 'Выйти'}</button></div>
+      </header>
+    </> : <div className="login-brand"><div className="app-brand" aria-hidden="true">д</div><p className="eyebrow">ЛИЧНЫЙ ДНЕВНИК</p></div>}
+    {!login && <aside className="login-intro"><span className="eyebrow">ЛИЧНОЕ ПРОСТРАНСТВО</span><h2>Место для<br />вашего дня.</h2><p>Сахар, питание и вода.<br />В одном спокойном ритме.</p></aside>}
     <section className="workspace">
+      <div className="page-heading">
+      <div>
+      {login && <p className="workspace-caption">ОБЗОР / {route.day ? route.day.split('-').reverse().join('.') : 'ЛИЧНЫЙ ДНЕВНИК'}</p>}
       <h1 id="title" ref={heading} tabIndex={-1}>{login ? ({ diary: 'Ввод сахара', charts: 'Аналитика сахара', basal: 'База', nutrition: 'Ввод питания', 'nutrition-summary': 'Аналитика питания', catalog: 'Каталог еды', calendar: 'Календарь', settings: 'Настройки' }[route.section]) : 'Вход в дневник'}</h1>
+      {login && <p className="page-description">{{ diary: 'Измерения, подколки и контекст события.', charts: 'От общей картины — к записям выбранного дня.', basal: 'Суточное расписание и временные изменения.', nutrition: 'Приёмы пищи, продукты и вода.', 'nutrition-summary': 'Итоги периода, приёмы пищи и вода.', catalog: 'Ваши продукты, их состав и порции.', calendar: 'Сахар, питание и вода — целостная картина дня.', settings: 'Приватное пространство для ваших данных.' }[route.section]}</p>}
+      </div>
+      {login && route.section === 'calendar' && <div className="page-actions"><button className="primary-action" onClick={() => navigate({ ...route, section: 'diary' })}>+ Записать сахар</button><button onClick={() => navigate({ ...route, section: 'nutrition' })}>+ Добавить еду</button></div>}
+      </div>
       {loading ? <p role="status">Проверяем вход…</p> : login ? <>
         <nav className="main-nav" aria-label="Разделы">
           {([['calendar', 'Календарь', 'M5 5h14v16H5zM8 3v4m8-4v4M5 10h14m-10 4h2m2 0h2m-6 3h2'], ['diary', 'Диабет', 'M12 3C9 7 6 10 6 14a6 6 0 0 0 12 0c0-4-3-7-6-11Z'], ['nutrition', 'Питание', 'M5 3v6m3-6v6m3-6v6M5 7h6M8 9v12M19 3v18m0-18c-4 3-4 9 0 9'], ['settings', 'Настройки', 'M4 7h16M4 17h16M8 4v6m8 4v6']] as const).map(([section, label, icon]) => <a key={section} href={routeUrl({ ...route, section })} aria-current={group === section ? (route.section === section ? 'page' : 'true') : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section }) } }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icon} /></svg>{label}</a>)}
@@ -146,8 +159,6 @@ function App() {
         {pages.length > 0 && <nav className="basal-nav section-nav" aria-label={group === 'diary' ? 'Страницы диабета' : 'Страницы питания'}>
           {pages.map(([section, label]) => <a key={section} href={routeUrl({ ...route, section })} aria-current={route.section === section ? 'page' : undefined} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ ...route, section }) } }}>{label}</a>)}
         </nav>}
-        <div className="account-row"><p className="account">Вы вошли как <strong>{login}</strong>.</p>
-        <button type="button" onClick={logout} disabled={busy}>{busy ? 'Выходим…' : 'Выйти'}</button></div>
       </> : <>
         <p className="muted">Ваши записи доступны только после входа.</p>
         <form onSubmit={submit} aria-busy={busy}>

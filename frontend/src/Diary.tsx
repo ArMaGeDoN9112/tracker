@@ -20,7 +20,7 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
   const [bolus, setBolus] = useState('')
   const [reason, setReason] = useState('')
   const [comment, setComment] = useState('')
-  const [dayLoading, setDayLoading] = useState(false)
+  const [dayLoading, setDayLoading] = useState(true)
   const [dayError, setDayError] = useState('')
   const [todayLoading, setTodayLoading] = useState(false)
   const [entries, setEntries] = useState<Entry[]>([])
@@ -298,13 +298,18 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
     {error && !['glucose', 'bolus', 'occurred_at', 'reason', 'comment', 'entry-fields'].includes(field ?? '') && <p id="entry-error" role="alert" className="error">{error}</p>}
     {notice && <p role="status" className="entry-notice">{notice}</p>}
     </div>
-    <div hidden={section !== 'diary' && section !== 'charts'} className="diary-layout">
+    <div hidden={section !== 'diary' && section !== 'charts'} className={`diary-layout${section === 'diary' ? ' diary-input-layout' : ''}`}>
     <section hidden={section !== 'diary' && !editing && !conflictId && pending?.method !== 'PUT'} className="diary-composer" aria-label="Ввод записи">
     <span className="eyebrow">БЫСТРЫЙ ВВОД</span>
-    <h2>{editing ? 'Изменение записи' : 'Быстрый ввод'}</h2>
+    <h2>{editing ? 'Изменение записи' : 'Новая запись'}</h2>
+    <p className="muted composer-description">Измерение, подколка или комментарий — вместе или по отдельности.</p>
     <div hidden={section === 'charts' && !editing && pending?.method !== 'PUT'}>
     {!localTime ? <button onClick={() => openForm().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение</button> : <form onSubmit={save} aria-busy={busy}>
       <fieldset aria-label="Данные записи" {...invalid('entry-fields')} disabled={busy || pending !== null || pendingAction !== null}>
+        <label htmlFor="occurred_at">Время события — Москва</label>
+        <input id="occurred_at" type="datetime-local" step="60" required value={localTime} onChange={e => { initialized.current = true; setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />
+        {fieldError('occurred_at')}
+        {candidates.length > 1 && <><label htmlFor="offset">Смещение UTC</label><select id="offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
         <div className="entry-numbers"><div className="glucose-field">
         <label htmlFor="glucose">Сахар, ммоль/л</label>
         <input id="glucose" inputMode="decimal" value={glucose} onChange={e => setGlucose(e.target.value)} {...invalid('glucose')} />
@@ -314,10 +319,6 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
         <input id="bolus" inputMode="decimal" value={bolus} onChange={e => setBolus(e.target.value)} {...invalid('bolus')} />
         {fieldError('bolus')}
         </div></div>
-        <label htmlFor="occurred_at">Время события — Москва</label>
-        <input id="occurred_at" type="datetime-local" step="60" required value={localTime} onChange={e => { initialized.current = true; setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />
-        {fieldError('occurred_at')}
-        {candidates.length > 1 && <><label htmlFor="offset">Смещение UTC</label><select id="offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
         <p className="muted" data-testid="form-basal">База: {basalText(formBasal)} · по расписанию</p>
         <label htmlFor="reason">Причина подколки</label>
         <select id="reason" value={reason} onChange={e => setReason(e.target.value)} {...invalid('reason')}><option value="">Без причины</option>{Object.entries(reasons).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
@@ -345,6 +346,10 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
     {pendingAction && !busy && createPortal(<div>{error && section !== 'diary' && section !== 'charts' && <p role="alert" className="error">{error}</p>}<button onClick={() => change(pendingAction)}>Повторить операцию</button></div>, document.getElementById('global-undo')!)}
     {undo && createPortal(<div role="status"><p>Запись удалена. Отмена доступна 30 секунд по времени сервера.</p><button disabled={busy || pending !== null || pendingAction !== null} onClick={() => entryAction(undo, 'restore')}>Отменить удаление</button></div>, document.getElementById('global-undo')!)}
     </section>
+    <aside className="input-aside" hidden={section !== 'diary'}>
+      <section className="input-context"><span className="eyebrow">БАЗА ПО РАСПИСАНИЮ</span><p className="context-value">{basalText(formBasal)}</p><p className="muted">Для времени открытой записи</p><a className="panel-link" href={`?section=basal${day ? `&day=${day}` : ''}`}>Посмотреть базу <span aria-hidden="true">↗</span></a></section>
+      <section className="input-help"><span className="eyebrow">ВСЁ НА СВОЁМ МЕСТЕ</span><h3>Сейчас — только запись.</h3><p>Просмотр и исправление сохранённых записей находятся в анализе.</p><button onClick={() => onDay(day || localTime.slice(0, 10), true)}>Перейти к анализу ↗</button></section>
+    </aside>
     <section hidden={section !== 'charts'} className="diary-timeline" aria-label="Хронология дня">
     <span className="eyebrow">ХРОНОЛОГИЯ · МОСКВА</span>
     <h2 id="day-history" tabIndex={-1}>Записи дня <span className="entry-count">{entries.length}</span></h2>
@@ -370,6 +375,7 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
         <p>Эффективное окончание: {moscowLabel(row.effective_ends_at)} (не включая).</p></details>
       </article>)}
     </section>
+    <div className="entry-table-heading" aria-hidden="true"><span>Время</span><span>Сахар / подколка</span><span>Комментарий и контекст</span><span>Действия</span></div>
     <ol className="entries">{[...entries.map(row => ({ kind: 'entry' as const, row, occurred_at: row.occurred_at })),
       ...basalChanges.map(change => ({ kind: 'basal' as const, row: change, occurred_at: change.occurred_at }))]
       .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at) || (a.kind === b.kind ? 0 : a.kind === 'basal' ? -1 : 1))
@@ -384,8 +390,7 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
       <div className="entry-values"><p className="entry-glucose"><span>Сахар: </span><strong>{row.glucose?.replace('.', ',') ?? 'не указан'}</strong><small>ммоль/л</small></p><p className="entry-bolus">Подколка: <strong>{row.bolus.replace('.', ',')}</strong> ед.</p></div>
       {row.reason && <p><span className="status-badge">{reasons[row.reason]}</span></p>}
       {row.comment && <p className="comment">{row.comment}</p>}
-      <p className="muted">База: {basalText(row.basal)} · по расписанию</p>
-      <p className="muted">Создана: {moscowLabel(row.created_at)}</p>
+      <details className="entry-details"><summary>Время и база</summary><p className="muted">База: {basalText(row.basal)} · по расписанию</p><p className="muted">Создана: {moscowLabel(row.created_at)}</p></details>
       <div className="entry-actions"><button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => edit(row)}>Изменить</button>
       <button disabled={busy || pending !== null || pendingAction !== null || editing !== null} onClick={() => entryAction(row, 'delete')}>Удалить</button></div>
     </li> })}</ol>

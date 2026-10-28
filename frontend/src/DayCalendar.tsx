@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { privateFetch } from './access'
 import { type Day as NutritionDay, type Totals } from './Nutrition'
 import { nutrients } from './ProductCatalog'
 import { CalendarDayChart } from './CalendarDayChart'
 import type { TemporaryPeriod } from './TemporaryBasal'
-import { localMinute, moscowLabel } from './time'
+import { basalText, localMinute, moscowLabel } from './time'
 import type { GlucoseDay } from './GlucoseCharts'
 
 type CalendarDay = { day: string; meal_count: number; totals: Totals; water_total_ml: number | null; glucose_average: string | null }
@@ -16,7 +16,7 @@ export type DiaryDay = {
 }
 
 function SummaryTotals({ totals }: { totals: Totals }) {
-  return <dl className="calendar-nutrients">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, unit]) => <div key={key}>
+  return <dl className="calendar-nutrients">{nutrients.slice(0, 3).map(([key, label, unit]) => <div key={key}>
     <dt>{label}</dt><dd>{totals[key].value === null ? <span className="muted">Неизвестно</span> : <>{totals[key].value} <small>{unit}</small></>}
       {totals[key].incomplete && <small className="nutrient-incomplete">Неполные данные</small>}
     </dd>
@@ -30,7 +30,7 @@ async function read<T,>(path: string): Promise<T> {
   return result
 }
 
-function DaySummary({ active, day, generation, onClose, onAnalysis, onNutrition }: { active: boolean; day: string; generation: number; onClose: () => void; onAnalysis: (day: string) => void; onNutrition: (day: string) => void }) {
+function DaySummary({ active, day, generation, summary, calendar, onClose, onAnalysis, onNutrition }: { active: boolean; day: string; generation: number; summary: CalendarDay | undefined; calendar: ReactNode; onClose: () => void; onAnalysis: (day: string) => void; onNutrition: (day: string) => void }) {
   const [data, setData] = useState<{ nutrition: NutritionDay; diary: DiaryDay } | null>(null)
   const [error, setError] = useState('')
   const heading = useRef<HTMLHeadingElement>(null)
@@ -48,23 +48,36 @@ function DaySummary({ active, day, generation, onClose, onAnalysis, onNutrition 
   return <section className="calendar-details" aria-label="Подробная сводка дня">
     <div className="calendar-detail-heading"><h3 tabIndex={-1} ref={heading}>Сводка за {day}</h3><button onClick={onClose}>Закрыть сводку</button></div>
     <p className="muted">Все события и границы дня — по Москве.</p>
-    {error ? <p role="alert" className="error">{error}</p> : !data ? <p role="status">Загружаем сводку дня…</p> : <>
-      <h4>Питание</h4>
-      <a href={`?section=nutrition-summary&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onNutrition(day) } }}>Записи питания</a>
-      {!data.nutrition.meals.length ? <p>Нет записей еды.</p> : <>
-        <div className="calendar-day-totals"><span className="eyebrow">ИТОГО ЗА ДЕНЬ</span><SummaryTotals totals={data.nutrition.totals} /></div>
-      </>}
-      <h4>Вода</h4>
-      {data.nutrition.water_total_ml === null ? <p>Нет записей воды.</p> : <div className="calendar-water-summary">
-        <p><strong>{data.nutrition.water_total_ml} мл</strong><span className="muted">Всего за день</span></p>
-      </div>}
-      <h4>Сахар и подколки</h4>
-      <a href={`?section=charts&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onAnalysis(day) } }}>Записи диабета</a>
-      <CalendarDayChart key={day} day={day} meals={data.nutrition.meals} diary={data.diary} />
-      {data.diary.temporary_basals.length > 0 && <details className="calendar-temporary"><summary>Временная база</summary>
-        {data.diary.temporary_basals.map(period => <p key={period.id}>{period.percent}% · {moscowLabel(period.starts_at)} — {moscowLabel(period.effective_ends_at)} (не включая)</p>)}
-      </details>}
-    </>}
+    <div className="calendar-console">
+      <aside className="calendar-summary-metrics">{data && <>
+        <dl className="console-metrics">
+          <div><dt>Средний сахар</dt><dd>{summary?.glucose_average?.replace('.', ',') ?? '—'}</dd><small>ммоль/л · {data.diary.entries.filter(entry => entry.glucose !== null).length} измерений</small></div>
+          <div><dt>Питание</dt><dd>{data.nutrition.meals.length ? data.nutrition.totals.calories.value ?? 'Неизвестно' : '—'}</dd><small>ккал · {data.nutrition.meals.length} приёмов</small>{data.nutrition.totals.calories.incomplete && <small>Неполные данные</small>}</div>
+          <div><dt>Вода</dt><dd>{data.nutrition.water_total_ml ?? '—'}</dd><small>мл за день</small></div>
+          <div><dt>Подколки</dt><dd>{(data.diary.entries.reduce((sum, entry) => sum + Math.round(Number(entry.bolus) * 10), 0) / 10).toFixed(1).replace('.', ',')}</dd><small>ед. за день</small></div>
+        </dl>
+        <section className="input-context"><span className="eyebrow">БАЗА ПО РАСПИСАНИЮ</span><p className="context-value">{basalText(data.diary.basal)}</p><p className="muted">На начало дня</p></section>
+      </>}</aside>
+      <div className="calendar-summary-chart">
+        {error ? <p role="alert" className="error">{error}</p> : !data ? <p role="status">Загружаем сводку дня…</p> : <>
+          <CalendarDayChart key={day} day={day} meals={data.nutrition.meals} diary={data.diary} />
+          {data.diary.temporary_basals.length > 0 && <details className="calendar-temporary"><summary>Временная база</summary>
+            {data.diary.temporary_basals.map(period => <p key={period.id}>{period.percent}% · {moscowLabel(period.starts_at)} — {moscowLabel(period.effective_ends_at)} (не включая)</p>)}
+          </details>}
+          <section className="calendar-records"><span className="eyebrow">СОБЫТИЯ ДНЯ</span><h4>Записи дня</h4>
+            <a href={`?section=charts&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onAnalysis(day) } }}>Записи диабета</a>
+            {!data.diary.entries.length ? <p className="muted">Нет записей сахара и подколок.</p> : <div className="console-table-scroll"><table><thead><tr><th>Время</th><th>Сахар, ммоль/л</th><th>Подколка, ед.</th><th>Комментарий</th></tr></thead><tbody>{data.diary.entries.map(entry => <tr key={entry.id}><td>{localMinute(entry.occurred_at).slice(11)}</td><td>{entry.glucose?.replace('.', ',') ?? '—'}</td><td>{entry.bolus.replace('.', ',')}</td><td>{entry.comment || '—'}</td></tr>)}</tbody></table></div>}
+          </section>
+        </>}
+      </div>
+      <aside className="calendar-right">{calendar}
+        {data && <section className="calendar-day-totals"><span className="eyebrow">ИТОГО ЗА ДЕНЬ</span><h4>Питание в деталях</h4>
+          <a href={`?section=nutrition-summary&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onNutrition(day) } }}>Записи питания</a>
+          {!data.nutrition.meals.length ? <p>Нет записей еды.</p> : <SummaryTotals totals={data.nutrition.totals} />}
+          {data.nutrition.water_total_ml === null ? <p>Нет записей воды.</p> : <p className="calendar-water-summary">Вода: <strong>{data.nutrition.water_total_ml} мл</strong></p>}
+        </section>}
+      </aside>
+    </div>
   </section>
 }
 
@@ -110,7 +123,7 @@ export function DayCalendar({ active, day, generation, onDay, onAnalysis, onNutr
     selectMonth(date.toISOString().slice(0, 7))
   }
 
-  return <section className="day-calendar" aria-label="Календарь дней">
+  const calendar = <div className="calendar-month-panel">
     <span className="eyebrow">ПО ДНЯМ · МОСКВА</span><h2>Календарь</h2>
     <div className="calendar-navigation">
       <button disabled={month === '0001-02'} onClick={() => moveMonth(-1)} aria-label="Предыдущий месяц">←</button>
@@ -137,8 +150,10 @@ export function DayCalendar({ active, day, generation, onDay, onAnalysis, onNutr
       </div>
       <p className="muted">Нажмите на день, чтобы увидеть сводку.</p>
     </>}
-    {active && open && day && <DaySummary key={day} active={active} day={day} generation={generation} onAnalysis={onAnalysis} onNutrition={onNutrition} onClose={() => {
-      setOpen(false); document.getElementById(`calendar-${day}`)?.focus()
-    }} />}
+    </div>
+  return <section className="day-calendar" aria-label="Календарь дней">
+    {active && open && day ? <DaySummary key={day} active={active} day={day} generation={generation} summary={days?.find(row => row.day === day)} calendar={calendar} onAnalysis={onAnalysis} onNutrition={onNutrition} onClose={() => {
+      setOpen(false); requestAnimationFrame(() => document.getElementById(`calendar-${day}`)?.focus())
+    }} /> : calendar}
   </section>
 }

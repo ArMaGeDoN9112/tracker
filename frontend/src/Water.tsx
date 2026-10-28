@@ -224,7 +224,7 @@ export function Water({ authorized, visible, analysis, day, csrfToken }: { autho
       {pending && (pending.action === 'delete' || pending.action === 'restore') && <><p role="status">{confirmed ? 'Операция подтверждена.' : 'Результат операции неизвестен.'}</p><button disabled={busy} onClick={() => void retry()}>Повторить операцию с водой</button>{error && <p role="alert">{error}</p>}</>}
     </div>, undoTarget)}
     <section className="water-panel" aria-label="Учёт воды" hidden={!authorized || !(visible || analysis)}>
-      <h2>Вода</h2><div hidden={!visible && !editing && !(pending?.action === 'save' && pending.method === 'PUT')}><p hidden={!visible} className="muted">Быстрые кнопки добавляют воду сейчас. Другое время укажите ниже.</p>
+      <span className="eyebrow">БЫСТРОЕ ДОБАВЛЕНИЕ</span><h2>Вода</h2><div hidden={!visible && !editing && !(pending?.action === 'save' && pending.method === 'PUT')}><p hidden={!visible} className="muted">Быстрые кнопки добавляют воду сейчас. Другое время укажите ниже.</p>
       {!settings && <button disabled={busy} onClick={() => void initialize().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение воды</button>}
       <div className="water-buttons" hidden={!visible}>{settings?.volumes_ml.map(value => <button key={value} aria-label={`Добавить ${value} мл`} disabled={locked || !!editing || !!amount} onClick={() => quick(value)}>{value} мл</button>)}</div>
       <form onSubmit={save} aria-label="Форма воды" aria-busy={busy}>
