@@ -36,7 +36,7 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
     basal: segments.flatMap(point => [{ time: point.time, value: point.basal === null ? null : Number(point.basal) }, { time: point.end, value: point.basal === null ? null : Number(point.basal) }]),
   }
   const axes = [...new Set(metrics.filter(metric => visible.includes(metric.key)).map(metric => metric.axis))]
-  const maximum = (axis: typeof metrics[number]['axis']) => Math.max(1, ...metrics.filter(metric => metric.axis === axis && visible.includes(metric.key)).flatMap(metric => data[metric.key].map(point => point.value ?? 0)))
+  const maximum = (axis: typeof metrics[number]['axis']) => axis === 'glucose' ? 30 : (axis === 'basal' ? 3 : 1) * Math.max(1, ...metrics.filter(metric => metric.axis === axis && visible.includes(metric.key)).flatMap(metric => data[metric.key].map(point => point.value ?? 0)))
   const times = [...new Set([start, end - 1, ...metrics.filter(metric => visible.includes(metric.key)).flatMap(metric => data[metric.key].map(point => point.time))])].filter(time => time < end).sort((a, b) => a - b)
   const ticks = Array.from({ length: 5 }, (_, index) => start + (end - start) * index / 4)
   const activeBasal = segments.find(point => selected !== null && point.time <= selected && selected < point.end)
@@ -86,7 +86,7 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
         <LineChart accessibilityLayer={false} margin={{ top: 16, right: 16, bottom: 8, left: 16 }}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis type="number" dataKey="time" domain={[start, end]} ticks={ticks} tickFormatter={clock} interval={0} tick={{ fill: 'var(--muted)', fontSize: 12 }} />
-          {axes.map(axis => <YAxis key={axis} yAxisId={axis} hide domain={[0, maximum(axis)]} />)}
+          {axes.map(axis => <YAxis key={axis} yAxisId={axis} hide domain={[0, maximum(axis)]} allowDataOverflow={axis === 'glucose'} />)}
           {metrics.filter(metric => visible.includes(metric.key)).map(metric => <Line key={metric.key} name={metric.label} data={data[metric.key]} dataKey="value" yAxisId={metric.axis} type={metric.key === 'basal' ? 'stepAfter' : 'linear'} stroke={metric.color} strokeDasharray={metric.dash} strokeWidth={2} dot={metric.key === 'basal' ? false : { r: 4 }} activeDot={false} connectNulls={false} isAnimationActive={false} />)}
           {selected !== null && <ReferenceLine yAxisId={axes[0]} x={selected} stroke="var(--text)" strokeDasharray="4 4" />}
         </LineChart>

@@ -27,6 +27,7 @@ test('day diabetes charts share actual times, values and selection with keyboard
   const bolus = details.getByRole('slider', { name: 'Подколки · ед.' })
   const sugarTip = details.getByRole('tooltip', { name: 'Сахар', exact: true })
   const bolusTip = details.getByRole('tooltip', { name: 'Подколки', exact: true })
+  await expect(glucose.getByText('30', { exact: true })).toBeVisible()
   await glucose.focus()
   await expect(sugarTip).toHaveText('00:00 · Сахар4,1 ммоль/л')
   await expect(bolusTip).toHaveText('00:00 · Подколки0,0 ед.')

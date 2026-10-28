@@ -76,7 +76,7 @@ export function GlucoseCharts({ active, generation, onDay }: {
           <ComposedChart data={points} accessibilityLayer title="Дневные сводки сахара и число измерений" margin={{ top: 32, right: 4, bottom: 12, left: 4 }}>
             <CartesianGrid stroke="var(--border)" vertical={false} />
             <XAxis dataKey="day" tick={{ fill: 'var(--muted)', fontSize: 12 }} tickFormatter={value => String(value).slice(5)} minTickGap={20} />
-            <YAxis yAxisId="glucose" width={40} tick={{ fill: 'var(--text)', fontSize: 12 }} label={{ value: 'ммоль/л', position: 'top', fill: 'var(--muted)', fontSize: 12, dx: 10 }} />
+            <YAxis yAxisId="glucose" domain={[0, 30]} allowDataOverflow width={40} tick={{ fill: 'var(--text)', fontSize: 12 }} label={{ value: 'ммоль/л', position: 'top', fill: 'var(--muted)', fontSize: 12, dx: 10 }} />
             <YAxis yAxisId="count" orientation="right" width={40} allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 12 }} label={{ value: 'Измерения', position: 'top', fill: 'var(--muted)', fontSize: 12, dx: -18 }} />
             <Tooltip wrapperStyle={{ maxWidth: '100%' }} contentStyle={{ background: 'var(--background)', borderColor: 'var(--muted)', color: 'var(--text)', borderRadius: 8, whiteSpace: 'normal', overflowWrap: 'anywhere' }} labelFormatter={label => `${label} · Москва`} formatter={(value, name, item) => [item.dataKey === 'count' ? `${value} измерений` : `${Number(value).toFixed(1).replace('.', ',')} ммоль/л`, name]} />
             <Legend wrapperStyle={{ fontSize: 14 }} />

@@ -66,7 +66,7 @@ export function DiabetesDayCharts({ day, entries }: { day: string; entries: Entr
             <LineChart data={values} accessibilityLayer={false} margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
               <CartesianGrid stroke="var(--border)" vertical={false} />
               <XAxis type="number" dataKey="time" domain={[start, end]} ticks={ticks} tickFormatter={clock} tick={{ fill: 'var(--muted)', fontSize: 12 }} interval={0} />
-              <YAxis width={48} domain={[0, 'auto']} tick={{ fill: 'var(--muted)', fontSize: 12 }} tickFormatter={value => String(value).replace('.', ',')} />
+              <YAxis width={48} domain={[0, key === 'glucose' ? 30 : 'auto']} allowDataOverflow={key === 'glucose'} tick={{ fill: 'var(--muted)', fontSize: 12 }} tickFormatter={value => String(value).replace('.', ',')} />
               <Line dataKey="value" type="linear" stroke={key === 'glucose' ? 'var(--accent)' : 'var(--warning)'} strokeWidth={2} dot={{ r: 4 }} activeDot={false} isAnimationActive={false} />
               {time !== null && <ReferenceLine x={time} stroke="var(--text)" strokeDasharray="4 4" />}
             </LineChart>

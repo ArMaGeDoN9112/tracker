@@ -104,6 +104,7 @@ test('glucose periods, gaps, keyboard day navigation and updated summaries', asy
   await expect(rows.nth(3).getByRole('cell')).toHaveText(['12,0', '12,0', '12,0', '1'])
   await expect(charts.getByRole('application').getByText('ммоль/л', { exact: true })).toBeVisible()
   await expect(charts.getByRole('application').getByText('Измерения', { exact: true })).toBeVisible()
+  await expect(charts.locator('.recharts-yAxis-tick-labels').first().locator('.recharts-cartesian-axis-tick-value').last()).toHaveText('30')
   // All three glucose series must break across the empty day.
   const paths = charts.locator('.recharts-line-curve')
   await expect(paths).toHaveCount(3)

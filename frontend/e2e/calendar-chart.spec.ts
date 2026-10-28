@@ -11,7 +11,7 @@ test('calendar combines all seven metrics, filters lines and tooltips, and prese
   } }))
   await page.route('**/api/day?*', route => route.fulfill({ json: {
     basal: '0.50', temporary_percent: null, temporary_basals: [],
-    basal_changes: [{ occurred_at: `${day}T06:00:00+03:00`, basal: null }, { occurred_at: `${day}T12:00:00+03:00`, basal: '0.00' }, { occurred_at: `${day}T18:00:00+03:00`, basal: '0.80' }],
+    basal_changes: [{ occurred_at: `${day}T06:00:00+03:00`, basal: null }, { occurred_at: `${day}T12:00:00+03:00`, basal: '0.00' }, { occurred_at: `${day}T18:00:00+03:00`, basal: '1.80' }],
     entries: [{ id: 'entry-1', occurred_at: `${day}T12:00:00+03:00`, glucose: '5.6', bolus: '1.2' }, { id: 'entry-2', occurred_at: `${day}T12:00:00+03:00`, glucose: null, bolus: '0.0' }],
   } }))
   await page.goto(`/?section=calendar&day=${day}`)
@@ -31,6 +31,8 @@ test('calendar combines all seven metrics, filters lines and tooltips, and prese
   await expect(plot.locator('.recharts-line')).toHaveCount(7)
   await expect(plot.locator('.recharts-line-curve')).toHaveCount(6)
   await expect(chart.getByRole('list', { name: 'Шкалы показателей' })).toContainText('Калории: 0–350 ккал')
+  await expect(chart.getByRole('list', { name: 'Шкалы показателей' })).toContainText('Сахар: 0–30 ммоль/л')
+  await expect(chart.getByRole('list', { name: 'Шкалы показателей' })).toContainText('Подколки: 0–1.2 ед.')
   if (process.env.DIARY_ACCEPTANCE_DIR) await chart.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-overview-${info.project.name}.png` })
   await plot.focus()
   await expect(tip).toContainText('00:00–06:00 · 0,50 ед/ч')
@@ -39,7 +41,7 @@ test('calendar combines all seven metrics, filters lines and tooltips, and prese
   await plot.press('ArrowRight')
   for (const value of ['350 ккал', 'Неполные данные', 'Неизвестно', 'Приём 1', 'Приём 2', '15 г', '40 г', '5,6 ммоль/л', 'Сахар не указан', '1,2 ед.', '0,0 ед.', '12:00–18:00 · 0,00 ед/ч']) await expect(tip).toContainText(value)
   await plot.press('ArrowRight')
-  await expect(tip).toContainText('18:00–24:00 · 0,80 ед/ч')
+  await expect(tip).toContainText('18:00–24:00 · 1,80 ед/ч')
   await plot.press('Escape')
   await expect(tip).toHaveCount(0)
   await plot.scrollIntoViewIfNeeded()
@@ -82,6 +84,13 @@ test('calendar combines all seven metrics, filters lines and tooltips, and prese
   await expect(tip).not.toContainText('Калории')
   // The unknown interval splits the basal path into two independent sections.
   expect((await plot.locator('.recharts-line-curve').getAttribute('d'))!.match(/M/g)!.length).toBe(2)
+  const area = await plot.locator('clipPath rect').first().evaluate(rect => ({ y: Number(rect.getAttribute('y')), height: Number(rect.getAttribute('height')) }))
+  const basal = await plot.locator('.recharts-line-curve').evaluate(path => {
+    const bounds = (path as SVGGraphicsElement).getBBox()
+    return { y: bounds.y, height: bounds.height }
+  })
+  expect(basal.y).toBeGreaterThanOrEqual(area.y + area.height * 2 / 3 - 1)
+  expect(basal.height).toBeCloseTo(area.height / 3, 0)
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -92,7 +101,7 @@ test('combined calendar keeps repeated Moscow hours as distinct events', async (
   const day = '2010-10-31'
   await page.route('**/api/day?*', route => route.fulfill({ json: {
     basal: null, basal_changes: [], temporary_basals: [], temporary_percent: null,
-    entries: [{ id: 'first', occurred_at: `${day}T02:30:00+04:00`, glucose: '4.2', bolus: '0.0' }, { id: 'second', occurred_at: `${day}T02:30:00+03:00`, glucose: '9.3', bolus: '2.0' }],
+    entries: [{ id: 'first', occurred_at: `${day}T02:30:00+04:00`, glucose: '4.2', bolus: '0.0' }, { id: 'second', occurred_at: `${day}T02:30:00+03:00`, glucose: '39.3', bolus: '2.0' }],
   } }))
   await page.goto(`/?section=calendar&day=${day}`)
   await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
@@ -101,6 +110,10 @@ test('combined calendar keeps repeated Moscow hours as distinct events', async (
   const chart = page.getByRole('region', { name: 'Общий график дня', exact: true })
   const plot = chart.getByRole('slider')
   await expect(chart).toContainText('В этот день переводились часы')
+  await expect(chart.getByRole('list', { name: 'Шкалы показателей' })).toContainText('Сахар: 0–30 ммоль/л')
+  const area = await plot.locator('clipPath rect').first().evaluate(rect => ({ y: Number(rect.getAttribute('y')), height: Number(rect.getAttribute('height')) }))
+  const glucoseY = Number(await plot.locator('.recharts-line-dot').first().getAttribute('cy'))
+  expect(glucoseY).toBeCloseTo(area.y + area.height * 0.86, 0)
   await plot.focus()
   await plot.press('ArrowRight')
   const tip = chart.getByRole('tooltip')
@@ -108,6 +121,6 @@ test('combined calendar keeps repeated Moscow hours as distinct events', async (
   await expect(tip).toContainText('4,2 ммоль/л')
   await plot.press('ArrowRight')
   await expect(tip).toContainText('02:30')
-  await expect(tip).toContainText('9,3 ммоль/л')
+  await expect(tip).toContainText('39,3 ммоль/л')
   await expect(tip).toContainText('2,0 ед.')
 })
