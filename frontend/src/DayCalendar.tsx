@@ -2,15 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { privateFetch } from './access'
 import { type Day as NutritionDay, type Totals } from './Nutrition'
 import { nutrients } from './ProductCatalog'
-import { BasalDayChart } from './BasalDayChart'
-import { DiabetesDayCharts } from './DiabetesDayCharts'
-import { NutritionDayChart } from './NutritionDayChart'
+import { CalendarDayChart } from './CalendarDayChart'
 import type { TemporaryPeriod } from './TemporaryBasal'
 import { localMinute, moscowLabel } from './time'
 import type { GlucoseDay } from './GlucoseCharts'
 
 type CalendarDay = { day: string; meal_count: number; totals: Totals; water_total_ml: number | null; glucose_average: string | null }
-type DiaryDay = {
+export type DiaryDay = {
   basal: string | null; temporary_percent: number | null
   basal_changes: { occurred_at: string; basal: string | null }[]
   temporary_basals: TemporaryPeriod[]
@@ -55,7 +53,6 @@ function DaySummary({ active, day, generation, onClose, onAnalysis, onNutrition 
       <a href={`?section=nutrition-summary&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onNutrition(day) } }}>Записи питания</a>
       {!data.nutrition.meals.length ? <p>Нет записей еды.</p> : <>
         <div className="calendar-day-totals"><span className="eyebrow">ИТОГО ЗА ДЕНЬ</span><SummaryTotals totals={data.nutrition.totals} /></div>
-        <NutritionDayChart day={day} meals={data.nutrition.meals} />
       </>}
       <h4>Вода</h4>
       {data.nutrition.water_total_ml === null ? <p>Нет записей воды.</p> : <div className="calendar-water-summary">
@@ -63,9 +60,7 @@ function DaySummary({ active, day, generation, onClose, onAnalysis, onNutrition 
       </div>}
       <h4>Сахар и подколки</h4>
       <a href={`?section=charts&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onAnalysis(day) } }}>Записи диабета</a>
-      <DiabetesDayCharts day={day} entries={data.diary.entries} />
-      <h4>База · по расписанию</h4>
-      <BasalDayChart day={day} basal={data.diary.basal} changes={data.diary.basal_changes} />
+      <CalendarDayChart key={day} day={day} meals={data.nutrition.meals} diary={data.diary} />
       {data.diary.temporary_basals.length > 0 && <details className="calendar-temporary"><summary>Временная база</summary>
         {data.diary.temporary_basals.map(period => <p key={period.id}>{period.percent}% · {moscowLabel(period.starts_at)} — {moscowLabel(period.effective_ends_at)} (не включая)</p>)}
       </details>}

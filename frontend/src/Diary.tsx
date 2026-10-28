@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { BasalSchedules } from './BasalSchedules'
 import { GlucoseCharts } from './GlucoseCharts'
 import { DayCalendar } from './DayCalendar'
+import { DiabetesDayCharts } from './DiabetesDayCharts'
 import { BasalDayChart } from './BasalDayChart'
 import { TemporaryBasal, type TemporaryPeriod } from './TemporaryBasal'
 import { localMinute, basalText, moscowLabel } from './time'
@@ -358,9 +359,10 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
     {dayLoading && <p role="status">Загружаем день…</p>}
     {dayError && <p role="alert" className="error">{dayError}</p>}
     <div hidden={dayLoading || !!dayError}>
+    {day && <DiabetesDayCharts key={day} day={day} entries={entries} />}
     <div className="day-basal-overview"><p data-testid="day-basal">База на начало дня: <strong>{basalText(dayBasal)}</strong> · по расписанию</p>
     <p data-testid="day-temporary-basal">На начало дня: <span className="status-badge">{temporaryPercent === null ? 'обычное расписание' : `временная база ${temporaryPercent}% от расписания`}</span></p></div>
-    <details className="explanation"><summary>График базы за день</summary><BasalDayChart basal={dayBasal} changes={basalChanges} /></details>
+    <details className="explanation"><summary>График базы за день</summary><BasalDayChart day={day || undefined} basal={dayBasal} changes={basalChanges} /></details>
     <section className="day-temporary" aria-label="Временная база дня" hidden={temporaryBasals.length === 0}>
       {temporaryBasals.map(row => <article key={row.id}>
         <p>Временная база {row.percent}% · с {moscowLabel(row.starts_at)} · по расписанию</p>

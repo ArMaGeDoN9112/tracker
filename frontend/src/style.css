@@ -107,8 +107,9 @@ button:disabled { opacity: .65; cursor: wait; }
 .diabetes-day-chart,.nutrition-day-chart { margin-top:16px; padding:12px; min-width:0; border:1px solid var(--border); border-radius:12px; background:var(--background); }
 .diabetes-day-chart>p { margin:0 0 8px; }
 .diabetes-day-plot { touch-action:pan-y; cursor:crosshair; }
-.diabetes-day-tooltip { min-height:72px; padding:8px; font-variant-numeric:tabular-nums; }
-.diabetes-day-tooltip p { margin:4px 0; }
+.day-chart-tooltip { pointer-events:none; position:fixed; z-index:30; width:max-content; max-width:min(320px, calc(100vw - 16px)); max-height:calc(100dvh - 16px); overflow:auto; padding:10px 12px; border:1px solid var(--muted); border-radius:8px; background:var(--background); color:var(--text); box-shadow:0 4px 16px #0003; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.day-chart-tooltip p { margin:4px 0; }
+.day-chart-tooltip>div+div { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
 @media(max-width:767px) {
   .calendar-nutrients { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .calendar-day-totals,.calendar-water-summary,.basal-day-chart { padding:12px; }
@@ -324,4 +325,12 @@ button[type=submit] { background:var(--accent); color:#102b22; border-color:var(
 
 .nutrition-legend { display:flex; flex-wrap:wrap; gap:8px 20px; list-style:none; margin:0; padding:0; font-size:.875rem; }
 .nutrition-legend li { display:flex; align-items:center; gap:8px; }
-.nutrition-axis-units { display:flex; justify-content:space-between; padding:4px 8px 0; color:var(--muted); font-size:.75rem; }
+
+.calendar-day-chart { --calendar-glucose:#f3a6aa; --calendar-bolus:#c4d879; margin-top:16px; padding:12px; border:1px solid var(--border); border-radius:12px; min-width:0; }
+.calendar-chart-options { display:flex; flex-wrap:wrap; gap:4px 16px; border:0; padding:0; margin:0; }
+.calendar-chart-options label { display:flex; align-items:center; gap:8px; min-height:44px; margin:0; cursor:pointer; }
+.calendar-chart-options input { width:20px; min-height:20px; height:20px; margin:0; accent-color:var(--accent); }
+.calendar-chart-scales { display:flex; flex-wrap:wrap; gap:4px 16px; padding:0; list-style:none; color:var(--muted); font-size:.8rem; }
+
+.calendar-day-chart .day-chart-tooltip { pointer-events:auto; font-size:.875rem; line-height:1.4; overscroll-behavior:contain; }
+.calendar-day-chart .day-chart-tooltip p { margin:2px 0 6px; }

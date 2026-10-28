@@ -22,7 +22,7 @@ FROM python-base AS back
 RUN useradd --create-home --uid 10001 diary \
     && mkdir /data && chown diary:diary /data
 USER diary
-CMD ["uvicorn", "diary.app:from_env", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers", "--no-access-log"]
+CMD ["sh", "-c", "python -m diary.admin --database \"$DIARY_DATABASE\" migrate && exec uvicorn diary.app:from_env --factory --host 0.0.0.0 --port 8000 --no-proxy-headers --no-access-log"]
 
 FROM back AS backup
 USER root

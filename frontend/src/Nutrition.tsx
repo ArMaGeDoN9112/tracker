@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { privateFetch } from './access'
 import { Water } from './Water'
+import { NutritionDayChart } from './NutritionDayChart'
 import { NutritionSummary } from './NutritionSummary'
 import { ProductCatalog, nutrients, type Product, type Portion, type ProductSeed } from './ProductCatalog'
 import { localMinute, moscowLabel } from './time'
@@ -324,6 +325,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
           {loading && <p role="status">Загружаем день питания…</p>}
           {dayError && <p role="alert" className="error">{dayError}</p>}
           {!loading && !dayError && data?.day === day && <>{!data.meals.length ? <p>Нет записей еды</p> : <><h3>Итоги дня</h3><TotalsView totals={data.totals} />
+            <NutritionDayChart key={day} day={day} meals={data.meals} />
             {data.meals.map(row => <article className="meal-history" key={row.id} aria-label={`Приём ${moscowLabel(row.occurred_at)}`}><MealDetails meal={row} onProduct={openProduct} productDisabled={locked || catalogEditing} /><div className="catalog-actions"><button disabled={locked} onClick={() => edit(row)}>Изменить приём</button><button disabled={locked} onClick={() => void repeat(row)}>Повторить приём</button><button disabled={locked} onClick={() => void action(row, 'delete')}>Удалить приём</button></div></article>)}
           </>}</>}
         </section>
