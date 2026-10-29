@@ -158,7 +158,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       if (version !== formGeneration.current) return
       const { id, revision, name, unit, protein, fat, carbohydrate, calories, portions } = current
       const lineId = crypto.randomUUID()
-      setLines(rows => [...rows, { id: lineId, kind: 'product', name, unit, quantity: '100', basis_quantity: '100.00',
+      setLines(rows => [...rows, { id: lineId, kind: 'product', name, unit, quantity: portions.length ? '' : '100', basis_quantity: '100.00',
         protein, fat, carbohydrate, calories, product_id: id, product_revision: revision, portion: null, portions }])
       setNotice('Продукт добавлен в состав.')
       focusMealForm.current = lineId
@@ -315,8 +315,18 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
                   <label htmlFor={`meal-name-${line.id}`}>Название строки {index + 1}</label><input id={`meal-name-${line.id}`} required maxLength={200} value={line.name} onChange={e => set({ name: e.target.value })} {...invalid(`lines.${index}.name`)} />{inlineError(`lines.${index}.name`)}
                   {inlineError(`lines.${index}`)}
                   {line.kind === 'one_off' && <><label htmlFor={`meal-unit-${line.id}`}>Единица строки {index + 1}</label><select id={`meal-unit-${line.id}`} required={!!line.quantity || !!line.basis_quantity} value={line.unit ?? ''} onChange={e => set({ unit: e.target.value as Line['unit'] || null })} disabled={!!line.basis_quantity} {...invalid(`lines.${index}.unit`)}><option value="">Количество неизвестно</option><option value="g">г</option><option value="ml">мл</option></select>{inlineError(`lines.${index}.unit`)}</>}
-                  {!!line.portions?.length && <><label htmlFor={`meal-portion-${line.id}`}>Порция строки {index + 1}</label><select id={`meal-portion-${line.id}`} value={line.portion?.id ?? ''} onChange={e => { const portion = line.portions!.find(p => p.id === e.target.value) ?? null; set({ portion, ...(portion ? { quantity: portion.quantity } : {}) }) }}><option value="">Произвольное количество</option>{line.portions.map(p => <option key={p.id} value={p.id}>{p.name} · {p.quantity} {unit}</option>)}</select></>}
-                  {line.portion && <p>Выбрана порция: {line.portion.name} · {line.portion.quantity} {unit}; съеденное количество можно изменить.</p>}
+                  {!!line.portions?.length && <div className="catalog-actions" role="group" aria-label={`Порции строки ${index + 1}`}>
+                    {line.portions.map(portion => <button type="button" key={portion.id} onClick={() => {
+                      const value = (line.quantity?.trim() || '0').replace(',', '.')
+                      const quantity = Math.round(Number(value) * 100) + Math.round(Number(portion.quantity) * 100)
+                      if (!/^\+?[0-9]+(?:\.[0-9]{1,2}0*)?$/.test(value) || !Number.isSafeInteger(quantity) || quantity > 2147483647) {
+                        setField(`lines.${index}.quantity`); setError('Укажите корректное количество перед добавлением порции.'); return
+                      }
+                      set({ portion, quantity: String(quantity / 100) })
+                      setField(null); setError('')
+                    }}>Добавить порцию {portion.name} · {portion.quantity} {unit}</button>)}
+                  </div>}
+                  {line.portion && <p>Последняя добавленная порция: {line.portion.name} · {line.portion.quantity} {unit}; каждое нажатие прибавляет её к количеству.</p>}
                   <label htmlFor={`meal-quantity-${line.id}`}>Количество строки {index + 1}, {unit}</label><input id={`meal-quantity-${line.id}`} required={line.kind === 'product' || !!line.basis_quantity} inputMode="decimal" value={line.quantity ?? ''} onChange={e => set({ quantity: e.target.value || null })} {...invalid(`lines.${index}.quantity`)} />{inlineError(`lines.${index}.quantity`)}
                   {line.kind === 'one_off' && <p>Значения за всю исходную порцию. {line.basis_quantity === undefined ? 'При первом сохранении количество станет исходной основой.' : line.basis_quantity === null ? 'Исходное количество неизвестно: новый вес сам по себе не пересчитывает ценность.' : `Сохранённая основа: ${line.basis_quantity} ${unit}; пересчёт без накопления округлений.`}</p>}
                   <details open={line.kind === 'one_off'}><summary>{line.kind === 'product' ? `Исходные значения на ${line.basis_quantity} ${unit}` : 'Исходная порция и её ценность'}</summary>

@@ -46,7 +46,14 @@ test('catalog composition, independent product creation, frozen draft, totals af
   await start(page)
   const name = await createProduct(page)
   await choose(page, name)
-  await page.getByLabel('Порция строки 1', { exact: true }).selectOption({ label: 'Упаковка · 180.00 г' })
+  const portion = form(page).getByRole('button', { name: 'Добавить порцию Упаковка · 180.00 г', exact: true })
+  await portion.click()
+  await expect(page.getByLabel('Количество строки 1, г', { exact: true })).toHaveValue('180')
+  await portion.click()
+  await expect(page.getByLabel('Количество строки 1, г', { exact: true })).toHaveValue('360')
+  await page.getByLabel('Количество строки 1, г', { exact: true }).fill('0,10')
+  await portion.click()
+  await expect(page.getByLabel('Количество строки 1, г', { exact: true })).toHaveValue('180.1')
   await page.getByLabel('Количество строки 1, г', { exact: true }).fill('90')
   await expect(form(page).locator('.meal-totals')).toHaveCount(0)
   // Editing the card cannot rewrite a product already picked into the meal.
@@ -99,6 +106,7 @@ test('lost committed response keeps exact body through navigation and login; rep
   await start(page)
   const name = await createProduct(page)
   await choose(page, name)
+  await page.getByLabel('Количество строки 1, г').fill('100')
   await page.getByLabel('Время приёма — Москва').fill('2026-10-19T13:00')
   const bodies: string[] = []
   page.on('request', request => { if (request.url().endsWith('/api/meals') && request.method() === 'POST') bodies.push(request.postData()!) })
@@ -237,6 +245,7 @@ test('expired session during CSRF does not automatically save under a new login'
   await start(page)
   const name = await createProduct(page)
   await choose(page, name)
+  await page.getByLabel('Количество строки 1, г').fill('100')
   let release!: () => void
   let reached!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
@@ -289,6 +298,7 @@ test('meal uses previous calendar date and exact latest glucose time after midni
   await expect(page.getByLabel('Время приёма — Москва')).toHaveValue('2026-10-18T23:45')
   const name = await createProduct(page)
   await choose(page, name)
+  await page.getByLabel('Количество строки 1, г').fill('100')
   const request = page.waitForRequest(request => request.url().endsWith('/api/meals') && request.method() === 'POST')
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   expect((await request).postDataJSON().occurred_at).toBe('2026-10-18T20:45:56.789Z')
