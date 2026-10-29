@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
+import { useChartTooltipDismiss } from './useChartTooltipDismiss'
 import type { DiaryDay } from './DayCalendar'
 import type { Day } from './Nutrition'
 import { nutrients } from './ProductCatalog'
@@ -25,6 +26,7 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
     return () => observer.disconnect()
   }, [])
   const [selected, setSelected] = useState<number | null>(null)
+  useChartTooltipDismiss(() => setSelected(null))
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [start, end] = moscowDayBounds(day)
   const clock = (value: number) => value === end ? '24:00' : localMinute(new Date(value).toISOString()).slice(11)
@@ -117,14 +119,14 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
     </div>}
     {showMeals && <div className="calendar-meals">
       <h5>Еда</h5>
-      {!meals.length ? <p className="muted">Нет приёмов пищи.</p> : <ul className="calendar-meal-track" aria-label="Приёмы пищи по времени" style={{ height: rowEnds.length * 88 + 12 }}>
+      {!meals.length ? <p className="muted">Нет приёмов пищи.</p> : <ul className="calendar-meal-track" aria-label="Приёмы пищи по времени">
         {cards.map(({ meal, anchor, left, row }) => <li key={meal.id}>
-          <span className="calendar-meal-stem" aria-hidden="true" style={{ left: anchor, height: row * 88 + 12 }} />
-          <button type="button" className="calendar-meal-card" aria-pressed={selected === Date.parse(meal.occurred_at)} style={{ left, top: row * 88 + 12, width: cardWidth }}
+          <span className="calendar-meal-stem" aria-hidden="true" style={{ left: anchor, gridRow: `1 / span ${row + 1}` }} />
+          <button type="button" className="calendar-meal-card" aria-pressed={selected === Date.parse(meal.occurred_at)} style={{ marginLeft: left, gridRow: row + 1, width: cardWidth }}
             onPointerEnter={event => { if (event.pointerType === 'mouse') selectMeal(meal, event.currentTarget) }}
             onFocus={event => selectMeal(meal, event.currentTarget)} onClick={event => selectMeal(meal, event.currentTarget)}>
             <strong>{clock(Date.parse(meal.occurred_at))}</strong>
-            <span>{meal.lines.map(line => line.name).join(', ') || 'Приём пищи'}</span>
+            <span className="calendar-meal-foods">{meal.lines.length ? meal.lines.map(line => <span key={line.id}>{line.name}</span>) : 'Приём пищи'}</span>
             <small>У {meal.totals.carbohydrate.value === null ? 'неизвестно' : `${meal.totals.carbohydrate.value.replace('.', ',')} г`}{meal.totals.carbohydrate.incomplete && ' · неполные данные'}</small>
           </button>
         </li>)}

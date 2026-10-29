@@ -122,6 +122,7 @@ button:disabled { opacity: .65; cursor: wait; }
 .diabetes-day-plot { touch-action:pan-y; cursor:crosshair; }
 .day-chart-tooltip { pointer-events:none; position:fixed; z-index:30; width:max-content; max-width:min(320px, calc(100vw - 16px)); max-height:calc(100dvh - 16px); overflow:auto; padding:10px 12px; border:1px solid var(--muted); border-radius:8px; background:var(--background); color:var(--text); box-shadow:0 4px 16px #0003; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .day-chart-tooltip p { margin:4px 0; }
+.chart-tooltip-dismissed .recharts-tooltip-wrapper,.chart-tooltip-dismissed .recharts-tooltip-cursor { visibility:hidden !important; }
 .day-chart-tooltip>div+div { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
 @media(max-width:767px) {
   .calendar-nutrients { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -380,11 +381,13 @@ button,input,select,textarea,a { scroll-margin-block:20px; }
 .calendar-day-chart>p,.calendar-chart-options legend { font-size:.8125rem; }
 .calendar-chart-scales { display:flex; flex-wrap:wrap; gap:4px 16px; padding:0; list-style:none; color:var(--muted); font-size:.8rem; }
 .calendar-meals h5 { margin:4px 16px 12px; font-size:.8125rem; color:var(--muted); }
-.calendar-meal-track { position:relative; margin:0 16px; padding:0; list-style:none; border-top:1px solid var(--border); }
-.calendar-meal-stem { position:absolute; top:0; border-left:1px solid var(--border); pointer-events:none; }
+.calendar-meal-track { position:relative; display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin:0 16px; padding:12px 0 0; list-style:none; border-top:1px solid var(--border); }
+.calendar-meal-track>li { display:contents; }
+.calendar-meal-stem { position:relative; grid-column:1; width:0; margin-top:-12px; border-left:1px solid var(--border); pointer-events:none; }
 .calendar-meal-stem::before { content:''; position:absolute; left:-4px; top:-4px; width:7px; height:7px; border-radius:50%; background:var(--accent); }
-.calendar-day-chart .calendar-meal-card { position:absolute; z-index:1; display:flex; flex-direction:column; align-items:flex-start; gap:3px; height:76px; min-height:0; margin:0; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); text-align:left; font-size:.8125rem; line-height:1.25; cursor:pointer; }
-.calendar-meal-card>span,.calendar-meal-card>small { width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.calendar-day-chart .calendar-meal-card { position:relative; grid-column:1; align-self:start; z-index:1; display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-height:76px; margin:0; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); text-align:left; font-size:.8125rem; line-height:1.25; cursor:pointer; }
+.calendar-meal-card>span,.calendar-meal-card>small { width:100%; white-space:normal; overflow-wrap:anywhere; }
+.calendar-meal-foods>span { display:block; }
 .calendar-meal-card>small { color:var(--muted); font-size:.75rem; }
 .calendar-day-chart .calendar-meal-card:hover,.calendar-day-chart .calendar-meal-card[aria-pressed=true] { border-color:var(--accent); background:var(--surface); }
 .calendar-meal-details { margin:8px 0; padding-bottom:6px; border-bottom:1px solid var(--border); }

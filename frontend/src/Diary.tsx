@@ -7,7 +7,7 @@ import { DayCalendar } from './DayCalendar'
 import { DiabetesDayCharts } from './DiabetesDayCharts'
 import { BasalDayChart } from './BasalDayChart'
 import { TemporaryBasal, type TemporaryPeriod } from './TemporaryBasal'
-import { localMinute, basalText, moscowLabel } from './time'
+import { localMinute, basalText, moscowLabel, moscowDayBounds } from './time'
 
 type Entry = { id: string; occurred_at: string; glucose: string | null; bolus: string; reason: string | null; comment: string; basal: string | null; revision: number; deleted_at: string | null; created_at: string }
 type PendingAction = { path: string; body: string; action: 'delete' | 'restore' }
@@ -24,6 +24,7 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
   const [dayError, setDayError] = useState('')
   const [todayLoading, setTodayLoading] = useState(false)
   const [entries, setEntries] = useState<Entry[]>([])
+  const [previousEntries, setPreviousEntries] = useState<Entry[]>([])
   const [dayBasal, setDayBasal] = useState<string | null>(null)
   const [formBasal, setFormBasal] = useState<string | null>(null)
   const [basalChanges, setBasalChanges] = useState<{ occurred_at: string; basal: string | null }[]>([])
@@ -155,10 +156,15 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
     const sequence = ++dayRequest.current
     setDayLoading(true); setDayError('')
     try {
-      const response = await privateFetch(`/api/day?day=${selected}`, { cache: 'no-store' })
-      if (!response.ok) throw new Error('Не удалось загрузить день.')
+      const previousDay = localMinute(new Date(moscowDayBounds(selected)[0] - 1).toISOString()).slice(0, 10)
+      const [response, previous] = await Promise.all([
+        privateFetch(`/api/day?day=${selected}`, { cache: 'no-store' }),
+        selected === '0001-01-01' ? null : privateFetch(`/api/day?day=${previousDay}`, { cache: 'no-store' }),
+      ])
+      if (!response.ok || (previous && !previous.ok)) throw new Error('Не удалось загрузить день.')
       const result = await response.json()
-      if (sequence === dayRequest.current && selected === selectedDay.current) { setEntries(result.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes); setTemporaryBasals(result.temporary_basals); setTemporaryPercent(result.temporary_percent) }
+      const previousResult = previous ? await previous.json() : { entries: [] }
+      if (sequence === dayRequest.current && selected === selectedDay.current) { setEntries(result.entries); setPreviousEntries(previousResult.entries); setDayBasal(result.basal); setBasalChanges(result.basal_changes); setTemporaryBasals(result.temporary_basals); setTemporaryPercent(result.temporary_percent) }
     } catch (failure) {
       if (sequence === dayRequest.current) setDayError('Не удалось загрузить день. Перезагрузите страницу.')
       if (sequence === dayRequest.current) throw failure
@@ -196,7 +202,7 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
 
   useEffect(() => {
     ++dayRequest.current
-    setEntries([]); setDayBasal(null); setBasalChanges([]); setTemporaryBasals([]); setTemporaryPercent(null)
+    setEntries([]); setPreviousEntries([]); setDayBasal(null); setBasalChanges([]); setTemporaryBasals([]); setTemporaryPercent(null)
     if (active && section === 'charts' && day) loadDay(day).catch(() => {})
   }, [active, day, section])
 
@@ -364,7 +370,7 @@ export function Diary({ active, section, day, temporary, onDay, onNutrition, onV
     {dayLoading && <p role="status">Загружаем день…</p>}
     {dayError && <p role="alert" className="error">{dayError}</p>}
     <div hidden={dayLoading || !!dayError}>
-    {day && <DiabetesDayCharts key={day} day={day} entries={entries} />}
+    {day && <DiabetesDayCharts key={day} day={day} entries={entries} previousEntries={previousEntries} />}
     <div className="day-basal-overview"><p data-testid="day-basal">База на начало дня: <strong>{basalText(dayBasal)}</strong> · по расписанию</p>
     <p data-testid="day-temporary-basal">На начало дня: <span className="status-badge">{temporaryPercent === null ? 'обычное расписание' : `временная база ${temporaryPercent}% от расписания`}</span></p></div>
     <details className="explanation"><summary>График базы за день</summary><BasalDayChart day={day || undefined} basal={dayBasal} changes={basalChanges} /></details>

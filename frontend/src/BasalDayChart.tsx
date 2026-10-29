@@ -1,4 +1,5 @@
-import { useEffect, useId, useState } from 'react'
+import { useId, useState } from 'react'
+import { useChartTooltipDismiss } from './useChartTooltipDismiss'
 import { localMinute, basalText, moscowLabel, moscowDayBounds } from './time'
 
 type Change = { occurred_at: string; basal: string | null }
@@ -31,11 +32,7 @@ export function BasalDayChart({ day, basal, changes }: { day?: string; basal: st
 export function BasalChart({ points, duration = 24, clock }: { points: { hour: number; basal: string | null }[]; duration?: number; clock?: (hour: number) => string }) {
   const [selected, setSelected] = useState<number | null>(null)
   const tooltipId = useId()
-  useEffect(() => {
-    const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelected(null) }
-    document.addEventListener('keydown', dismiss)
-    return () => document.removeEventListener('keydown', dismiss)
-  }, [])
+  useChartTooltipDismiss(() => setSelected(null))
   const segments = points.map((point, index) => ({ ...point, end: points[index + 1]?.hour ?? duration })).filter(point => point.end > point.hour)
   const maximum = Math.max(1, ...segments.map(point => Number(point.basal)))
   const x = (hour: number) => 40 + hour / duration * 300

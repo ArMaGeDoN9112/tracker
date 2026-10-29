@@ -147,6 +147,7 @@ test('combined calendar keeps repeated Moscow hours as distinct events', async (
 
 test('meal timeline keeps day edges, unknown carbs and food-only selection', async ({ page }, info) => {
   const day = '2089-01-12'
+  const lunchFoods = ['Гречка с овощами и грибами', 'Куриная грудка', 'Салат из свежих овощей', 'Цельнозерновой хлеб', 'Чай без сахара']
   const total = (value: string | null, incomplete = false) => ({ value, incomplete, known_count: value === null ? 0 : 1, unknown_count: incomplete || value === null ? 1 : 0 })
   const totals = { calories: total('350'), protein: total('15'), fat: total('10'), carbohydrate: total('40') }
   await page.route('**/api/nutrition-day?*', route => route.fulfill({ json: {
@@ -154,7 +155,7 @@ test('meal timeline keeps day edges, unknown carbs and food-only selection', asy
     meals: ['00:00:00.000', '08:00:00.000', '12:30:00.000', '12:31:00.000', '23:59:59.999'].map((time, index) => ({
       id: `meal-${index}`, occurred_at: `${day}T${time}+03:00`,
       totals: { ...totals, carbohydrate: index === 0 ? total('0') : index === 4 ? total(null, true) : total('40', index === 3) },
-      lines: [{ id: `line-${index}`, name: ['Чай', 'Омлет, хлеб', 'Гречка, курица', 'Яблоко', 'Кефир'][index], quantity: '150', unit: 'g' }],
+      lines: (index === 2 ? lunchFoods : [['Чай', 'Омлет, хлеб', '', 'Яблоко', 'Кефир'][index]]).map((name, line) => ({ id: `line-${index}-${line}`, name, quantity: '150', unit: 'g' })),
     })),
   } }))
   await page.route('**/api/day?*', route => route.fulfill({ json: { basal: null, basal_changes: [], temporary_basals: [], temporary_percent: null, entries: [] } }))
@@ -171,6 +172,10 @@ test('meal timeline keeps day edges, unknown carbs and food-only selection', asy
   await expect(cards.last()).toContainText('23:59КефирУ неизвестно')
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 })
+    for (const food of lunchFoods) await expect(cards.nth(2)).toContainText(food)
+    await expect.poll(() => cards.evaluateAll(elements => elements.every(card => [...card.querySelectorAll('span, small')].every(text =>
+      text.scrollWidth <= text.clientWidth && text.scrollHeight <= text.clientHeight && text.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom
+    )))).toBe(true)
     await expect.poll(async () => {
       const bounds = (await track.boundingBox())!
       const boxes = await cards.evaluateAll(elements => elements.map(element => {

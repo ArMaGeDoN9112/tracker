@@ -1,4 +1,5 @@
 import { privateFetch } from './access'
+import { useChartTooltipDismiss } from './useChartTooltipDismiss'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Dot, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, type DotItemDotProps } from 'recharts'
 
@@ -15,6 +16,10 @@ export function GlucoseCharts({ active, generation, onDay }: {
   const [query, setQuery] = useState('period=week')
   const [summary, setSummary] = useState<Summary | null>(null)
   const [error, setError] = useState('')
+  const plot = useRef<HTMLDivElement>(null)
+  // Hide the library tooltip without rebuilding clickable day markers during a tap.
+  useChartTooltipDismiss(() => plot.current?.classList.add('chart-tooltip-dismissed'))
+  const showTooltip = () => plot.current?.classList.remove('chart-tooltip-dismissed')
 
   useEffect(() => {
     let cancelled = false
@@ -70,7 +75,9 @@ export function GlucoseCharts({ active, generation, onDay }: {
       <p className="glucose-bounds" data-testid="period-bounds">{summary.start} — {summary.end} · Москва · обе даты включены</p>
       <p className="glucose-total summary-counts" data-testid="period-average"><span>Среднее за период: <strong>{glucoseText(summary.average)} <small>ммоль/л</small></strong></span> · <span>измерений: <strong>{summary.count}</strong></span></p>
       {summary.count === 0 && <p role="status">В этом периоде нет измерений сахара.</p>}
-      <div className="period-visuals"><div className="glucose-plot">
+      <div className="period-visuals"><div ref={plot} className="glucose-plot"
+        onPointerDownCapture={showTooltip} onPointerMove={showTooltip}
+        onFocusCapture={showTooltip} onKeyDownCapture={event => { if (event.key !== 'Escape') showTooltip() }}>
         <ResponsiveContainer width="100%" height={320}>
           <ComposedChart data={points} accessibilityLayer title="Дневные сводки сахара и число измерений" margin={{ top: 32, right: 4, bottom: 12, left: 4 }}>
             <CartesianGrid stroke="var(--border)" vertical={false} />

@@ -1,5 +1,6 @@
 import { ChartTooltip } from './ChartTooltip'
-import { useEffect, useId, useState, type PointerEvent } from 'react'
+import { useChartTooltipDismiss } from './useChartTooltipDismiss'
+import { useId, useState, type PointerEvent } from 'react'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import type { Day, Totals } from './Nutrition'
 import { nutrients } from './ProductCatalog'
@@ -13,11 +14,7 @@ export function NutritionDayChart({ day, meals }: { day: string; meals: Day['mea
   const [selected, setSelected] = useState<number | null>(null)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const id = useId()
-  useEffect(() => {
-    const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelected(null) }
-    document.addEventListener('keydown', dismiss)
-    return () => document.removeEventListener('keydown', dismiss)
-  }, [])
+  useChartTooltipDismiss(() => setSelected(null))
   const [start, end] = moscowDayBounds(day)
   const points = meals.map(meal => ({ time: Date.parse(meal.occurred_at), ...Object.fromEntries(series.map(([key]) => [key, meal.totals[key].value === null ? null : Number(meal.totals[key].value)])) }))
     .sort((a, b) => a.time - b.time)

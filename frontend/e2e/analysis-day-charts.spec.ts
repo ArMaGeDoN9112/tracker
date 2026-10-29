@@ -23,8 +23,8 @@ test('day diabetes charts share actual times, values and selection with keyboard
   }
   await page.reload()
   const details = page.getByRole('region', { name: 'Хронология дня' })
-  const glucose = details.getByRole('slider', { name: 'Сахар · ммоль/л' })
-  const bolus = details.getByRole('slider', { name: 'Подколки · ед.' })
+  const glucose = details.getByRole('slider', { name: 'Сахар и инсулин по времени' })
+  const bolus = glucose
   const sugarTip = details.getByRole('tooltip', { name: 'Сахар', exact: true })
   const bolusTip = details.getByRole('tooltip', { name: 'Подколки', exact: true })
   await expect(glucose.getByText('30', { exact: true })).toBeVisible()
@@ -44,6 +44,7 @@ test('day diabetes charts share actual times, values and selection with keyboard
   await expect(bolusTip).toContainText('Запись 1: 1,1 ед.')
   await expect(bolusTip).toContainText('Запись 2: 3,3 ед.')
   await page.keyboard.press('End')
+  await page.keyboard.press('ArrowLeft')
   await expect(sugarTip).toHaveText('23:59 · Сахар7,7 ммоль/л')
   await page.keyboard.press('Home')
   await expect(sugarTip).toContainText('00:00')
@@ -51,10 +52,10 @@ test('day diabetes charts share actual times, values and selection with keyboard
   await expect(sugarTip).toHaveCount(0)
   await expect(bolusTip).toHaveCount(0)
 
-  // Use the rendered clock marks to exercise the same time on each chart.
+  // Use the rendered clock marks to exercise selection on the combined chart.
   const boxes: number[][] = []
   const origins: number[] = []
-  for (const slider of [glucose, bolus]) {
+  for (const slider of [glucose]) {
     await slider.scrollIntoViewIfNeeded()
     const left = await slider.getByText('00:00', { exact: true }).boundingBox()
     const middle = await slider.getByText('12:00', { exact: true }).boundingBox()
@@ -80,10 +81,9 @@ test('day diabetes charts share actual times, values and selection with keyboard
       await expect(bolusTip).toContainText('3,3 ед.')
     }
   }
-  boxes[0].forEach((x, index) => expect(x - origins[0]).toBeCloseTo(boxes[1][index] - origins[1], 0))
-  await expect(glucose.locator('.recharts-line-curve')).toHaveAttribute('d', /C/)
+  await expect(glucose.locator('.recharts-line-curve').first()).toHaveAttribute('d', /C/)
   await expect(glucose.locator('.recharts-line-dot')).toHaveCount(5)
-  await expect(bolus.locator('.recharts-line')).toHaveCount(0)
+  await expect(bolus.locator('.recharts-line')).toHaveCount(2)
   await expect(bolus.locator('.recharts-bar')).toHaveCount(1)
   expect(await bolus.locator('.recharts-bar-rectangle').count()).toBeGreaterThan(0)
   await page.getByRole('heading', { level: 1 }).focus()
@@ -127,7 +127,7 @@ test('historical repeated hours and single indicators retain every event within 
   }
   await page.reload()
   const details = page.getByRole('region', { name: 'Хронология дня' })
-  const glucose = details.getByRole('slider', { name: 'Сахар · ммоль/л' })
+  const glucose = details.getByRole('slider', { name: 'Сахар и инсулин по времени' })
   const sugarTip = details.getByRole('tooltip', { name: 'Сахар', exact: true })
   const bolusTip = details.getByRole('tooltip', { name: 'Подколки', exact: true })
   await glucose.focus()
@@ -141,6 +141,7 @@ test('historical repeated hours and single indicators retain every event within 
   await expect(sugarTip).toContainText('9,3 ммоль/л')
   await expect(bolusTip).toContainText('2,0 ед.')
   await page.keyboard.press('End')
+  await page.keyboard.press('ArrowLeft')
   await expect(sugarTip).toContainText('23:59')
   await expect(sugarTip).toContainText('5,4 ммоль/л')
   await expect(sugarTip).not.toContainText('99,')
@@ -151,12 +152,14 @@ test('historical repeated hours and single indicators retain every event within 
       await expect(details).toContainText(expected)
       await glucose.focus()
       await page.keyboard.press('ArrowRight')
-      await expect(sugarTip).toHaveCount(0)
+      await expect(sugarTip).toContainText('Нет записи в этот момент')
     } else {
       await glucose.focus()
+      await page.keyboard.press('ArrowRight')
       await expect(sugarTip).toContainText(expected)
       await expect(bolusTip).toContainText(month === '05' ? '0,0 ед.' : '1,7 ед.')
       await page.keyboard.press('End')
+      await page.keyboard.press('ArrowLeft')
       await expect(sugarTip).toContainText(expected)
     }
   }
