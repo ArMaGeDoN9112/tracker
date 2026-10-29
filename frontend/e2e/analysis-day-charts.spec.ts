@@ -81,11 +81,11 @@ test('day diabetes charts share actual times, values and selection with keyboard
     }
   }
   boxes[0].forEach((x, index) => expect(x - origins[0]).toBeCloseTo(boxes[1][index] - origins[1], 0))
-  for (const slider of [glucose, bolus]) {
-    const line = slider.locator('.recharts-line-curve')
-    await expect(line).toBeVisible()
-    await expect(line).not.toHaveCSS('stroke', 'none')
-  }
+  await expect(glucose.locator('.recharts-line-curve')).toHaveAttribute('d', /C/)
+  await expect(glucose.locator('.recharts-line-dot')).toHaveCount(5)
+  await expect(bolus.locator('.recharts-line')).toHaveCount(0)
+  await expect(bolus.locator('.recharts-bar')).toHaveCount(1)
+  expect(await bolus.locator('.recharts-bar-rectangle').count()).toBeGreaterThan(0)
   await page.getByRole('heading', { level: 1 }).focus()
   await glucose.hover()
   await expect(sugarTip).toBeVisible()

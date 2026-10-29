@@ -1,13 +1,12 @@
 import { ChartTooltip } from './ChartTooltip'
 import { useEffect, useId, useState, type PointerEvent } from 'react'
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import type { Day, Totals } from './Nutrition'
 import { nutrients } from './ProductCatalog'
 import { localMinute, moscowDayBounds } from './time'
 
 const series = [nutrients[3], ...nutrients.slice(0, 3)]
 const colors = { calories: 'var(--accent)', protein: 'var(--water)', fat: 'var(--nutrition-fat)', carbohydrate: 'var(--warning)' }
-const dashes = { calories: undefined, protein: '8 3', fat: '3 3', carbohydrate: '8 3 2 3' }
 const valueText = (total: Totals[keyof Totals], unit: string) => `${total.value === null ? 'Неизвестно' : `${total.value} ${unit}`}${total.incomplete ? ' · Неполные данные' : ''}`
 
 export function NutritionDayChart({ day, meals }: { day: string; meals: Day['meals'] }) {
@@ -39,12 +38,12 @@ export function NutritionDayChart({ day, meals }: { day: string; meals: Day['mea
   }
 
   return <div className="nutrition-day-charts">
-    <p className="muted" id={`${id}-help`}>Наведите, коснитесь или проведите по графику. С клавиатуры: стрелки, Home и End; Escape скрывает подсказку. Точки — приёмы пищи; линии соединяют записи. Пропуски не равны нулю.</p>
+    <p className="muted" id={`${id}-help`}>Наведите, коснитесь или проведите по графику. С клавиатуры: стрелки, Home и End; Escape скрывает подсказку. Столбики — КБЖУ каждого приёма пищи. Пропуски не равны нулю.</p>
     {(end - start) !== 86400000 && <p className="muted">В этот день переводились часы. Повторяющиеся часы показаны в порядке событий.</p>}
     {[series.slice(0, 1), series.slice(1)].map((group, index) => <div className="nutrition-day-chart" key={index}>
       <p><strong>{index === 0 ? 'Калории' : 'БЖУ'}</strong> · {index === 0 ? 'ккал' : 'г'}</p>
       <ul className="nutrition-legend" aria-label="Показатели питания">{group.map(([key, label, unit]) => <li key={key}>
-        <svg width="28" height="12" aria-hidden="true"><line x1="0" x2="28" y1="6" y2="6" stroke={colors[key]} strokeWidth="3" strokeDasharray={dashes[key]} /></svg>{label} · {unit}
+        <svg width="28" height="12" aria-hidden="true"><rect x="10" y="1" width="8" height="10" fill={colors[key]} fillOpacity={0.6} /></svg>{label} · {unit}
       </li>)}</ul>
       <div className="diabetes-day-plot" role="slider" tabIndex={0} aria-label={index === 0 ? 'Калории по времени' : 'БЖУ по времени'}
         aria-describedby={`${id}-help`} aria-disabled={!times.length}
@@ -66,13 +65,13 @@ export function NutritionDayChart({ day, meals }: { day: string; meals: Day['mea
           }
         }}>
         <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={points} accessibilityLayer={false} margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
+          <BarChart data={points} accessibilityLayer={false} barGap={4} margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
             <CartesianGrid stroke="var(--border)" vertical={false} />
             <XAxis type="number" dataKey="time" domain={[start, end]} ticks={ticks} tickFormatter={clock} tick={{ fill: 'var(--muted)', fontSize: 12 }} interval={0} />
             <YAxis width={48} domain={[0, 'auto']} tick={{ fill: 'var(--muted)', fontSize: 12 }} />
-            {group.map(([key]) => <Line key={key} dataKey={key} type="linear" stroke={colors[key]} strokeDasharray={dashes[key]} strokeWidth={2} dot={{ r: 4 }} activeDot={false} isAnimationActive={false} />)}
+            {group.map(([key]) => <Bar key={key} dataKey={key} barSize={8} fill={colors[key]} fillOpacity={0.55} stroke="none" radius={[2, 2, 0, 0]} isAnimationActive={false} />)}
             {time !== null && <ReferenceLine x={time} stroke="var(--text)" strokeDasharray="4 4" />}
-          </LineChart>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>)}

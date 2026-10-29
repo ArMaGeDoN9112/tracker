@@ -81,9 +81,9 @@ export function GlucoseCharts({ active, generation, onDay }: {
             <Tooltip wrapperStyle={{ maxWidth: '100%' }} contentStyle={{ background: 'var(--background)', borderColor: 'var(--muted)', color: 'var(--text)', borderRadius: 8, whiteSpace: 'normal', overflowWrap: 'anywhere' }} labelFormatter={label => `${label} · Москва`} formatter={(value, name, item) => [item.dataKey === 'count' ? `${value} измерений` : `${Number(value).toFixed(1).replace('.', ',')} ммоль/л`, name]} />
             <Legend wrapperStyle={{ fontSize: 14 }} />
             <Bar yAxisId="count" dataKey="count" name="Измерений (справа)" fill="var(--muted)" maxBarSize={24} isAnimationActive={false} onClick={point => onDay(point.payload.day)} />
-            <Line yAxisId="glucose" dataKey="minimum" name="Минимум" stroke="var(--chart-minimum)" strokeDasharray="3 3" dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
-            <Line yAxisId="glucose" dataKey="maximum" name="Максимум" stroke="var(--chart-maximum)" strokeDasharray="8 4" dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
-            <Line yAxisId="glucose" dataKey="average" name="Среднее" stroke="var(--accent)" strokeWidth={3} dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
+            <Line type="monotoneX" yAxisId="glucose" dataKey="minimum" name="Минимум" stroke="var(--chart-minimum)" strokeDasharray="3 3" dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
+            <Line type="monotoneX" yAxisId="glucose" dataKey="maximum" name="Максимум" stroke="var(--chart-maximum)" strokeDasharray="8 4" dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
+            <Line type="monotoneX" yAxisId="glucose" dataKey="average" name="Среднее" stroke="var(--accent)" strokeWidth={3} dot={dayDot} activeDot={false} connectNulls={false} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

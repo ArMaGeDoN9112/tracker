@@ -1,5 +1,5 @@
 import { useId, useState, type PointerEvent } from 'react'
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 import type { DiaryDay } from './DayCalendar'
 import type { Day } from './Nutrition'
@@ -36,6 +36,10 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
     basal: segments.flatMap(point => [{ time: point.time, value: point.basal === null ? null : Number(point.basal) }, { time: point.end, value: point.basal === null ? null : Number(point.basal) }]),
   }
   const axes = [...new Set(metrics.filter(metric => visible.includes(metric.key)).map(metric => metric.axis))]
+  const bars = [
+    ...meals.map(meal => ({ time: Date.parse(meal.occurred_at), bolus: null, ...Object.fromEntries(nutrients.map(([key]) => [key, meal.totals[key].value === null ? null : Number(meal.totals[key].value)])) })),
+    ...diary.entries.map(entry => ({ time: Date.parse(entry.occurred_at), calories: null, protein: null, fat: null, carbohydrate: null, bolus: Number(entry.bolus) })),
+  ].sort((a, b) => a.time - b.time)
   const maximum = (axis: typeof metrics[number]['axis']) => axis === 'glucose' ? 30 : (axis === 'basal' ? 3 : 1) * Math.max(1, ...metrics.filter(metric => metric.axis === axis && visible.includes(metric.key)).flatMap(metric => data[metric.key].map(point => point.value ?? 0)))
   const times = [...new Set([start, end - 1, ...metrics.filter(metric => visible.includes(metric.key)).flatMap(metric => data[metric.key].map(point => point.time))])].filter(time => time < end).sort((a, b) => a - b)
   const ticks = Array.from({ length: 5 }, (_, index) => start + (end - start) * index / 4)
@@ -62,11 +66,13 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
         setVisible(event.target.checked ? [...visible, metric.key] : visible.filter(key => key !== metric.key))
         setSelected(null)
       }} />
-        <svg width="24" height="12" aria-hidden="true"><line x1="0" x2="24" y1="6" y2="6" stroke={metric.color} strokeWidth="3" strokeDasharray={metric.dash} /></svg>
+        <svg width="24" height="12" aria-hidden="true">{metric.key === 'glucose' || metric.key === 'basal'
+          ? <line x1="0" x2="24" y1="6" y2="6" stroke={metric.color} strokeWidth="3" strokeDasharray={metric.dash} />
+          : <rect x="8" y="1" width="8" height="10" fill={metric.color} fillOpacity={0.6} />}</svg>
         {metric.label}
       </label>)}
     </fieldset>
-    <p className="muted" id={`${id}-help`}>Общая шкала времени — Москва. У показателей отдельные шкалы; БЖУ — на общей шкале в граммах. Точные значения — в подсказке рядом с курсором. Наведите, коснитесь или используйте стрелки, Home, End; Escape скрывает подсказку. Линии соединяют записи, пропуски не равны нулю.</p>
+    <p className="muted" id={`${id}-help`}>Общая шкала времени — Москва. КБЖУ и подколки — столбики, сахар — точки с плавной линией, база — ступени. У показателей отдельные шкалы; БЖУ — на общей шкале в граммах. Точные значения — в подсказке рядом с курсором. Наведите, коснитесь или используйте стрелки, Home, End; Escape скрывает подсказку. Между измерениями сахар неизвестен; пропуски не равны нулю.</p>
     <ul className="calendar-chart-scales" aria-label="Шкалы показателей">{axes.map(axis => <li key={axis}>{metrics.filter(metric => metric.axis === axis && visible.includes(metric.key)).map(metric => metric.label).join(', ')}: 0–{maximum(axis)} {metrics.find(metric => metric.axis === axis)!.unit}</li>)}</ul>
     {end - start !== 86400000 && <p className="muted">В этот день переводились часы. Повторяющиеся часы показаны в порядке событий.</p>}
     {!diary.entries.length && <p className="muted">Нет записей сахара и подколок.</p>}
@@ -83,13 +89,14 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
         }
       }}>
       <ResponsiveContainer width="100%" height={360}>
-        <LineChart accessibilityLayer={false} margin={{ top: 16, right: 16, bottom: 8, left: 16 }}>
+        <ComposedChart data={bars} accessibilityLayer={false} barGap={4} margin={{ top: 16, right: 16, bottom: 8, left: 16 }}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis type="number" dataKey="time" domain={[start, end]} ticks={ticks} tickFormatter={clock} interval={0} tick={{ fill: 'var(--muted)', fontSize: 12 }} />
           {axes.map(axis => <YAxis key={axis} yAxisId={axis} hide domain={[0, maximum(axis)]} allowDataOverflow={axis === 'glucose'} />)}
-          {metrics.filter(metric => visible.includes(metric.key)).map(metric => <Line key={metric.key} name={metric.label} data={data[metric.key]} dataKey="value" yAxisId={metric.axis} type={metric.key === 'basal' ? 'stepAfter' : 'linear'} stroke={metric.color} strokeDasharray={metric.dash} strokeWidth={2} dot={metric.key === 'basal' ? false : { r: 4 }} activeDot={false} connectNulls={false} isAnimationActive={false} />)}
+          {metrics.filter(metric => visible.includes(metric.key) && metric.key !== 'glucose' && metric.key !== 'basal').map(metric => <Bar key={metric.key} name={metric.label} dataKey={metric.key} yAxisId={metric.axis} barSize={6} fill={metric.color} fillOpacity={0.55} stroke="none" radius={[2, 2, 0, 0]} isAnimationActive={false} />)}
+          {metrics.filter(metric => visible.includes(metric.key) && (metric.key === 'glucose' || metric.key === 'basal')).map(metric => <Line key={metric.key} name={metric.label} data={data[metric.key]} dataKey="value" yAxisId={metric.axis} type={metric.key === 'basal' ? 'stepAfter' : 'monotoneX'} stroke={metric.color} strokeDasharray={metric.dash} strokeWidth={2} dot={metric.key === 'basal' ? false : { r: 4 }} activeDot={false} connectNulls={false} isAnimationActive={false} />)}
           {selected !== null && <ReferenceLine yAxisId={axes[0]} x={selected} stroke="var(--text)" strokeDasharray="4 4" />}
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>}
     {selected !== null && <ChartTooltip {...position}><div role="tooltip" aria-label="Показатели дня"><strong>{clock(selected)}</strong>

@@ -38,15 +38,16 @@ test('nutrition analysis keeps four series, exact meal times, incomplete values 
   await expect(legend.getByRole('listitem')).toHaveText(['Калории · ккал', 'Белки · г', 'Жиры · г', 'Углеводы · г'])
   const macros = details.getByRole('slider', { name: 'БЖУ по времени' })
   await expect(macros).toBeVisible()
-  await expect(plot.locator('.recharts-line')).toHaveCount(1)
-  await expect(macros.locator('.recharts-line')).toHaveCount(3)
-  const lines = details.locator('.nutrition-day-charts .recharts-line')
+  await expect(plot.locator('.recharts-bar')).toHaveCount(1)
+  await expect(macros.locator('.recharts-bar')).toHaveCount(3)
+  await expect(details.locator('.nutrition-day-charts .recharts-line')).toHaveCount(0)
+  const lines = details.locator('.nutrition-day-charts .recharts-bar')
   await expect(lines).toHaveCount(4)
   const strokes = []
   for (const line of await lines.all()) {
-    const curve = line.locator('.recharts-line-curve')
+    const curve = line.locator('.recharts-bar-rectangle path').filter({ visible: true }).first()
     await expect(curve).toBeVisible()
-    strokes.push(await curve.evaluate(element => getComputedStyle(element).stroke))
+    strokes.push(await curve.evaluate(element => getComputedStyle(element).fill))
   }
   expect(new Set(strokes).size).toBe(4)
   expect(strokes).not.toContain('none')

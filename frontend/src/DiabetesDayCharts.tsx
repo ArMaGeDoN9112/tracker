@@ -1,6 +1,6 @@
 import { ChartTooltip } from './ChartTooltip'
 import { useEffect, useId, useState, type PointerEvent } from 'react'
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { localMinute, moscowDayBounds } from './time'
 
 type Entry = { id: string; occurred_at: string; glucose: string | null; bolus: string }
@@ -33,7 +33,7 @@ export function DiabetesDayCharts({ day, entries }: { day: string; entries: Entr
   }
 
   return <div className="diabetes-day-charts">
-    <p className="muted" id={`${id}-help`}>Наведите, коснитесь или проведите по графику. С клавиатуры: стрелки, Home и End; Escape скрывает подсказки. Линии соединяют записи, значения между ними не измерены.</p>
+    <p className="muted" id={`${id}-help`}>Наведите, коснитесь или проведите по графику. С клавиатуры: стрелки, Home и End; Escape скрывает подсказки. Подколки — столбики. Точки сахара соединены плавной линией; значения между ними не измерены.</p>
     {!entries.length && <p>Нет записей сахара и подколок.</p>}
     {(end - start) !== 86400000 && <p className="muted">В этот день переводились часы. Повторяющиеся часы показаны в порядке событий.</p>}
     {(['glucose', 'bolus'] as const).map(key => {
@@ -63,13 +63,15 @@ export function DiabetesDayCharts({ day, entries }: { day: string; entries: Entr
             }
           }}>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={values} accessibilityLayer={false} margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
+            <ComposedChart data={values} accessibilityLayer={false} margin={{ top: 16, right: 16, bottom: 8, left: 8 }}>
               <CartesianGrid stroke="var(--border)" vertical={false} />
               <XAxis type="number" dataKey="time" domain={[start, end]} ticks={ticks} tickFormatter={clock} tick={{ fill: 'var(--muted)', fontSize: 12 }} interval={0} />
               <YAxis width={48} domain={[0, key === 'glucose' ? 30 : 'auto']} allowDataOverflow={key === 'glucose'} tick={{ fill: 'var(--muted)', fontSize: 12 }} tickFormatter={value => String(value).replace('.', ',')} />
-              <Line dataKey="value" type="linear" stroke={key === 'glucose' ? 'var(--accent)' : 'var(--warning)'} strokeWidth={2} dot={{ r: 4 }} activeDot={false} isAnimationActive={false} />
+              {key === 'glucose'
+                ? <Line dataKey="value" type="monotoneX" stroke="var(--accent)" strokeWidth={2} dot={{ r: 4 }} activeDot={false} isAnimationActive={false} />
+                : <Bar dataKey="value" barSize={8} fill="var(--calendar-bolus)" fillOpacity={0.55} stroke="none" radius={[2, 2, 0, 0]} isAnimationActive={false} />}
               {time !== null && <ReferenceLine x={time} stroke="var(--text)" strokeDasharray="4 4" />}
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
