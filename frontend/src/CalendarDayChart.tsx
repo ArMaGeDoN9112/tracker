@@ -1,4 +1,4 @@
-import { useId, useState, type PointerEvent } from 'react'
+import { useState, type PointerEvent } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
 import type { DiaryDay } from './DayCalendar'
@@ -22,7 +22,6 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
   const [visible, setVisible] = useState<Metric[]>(metrics.map(metric => metric.key))
   const [selected, setSelected] = useState<number | null>(null)
   const [position, setPosition] = useState({ x: 0, y: 0 })
-  const id = useId()
   const [start, end] = moscowDayBounds(day)
   const clock = (value: number) => value === end ? '24:00' : localMinute(new Date(value).toISOString()).slice(11)
   const segments = [{ time: start, basal: diary.basal }, ...diary.basal_changes.map(change => ({ time: Date.parse(change.occurred_at), basal: change.basal }))]
@@ -72,11 +71,10 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
         {metric.label}
       </label>)}
     </fieldset>
-    <p className="muted" id={`${id}-help`}>Общая шкала времени — Москва. КБЖУ и подколки — столбики, сахар — точки с плавной линией, база — ступени. У показателей отдельные шкалы; БЖУ — на общей шкале в граммах. Точные значения — в подсказке рядом с курсором. Наведите, коснитесь или используйте стрелки, Home, End; Escape скрывает подсказку. Между измерениями сахар неизвестен; пропуски не равны нулю.</p>
     <ul className="calendar-chart-scales" aria-label="Шкалы показателей">{axes.map(axis => <li key={axis}>{metrics.filter(metric => metric.axis === axis && visible.includes(metric.key)).map(metric => metric.label).join(', ')}: 0–{maximum(axis)} {metrics.find(metric => metric.axis === axis)!.unit}</li>)}</ul>
     {end - start !== 86400000 && <p className="muted">В этот день переводились часы. Повторяющиеся часы показаны в порядке событий.</p>}
     {!diary.entries.length && <p className="muted">Нет записей сахара и подколок.</p>}
-    {!visible.length ? <p role="status">Выберите хотя бы один показатель.</p> : <div className="diabetes-day-plot" role="slider" tabIndex={0} aria-label="Показатели дня по времени" aria-describedby={`${id}-help`}
+    {!visible.length ? <p role="status">Выберите хотя бы один показатель.</p> : <div className="diabetes-day-plot" role="slider" tabIndex={0} aria-label="Показатели дня по времени"
       aria-valuemin={start} aria-valuemax={end - 1} aria-valuenow={selected ?? start} aria-valuetext={selected === null ? 'Выберите время' : clock(selected)}
       onPointerMove={select} onPointerDown={event => { event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); select(event) }}
       onFocus={event => { const bounds = event.currentTarget.getBoundingClientRect(); setPosition({ x: bounds.left + bounds.width / 2, y: bounds.top + 32 }); setSelected(time => time ?? start) }}

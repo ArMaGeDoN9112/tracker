@@ -1,5 +1,5 @@
 import { ChartTooltip } from './ChartTooltip'
-import { useEffect, useId, useState, type PointerEvent } from 'react'
+import { useEffect, useState, type PointerEvent } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { localMinute, moscowDayBounds } from './time'
 
@@ -8,7 +8,6 @@ type Entry = { id: string; occurred_at: string; glucose: string | null; bolus: s
 export function DiabetesDayCharts({ day, entries }: { day: string; entries: Entry[] }) {
   const [selected, setSelected] = useState<number | null>(null)
   const [position, setPosition] = useState({ x: 0, y: 0 })
-  const id = useId()
   useEffect(() => {
     const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelected(null) }
     document.addEventListener('keydown', dismiss)
@@ -33,7 +32,6 @@ export function DiabetesDayCharts({ day, entries }: { day: string; entries: Entr
   }
 
   return <div className="diabetes-day-charts">
-    <p className="muted" id={`${id}-help`}>Наведите, коснитесь или проведите по графику. С клавиатуры: стрелки, Home и End; Escape скрывает подсказки. Подколки — столбики. Точки сахара соединены плавной линией; значения между ними не измерены.</p>
     {!entries.length && <p>Нет записей сахара и подколок.</p>}
     {(end - start) !== 86400000 && <p className="muted">В этот день переводились часы. Повторяющиеся часы показаны в порядке событий.</p>}
     {(['glucose', 'bolus'] as const).map(key => {
@@ -44,7 +42,7 @@ export function DiabetesDayCharts({ day, entries }: { day: string; entries: Entr
         <p><strong>{label}</strong> · {unit}</p>
         {!values.length && <p className="muted">Нет {key === 'glucose' ? 'измерений сахара' : 'записей подколок'}.</p>}
         <div className="diabetes-day-plot" role="slider" tabIndex={0} aria-label={`${label} · ${unit}`}
-          aria-describedby={`${id}-help`} aria-disabled={!times.length}
+          aria-disabled={!times.length}
           aria-valuemin={0} aria-valuemax={Math.max(0, times.length - 1)} aria-valuenow={selected ?? 0}
           aria-valuetext={time === null ? 'Выберите время события' : `${clock(time)} · ${matches.map(point => point[key] === null ? 'Сахар не указан' : `${point[key]!.replace('.', ',')} ${unit}`).join('; ')}`}
           onPointerLeave={event => { if (event.pointerType === 'mouse') setSelected(null) }}
