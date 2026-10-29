@@ -278,17 +278,18 @@ test('explicit new selection reads current card while earlier snapshot stays fro
 })
 
 
-test('meal uses exact latest glucose time', async ({ page }) => {
+test('meal uses previous calendar date and exact latest glucose time after midnight', async ({ page }) => {
   await page.route('**/api/entry-form', async route => {
     const response = await route.fetch()
-    await route.fulfill({ json: { ...await response.json(), latest_glucose_at: '2026-10-18T09:34:56.789Z' } })
+    await route.fulfill({ json: { ...await response.json(), local_time: '2026-10-19T00:15', latest_glucose_at: '2026-10-18T20:45:56.789Z' } })
   })
   await start(page)
+  await expect(page.getByLabel('Время приёма — Москва')).toHaveValue('2026-10-19T00:15')
   await page.getByRole('button', { name: 'Время последнего измерения сахара', exact: true }).click()
-  await expect(page.getByLabel('Время приёма — Москва')).toHaveValue('2026-10-18T12:34')
+  await expect(page.getByLabel('Время приёма — Москва')).toHaveValue('2026-10-18T23:45')
   const name = await createProduct(page)
   await choose(page, name)
   const request = page.waitForRequest(request => request.url().endsWith('/api/meals') && request.method() === 'POST')
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
-  expect((await request).postDataJSON().occurred_at).toBe('2026-10-18T09:34:56.789Z')
+  expect((await request).postDataJSON().occurred_at).toBe('2026-10-18T20:45:56.789Z')
 })
