@@ -88,7 +88,8 @@ def register_entries(app: FastAPI, cases: EntryUseCases, clock: Callable[[], int
     @app.get("/api/entry-form")
     def entry_form() -> EntryFormOutput:
         result = cases.form.execute()
-        return EntryFormOutput(local_time=result.local_time.isoformat(timespec="minutes")[:16], basal=result.basal)
+        return EntryFormOutput(local_time=result.local_time.isoformat(timespec="minutes")[:16], basal=result.basal,
+                               latest_glucose_at=timestamp(result.latest_glucose_at) if result.latest_glucose_at is not None else None)
 
     @app.get("/api/moscow-time", response_model=MoscowTimeOutput)
     def moscow_time(local_time: str) -> MoscowTimeOutput:

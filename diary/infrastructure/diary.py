@@ -45,6 +45,12 @@ class SqliteEntries:
         row = self.connection.execute(select(entry).where(entry.c.id == entry_id)).mappings().first()
         return EntryRecord.model_validate(row) if row is not None else None
 
+    def latest_glucose(self) -> EntryRecord | None:
+        row = self.connection.execute(select(entry).where(
+            entry.c.deleted_at.is_(None), entry.c.glucose.is_not(None)
+        ).order_by(entry.c.occurred_at.desc(), entry.c.created_at.desc(), entry.c.id.desc()).limit(1)).mappings().first()
+        return EntryRecord.model_validate(row) if row is not None else None
+
     def day(self, start: int, end: int) -> list[EntryRecord]:
         return [EntryRecord.model_validate(row) for row in self.connection.execute(select(entry).where(
             entry.c.deleted_at.is_(None), entry.c.occurred_at >= start, entry.c.occurred_at < end

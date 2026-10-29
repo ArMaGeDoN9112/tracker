@@ -23,6 +23,7 @@ class LoginOutput(SessionOutput, CsrfOutput):
 
 
 class EntryFormOutput(BaseModel):
+    latest_glucose_at: str | None
     local_time: str
     basal: str | None
 

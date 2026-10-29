@@ -31,6 +31,10 @@ class MemoryEntries:
     def save(self, record, *, create):
         self.records[record.id] = deepcopy(record)
 
+    def latest_glucose(self):
+        return deepcopy(max((r for r in self.records.values() if r.deleted_at is None and r.glucose is not None),
+                            key=lambda r: (r.occurred_at, r.created_at, r.id), default=None))
+
     def day(self, start, end):
         return sorted((deepcopy(r) for r in self.records.values()
                        if r.deleted_at is None and start <= r.occurred_at < end),
@@ -231,3 +235,12 @@ def test_historical_moscow_time_candidates_without_http():
         case.execute(MoscowTimeQuery(local_time='2011-03-27T02:30'))
     with pytest.raises(InvalidMoscowTime):
         case.execute(MoscowTimeQuery(local_time='2026-01-01'))
+
+
+def test_form_returns_latest_glucose_time_without_bolus_only():
+    store = MemoryDiaryUow()
+    assert GetEntryForm(store.open, lambda: 0).execute().latest_glucose_at is None
+    create = CreateEntry(EntryOperations(store.open, lambda: 1000, lambda: str(uuid4())))
+    create.execute(EntryInput(operation_id=str(uuid4()), occurred_at="2026-10-18T12:34:56.789+03:00", glucose="5.6"))
+    create.execute(EntryInput(operation_id=str(uuid4()), occurred_at="2026-10-19T12:00:00Z", bolus="1"))
+    assert GetEntryForm(store.open, lambda: 0).execute().latest_glucose_at == 1792316096789

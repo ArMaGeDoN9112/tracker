@@ -36,7 +36,8 @@ async function choose(page: Page, name: string) {
   await expect(card).toBeVisible()
   if (!await card.getByRole('button', { name: 'Добавить в приём', exact: true }).isVisible()) await card.locator('summary').click()
   await card.getByRole('button', { name: 'Добавить в приём', exact: true }).click()
-  await expect(page.locator('#meal-form-title')).toBeFocused()
+  await expect(page.locator('.meal-line').last().getByRole('textbox', { name: /Количество строки/ })).toBeFocused()
+  await expect(page.locator('.meal-line').last().getByRole('textbox', { name: /Количество строки/ })).toBeInViewport()
 }
 const form = (page: Page) => page.getByRole('region', { name: 'Форма приёма пищи', exact: true })
 const history = (page: Page) => page.getByRole('region', { name: 'День питания', exact: true })
@@ -274,4 +275,20 @@ test('explicit new selection reads current card while earlier snapshot stays fro
   const fields = form(page).locator('.meal-line')
   await expect(fields.nth(0).getByLabel('Калории строки 1, ккал на 100 г', { exact: true })).toHaveValue('180.00')
   await expect(fields.nth(1).getByLabel('Калории строки 2, ккал на 100 г', { exact: true })).toHaveValue('200.00')
+})
+
+
+test('meal uses exact latest glucose time', async ({ page }) => {
+  await page.route('**/api/entry-form', async route => {
+    const response = await route.fetch()
+    await route.fulfill({ json: { ...await response.json(), latest_glucose_at: '2026-10-18T09:34:56.789Z' } })
+  })
+  await start(page)
+  await page.getByRole('button', { name: 'Время последнего измерения сахара', exact: true }).click()
+  await expect(page.getByLabel('Время приёма — Москва')).toHaveValue('2026-10-18T12:34')
+  const name = await createProduct(page)
+  await choose(page, name)
+  const request = page.waitForRequest(request => request.url().endsWith('/api/meals') && request.method() === 'POST')
+  await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
+  expect((await request).postDataJSON().occurred_at).toBe('2026-10-18T09:34:56.789Z')
 })

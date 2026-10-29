@@ -93,6 +93,7 @@ class DayResult(BaseModel):
 
 
 class EntryFormResult(BaseModel):
+    latest_glucose_at: int | None
     local_time: datetime
     basal: str | None
 
@@ -160,7 +161,8 @@ class GetEntryForm:
         now = (EPOCH + timedelta(milliseconds=instant)).astimezone(MOSCOW)
         with self.uow() as uow:
             basal = basal_at(uow.basal.schedules(), instant, uow.basal.temporary())
-        return EntryFormResult(local_time=now, basal=basal)
+            latest = uow.entries.latest_glucose()
+        return EntryFormResult(local_time=now, basal=basal, latest_glucose_at=latest.occurred_at if latest else None)
 
 
 @dataclass

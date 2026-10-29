@@ -207,3 +207,13 @@ def test_concurrent_repeat_creates_one_entry(diary):
         results = list(pool.map(save, range(2)))
     assert {result["replayed"] for result in results} == {False, True}
     assert len(client.get("/api/day?day=2026-10-19").json()["entries"]) == 1
+
+
+def test_entry_form_latest_glucose_ignores_deleted_and_bolus_only(diary):
+    client, _ = diary
+    assert client.get("/api/entry-form").json()["latest_glucose_at"] is None
+    client.post("/api/entries", json=entry(occurred_at="2026-10-18T12:34:56.789+03:00"))
+    newer = client.post("/api/entries", json=entry(occurred_at="2026-10-19T12:00:00+03:00")).json()
+    client.post(f"/api/entries/{newer['result_id']}/delete", json={"operation_id": str(uuid4()), "expected_revision": 1})
+    client.post("/api/entries", json=entry(glucose=None, bolus="1", occurred_at="2026-10-20T12:00:00+03:00"))
+    assert client.get("/api/entry-form").json()["latest_glucose_at"] == "2026-10-18T09:34:56.789Z"
