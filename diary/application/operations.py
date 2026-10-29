@@ -72,8 +72,16 @@ def request_hash(normalized: dict[str, object]) -> str:
 def replay_receipt(store: ReceiptStore, action: OperationAction, operation_id: str,
                    normalized: dict[str, object]) -> ReceiptRecord | None:
     receipt = store.get(operation_id)
-    if receipt is not None and (receipt.action != action or receipt.request_hash != request_hash(normalized)):
-        raise OperationConflict()
+    if receipt is not None:
+        if receipt.action != action:
+            raise OperationConflict()
+        if receipt.request_hash != request_hash(normalized):
+            # Old meal receipts hashed the removed category; composition must still match exactly.
+            if action not in (OperationAction.CREATE_MEAL, OperationAction.EDIT_MEAL) or not any(
+                receipt.request_hash == request_hash(normalized | {"category": category})
+                for category in (None, "breakfast", "lunch", "dinner", "snack")
+            ):
+                raise OperationConflict()
     return receipt
 
 

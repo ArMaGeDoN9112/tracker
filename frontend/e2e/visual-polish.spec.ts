@@ -13,7 +13,7 @@ test('every screen keeps readable cards, unknown values and usable controls at a
   const name = `Овсянка с ягодами ${crypto.randomUUID()}`
   for (const [path, data] of [
     ['/api/products', { name, unit: 'g', calories: '120', protein: '4', fat: null, carbohydrate: '22', portions: [] }],
-    ['/api/meals', { occurred_at: `${day}T09:00:00+03:00`, category: 'breakfast', lines: [{ id: crypto.randomUUID(), kind: 'one_off', name: 'Овсянка с ягодами', quantity: '250', unit: 'g', calories: '300', protein: '10', fat: null, carbohydrate: '55' }] }],
+    ['/api/meals', { occurred_at: `${day}T09:00:00+03:00`, lines: [{ id: crypto.randomUUID(), kind: 'one_off', name: 'Овсянка с ягодами', quantity: '250', unit: 'g', calories: '300', protein: '10', fat: null, carbohydrate: '55' }] }],
     ['/api/entries', { occurred_at: `${day}T09:00:00+03:00`, glucose: '5.6', bolus: '1.2', reason: 'food', comment: 'После завтрака' }],
     ['/api/water', { occurred_at: `${day}T09:00:00+03:00`, volume_ml: 250 }],
     ['/api/water', { occurred_at: `${day}T13:00:00+03:00`, volume_ml: 500 }],

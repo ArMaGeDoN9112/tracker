@@ -54,7 +54,7 @@ def test_saved_receipts_replay_after_migration_and_restart_without_writes(diary,
             elif 'name' in changed:
                 changed['name'] = 'Другой продукт'
             elif 'lines' in changed:
-                changed['category'] = 'dinner'
+                changed['lines'] = [{**line, 'name': 'Другой состав'} for line in changed['lines']]
             elif 'percent' in changed:
                 changed['percent'] += 1
             else:

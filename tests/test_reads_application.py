@@ -41,7 +41,7 @@ class MemoryNutrition:
         if not lines:
             return []
         at = lines[0].occurred_at
-        return [MealResult(record=MealRecord(id='meal', occurred_at=at, category=None, revision=1,
+        return [MealResult(record=MealRecord(id='meal', occurred_at=at, revision=1,
                            created_at=at, updated_at=at, deleted_at=None), lines=lines)]
 
     def lines(self, start, end):

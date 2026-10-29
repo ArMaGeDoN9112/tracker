@@ -45,7 +45,7 @@ class MemoryStorage:
         return self.manifest()
 
     def manifest(self):
-        return Manifest(created_at=AT, release='test', schema_version='010_remove_product_archive', sqlite_version='3', files={})
+        return Manifest(created_at=AT, release='test', schema_version='011_remove_meal_category', sqlite_version='3', files={})
 
     def upload(self, bundle, kind, at):
         if self.fault == 'upload':
@@ -71,7 +71,7 @@ class MemoryStorage:
         self.revoked.add(target)
 
     def validate_database(self, target):
-        return '010_remove_product_archive'
+        return '011_remove_meal_category'
 
     def mark_verified(self, snapshot):
         if self.fault == 'tag':

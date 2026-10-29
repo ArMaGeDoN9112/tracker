@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
-test('calendar combines all seven metrics, filters lines and tooltips, and preserves basal gaps', async ({ page }, info) => {
+test('calendar aligns meal cards, filters metrics and tooltips, and preserves basal gaps', async ({ page }, info) => {
   const day = '2026-10-20'
   const total = (value: string | null, incomplete = false) => ({ value, incomplete, known_count: value === null ? 0 : 1, unknown_count: incomplete || value === null ? 1 : 0 })
   const totals = { calories: total('350', true), protein: total('15'), fat: total(null, true), carbohydrate: total('40') }
   await page.route('**/api/nutrition-day?*', route => route.fulfill({ json: {
-    day, totals, meals: [1, 2].map(index => ({ id: `meal-${index}`, occurred_at: `${day}T12:00:00+03:00`, totals })), water_total_ml: 750, water: [],
+    day, totals, meals: [1, 2].map(index => ({ id: `meal-${index}`, occurred_at: `${day}T12:00:00+03:00`, totals, lines: [{ id: `line-${index}`, name: index === 1 ? 'Гречка, курица' : 'Чай', quantity: '150', unit: 'g' }] })), water_total_ml: 750, water: [],
   } }))
   await page.route('**/api/day?*', route => route.fulfill({ json: {
     basal: '0.50', temporary_percent: null, temporary_basals: [],
@@ -23,20 +23,29 @@ test('calendar combines all seven metrics, filters lines and tooltips, and prese
   const tip = chart.getByRole('tooltip', { name: 'Показатели дня' })
   await expect(plot).toBeVisible()
   await expect(chart.locator('.recharts-wrapper')).toHaveCount(1)
-  await expect(chart.getByRole('checkbox')).toHaveCount(7)
+  await expect(chart.getByRole('checkbox')).toHaveCount(4)
   for (const option of await chart.getByRole('checkbox').all()) await expect(option).toBeChecked()
-  const colors = await chart.locator('.calendar-chart-options svg > *').evaluateAll(marks => marks.map(mark => getComputedStyle(mark)[mark.tagName === 'rect' ? 'fill' : 'stroke']))
+  const colors = await chart.locator('.calendar-chart-options svg > *').evaluateAll(marks => marks.map(mark => getComputedStyle(mark)[mark.tagName === 'line' ? 'stroke' : 'fill']))
   expect(colors).not.toContain('none')
-  expect(new Set(colors).size).toBe(7)
+  expect(new Set(colors).size).toBe(4)
   await expect(plot.locator('.recharts-line')).toHaveCount(2)
-  await expect(plot.locator('.recharts-bar')).toHaveCount(5)
+  await expect(plot.locator('.recharts-bar')).toHaveCount(1)
   await expect(plot.locator('.recharts-line-curve')).toHaveCount(1)
   expect(await plot.locator('.recharts-bar-rectangle').count()).toBeGreaterThan(0)
-  await expect(chart.getByRole('list', { name: 'Шкалы показателей' })).toContainText('Калории: 0–350 ккал')
+  const meals = chart.getByRole('list', { name: 'Приёмы пищи по времени' })
+  const cards = meals.getByRole('button')
+  await expect(cards).toHaveCount(2)
+  await expect(cards.first()).toContainText('12:00Гречка, курицаУ 40 г')
+  await cards.first().focus()
+  await expect(tip).toContainText('Гречка, курица · 150 г')
+  await expect(plot.locator('.recharts-reference-line')).toHaveCount(1)
+  await cards.first().press('Escape')
+  await expect(tip).toHaveCount(0)
   await expect(chart.getByRole('list', { name: 'Шкалы показателей' })).toContainText('Сахар: 0–30 ммоль/л')
   await expect(chart.getByRole('list', { name: 'Шкалы показателей' })).toContainText('Подколки: 0–1.2 ед.')
   if (process.env.DIARY_ACCEPTANCE_DIR) await chart.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-overview-${info.project.name}.png` })
   await plot.focus()
+  await plot.press('Home')
   await expect(tip).toContainText('00:00–06:00 · 0,50 ед/ч')
   await plot.press('ArrowRight')
   await expect(tip).toContainText('06:00–12:00 · неизвестна')
@@ -66,8 +75,9 @@ test('calendar combines all seven metrics, filters lines and tooltips, and prese
     await expect(tip).toBeVisible()
   }
   if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-combined-${info.project.name}.png` })
-  await chart.getByRole('checkbox', { name: 'Калории', exact: true }).uncheck()
-  await expect(plot.locator('.recharts-bar')).toHaveCount(4)
+  await chart.getByRole('checkbox', { name: 'Еда', exact: true }).uncheck()
+  await expect(meals).toHaveCount(0)
+  await expect(plot.locator('.recharts-bar')).toHaveCount(1)
   await plot.focus()
   await plot.press('Home')
   await plot.press('ArrowRight')
@@ -95,8 +105,16 @@ test('calendar combines all seven metrics, filters lines and tooltips, and prese
   expect(basal.height).toBeCloseTo(area.height / 3, 0)
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 })
+    await chart.getByRole('checkbox', { name: 'Еда', exact: true }).check()
+    await expect.poll(async () => {
+      const a = (await cards.first().boundingBox())!, b = (await cards.last().boundingBox())!
+      return a.y + a.height <= b.y || b.y + b.height <= a.y || a.x + a.width <= b.x || b.x + b.width <= a.x
+    }).toBe(true)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   }
+  await cards.first().click()
+  await expect(tip).toContainText('Гречка, курица · 150 г')
+  if (process.env.DIARY_ACCEPTANCE_DIR) await chart.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-meal-cards-${info.project.name}.png` })
 })
 
 test('combined calendar keeps repeated Moscow hours as distinct events', async ({ page }) => {
@@ -125,4 +143,52 @@ test('combined calendar keeps repeated Moscow hours as distinct events', async (
   await expect(tip).toContainText('02:30')
   await expect(tip).toContainText('39,3 ммоль/л')
   await expect(tip).toContainText('2,0 ед.')
+})
+
+test('meal timeline keeps day edges, unknown carbs and food-only selection', async ({ page }, info) => {
+  const day = '2089-01-12'
+  const total = (value: string | null, incomplete = false) => ({ value, incomplete, known_count: value === null ? 0 : 1, unknown_count: incomplete || value === null ? 1 : 0 })
+  const totals = { calories: total('350'), protein: total('15'), fat: total('10'), carbohydrate: total('40') }
+  await page.route('**/api/nutrition-day?*', route => route.fulfill({ json: {
+    day, totals, water_total_ml: null, water: [],
+    meals: ['00:00:00.000', '08:00:00.000', '12:30:00.000', '12:31:00.000', '23:59:59.999'].map((time, index) => ({
+      id: `meal-${index}`, occurred_at: `${day}T${time}+03:00`,
+      totals: { ...totals, carbohydrate: index === 0 ? total('0') : index === 4 ? total(null, true) : total('40', index === 3) },
+      lines: [{ id: `line-${index}`, name: ['Чай', 'Омлет, хлеб', 'Гречка, курица', 'Яблоко', 'Кефир'][index], quantity: '150', unit: 'g' }],
+    })),
+  } }))
+  await page.route('**/api/day?*', route => route.fulfill({ json: { basal: null, basal_changes: [], temporary_basals: [], temporary_percent: null, entries: [] } }))
+  await page.goto(`/?section=calendar&day=${day}`)
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  const chart = page.getByRole('region', { name: 'Общий график дня', exact: true })
+  const track = chart.getByRole('list', { name: 'Приёмы пищи по времени' })
+  const cards = track.getByRole('button')
+  await expect(cards).toHaveCount(5)
+  await expect(cards.first()).toContainText('00:00ЧайУ 0 г')
+  await expect(cards.nth(3)).toContainText('неполные данные')
+  await expect(cards.last()).toContainText('23:59КефирУ неизвестно')
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect.poll(async () => {
+      const bounds = (await track.boundingBox())!
+      const boxes = await cards.evaluateAll(elements => elements.map(element => {
+        const { x, y, width, height } = element.getBoundingClientRect()
+        return { x, y, width, height }
+      }))
+      return boxes.every((a, index) => a.width > 0 && a.x >= bounds.x - 1 && a.x + a.width <= bounds.x + bounds.width + 1 && boxes.slice(index + 1).every(b => a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y))
+    }).toBe(true)
+  }
+  for (const name of ['Сахар', 'Подколки', 'База']) await chart.getByRole('checkbox', { name, exact: true }).uncheck()
+  await cards.last().click()
+  const tip = chart.getByRole('tooltip')
+  await expect(tip).toContainText('Углеводы: Неизвестно · Неполные данные')
+  await expect(chart.locator('.recharts-reference-line')).toHaveCount(1)
+  await cards.last().press('Escape')
+  await expect(tip).toHaveCount(0)
+  await chart.getByRole('checkbox', { name: 'Сахар', exact: true }).check()
+  await chart.getByRole('checkbox', { name: 'Сахар', exact: true }).blur()
+  if (info.project.name === 'phone') await page.setViewportSize({ width: 390, height: 844 })
+  if (process.env.DIARY_ACCEPTANCE_DIR) await chart.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-meals-day-${info.project.name}.png` })
 })

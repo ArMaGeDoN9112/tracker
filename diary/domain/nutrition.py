@@ -7,13 +7,11 @@ from diary.domain.precision import rate_string
 
 
 NUTRIENTS = ("protein", "fat", "carbohydrate", "calories")
-Category = Literal["breakfast", "lunch", "dinner", "snack"]
 
 
 class MealRecord(BaseModel):
     id: str
     occurred_at: int
-    category: Category | None
     revision: int
     created_at: int
     updated_at: int

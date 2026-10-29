@@ -36,7 +36,7 @@ test('one-off portion, explicit card preview, mixed meal and independent repeat 
   await page.getByLabel('Название строки 3', { exact: true }).fill('Без веса')
   await page.getByLabel('Жиры строки 3, г за исходную порцию', { exact: true }).fill('0')
   await page.getByLabel('Время приёма — Москва').fill('2026-10-19T12:00')
-  await page.getByLabel('Категория приёма').selectOption('lunch')
+  await expect(page.getByLabel('Категория приёма')).toHaveCount(0)
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await openSection(page, 'Аналитика питания')
   const saved = history(page).getByRole('article').filter({ hasText: name })
@@ -58,7 +58,7 @@ test('one-off portion, explicit card preview, mixed meal and independent repeat 
   draft = await (await response).json()
   await expect(page.getByLabel('Название строки 1', { exact: true })).toHaveValue(name)
   await expect(form(page).locator('.meal-totals')).toHaveCount(0)
-  await expect(page.getByLabel('Категория приёма')).toHaveValue('lunch')
+  await expect(page.getByLabel('Категория приёма')).toHaveCount(0)
   await expect(page.getByLabel('Время приёма — Москва')).not.toHaveValue('2026-10-19T12:00')
   const time = await page.getByLabel('Время приёма — Москва').inputValue()
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
@@ -134,7 +134,7 @@ test('repeat draft survives source edit and lost response, explicit retry create
   const prior = (await (await page.request.get('/api/nutrition-day?day=2026-10-19')).json()).meals.find((row: { lines: { name: string }[] }) => row.lines[0].name === name)
   const csrf = (await (await page.request.get('/api/auth/csrf')).json()).csrf_token
   const edit = await page.request.put(`/api/meals/${prior.id}`, { headers: { Origin: 'https://localhost:5173', 'X-CSRF-Token': csrf }, data: {
-    operation_id: crypto.randomUUID(), expected_revision: prior.revision, occurred_at: prior.occurred_at, category: 'dinner',
+    operation_id: crypto.randomUUID(), expected_revision: prior.revision, occurred_at: prior.occurred_at,
     lines: prior.lines.map(({ totals, ...line }: { totals: unknown; carbohydrate: string }) => ({ ...line, carbohydrate: '24' })),
   } })
   expect(edit.ok()).toBeTruthy()

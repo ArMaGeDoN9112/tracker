@@ -180,7 +180,7 @@ def test_meal_edit_replaces_composition_and_checks_uuid_and_revision(nutrition_a
     store, clock, products, meals = nutrition_app
     _, _, payload, food = create_food(products, meals)
     with pytest.raises(OperationConflict):
-        CreateMeal(meals).execute(payload.model_copy(update={'category': 'lunch'}))
+        CreateMeal(meals).execute(payload.model_copy(update={'occurred_at': '2026-10-19T12:00:00Z'}))
     command = EditMealCommand(**{**payload.model_dump(), 'operation_id': str(uuid4()), 'meal_id': food.result_id,
                                 'expected_revision': 1, 'lines': [{'id': str(uuid4()), 'name': 'Суп', 'kind': 'one_off', 'calories': '15'}]})
     EditMeal(meals).execute(command)

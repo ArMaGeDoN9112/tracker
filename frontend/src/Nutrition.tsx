@@ -13,10 +13,9 @@ type Total = { value: string | null; known_count: number; unknown_count: number;
 export type Totals = Record<Nutrient, Total>
 type Line = Values & { id: string; kind: 'product' | 'one_off'; name: string; unit: 'g' | 'ml' | null; quantity: string | null; basis_quantity: string | null; product_id: string | null; product_revision: number | null; portion: Portion | null }
 type FormLine = Omit<Line, 'basis_quantity'> & { basis_quantity?: string | null; portions?: Portion[] }
-type Meal = { id: string; occurred_at: string; category: string | null; revision: number; deleted_at: string | null; lines: (Line & { totals: Values })[]; totals: Totals }
+type Meal = { id: string; occurred_at: string; revision: number; deleted_at: string | null; lines: (Line & { totals: Values })[]; totals: Totals }
 export type Day = { day: string; meals: Meal[]; totals: Totals; water: { id: string; occurred_at: string; volume_ml: number }[]; water_total_ml: number | null }
 type Pending = { path: string; method: string; body: string; action: 'save' | 'delete' | 'restore' }
-const categories = [['breakfast', 'Завтрак'], ['lunch', 'Обед'], ['dinner', 'Ужин'], ['snack', 'Перекус']]
 
 export function TotalsView({ totals }: { totals: Totals }) {
   return <dl className="meal-totals metric-grid">{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, unit]) => <div key={key}><dt>{label}</dt><dd>
@@ -25,7 +24,7 @@ export function TotalsView({ totals }: { totals: Totals }) {
   </dd></div>)}</dl>
 }
 export function MealDetails({ meal, onProduct, productDisabled }: { meal: Meal; onProduct?: (line: Line) => void; productDisabled?: boolean }) {
-  return <><header className="record-heading"><strong>{categories.find(([key]) => key === meal.category)?.[1] ?? 'Приём пищи'}</strong><time dateTime={meal.occurred_at}>{localMinute(meal.occurred_at).replace('T', ' · ')}</time>{meal.deleted_at && <span className="status-badge">Удалён</span>}</header>
+  return <><header className="record-heading"><strong>Приём пищи</strong><time dateTime={meal.occurred_at}>{localMinute(meal.occurred_at).replace('T', ' · ')}</time>{meal.deleted_at && <span className="status-badge">Удалён</span>}</header>
     <TotalsView totals={meal.totals} />
     <ol className="meal-foods">{meal.lines.map((line, index) => <li key={line.id}><div className="record-heading"><strong>{line.name}</strong><span className="muted">{line.quantity === null ? 'Целая порция · количество неизвестно' : `${line.quantity} ${line.unit === 'g' ? 'г' : 'мл'}`}</span></div>
       {line.portion && <p>Порция: {line.portion.name} · {line.portion.quantity} {line.unit === 'g' ? 'г' : 'мл'}</p>}
@@ -42,7 +41,6 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   const [lines, setLines] = useState<FormLine[]>([])
   const [localTime, setLocalTime] = useState('')
   const [latestGlucoseAt, setLatestGlucoseAt] = useState<string | null>(null)
-  const [category, setCategory] = useState('')
   const [editing, setEditing] = useState<Meal | null>(null)
   const [candidates, setCandidates] = useState<string[]>([])
   const [instant, setInstant] = useState('')
@@ -82,7 +80,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
 
   const analysisVisible = useRef(false)
   analysisVisible.current = authorized && summaryVisible
-  const repeatForm = useRef<{ occurred_at: string; category: string | null; lines: Line[] } | null>(null)
+  const repeatForm = useRef<{ occurred_at: string; lines: Line[] } | null>(null)
   const analysisDay = summaryVisible ? day : ''
   const mealPage = visible || summaryVisible
 
@@ -107,13 +105,13 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   const formGeneration = useRef(0)
   useEffect(() => {
     formGeneration.current++
-    setLines([]); setCategory(''); setEditing(null); setCandidates([]); setInstant(''); setLocalTime(''); setLatestGlucoseAt(null)
+    setLines([]); setEditing(null); setCandidates([]); setInstant(''); setLocalTime(''); setLatestGlucoseAt(null)
     setConflict(null); setLatest(null); setError(''); setField(null); setNotice('')
     setConversion(null); setConversionQuantity(''); setConversionUnit('g'); setProductSeed(null); setChoosingProduct(false)
     initialized.current = false
     if (authorized && visible && repeatForm.current) {
       const form = repeatForm.current
-      setLines(form.lines); setCategory(form.category ?? '')
+      setLines(form.lines)
       setLocalTime(localMinute(form.occurred_at)); setInstant(form.occurred_at)
       initialized.current = true
       setNotice('Повтор открыт в новой форме. Проверьте состав и время; запись появится после сохранения.')
@@ -168,7 +166,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
   }
   function edit(meal: Meal) {
     initialized.current = true
-    setEditing(meal); setLocalTime(localMinute(meal.occurred_at)); setCategory(meal.category ?? '')
+    setEditing(meal); setLocalTime(localMinute(meal.occurred_at))
     setLines(meal.lines.map(({ totals, ...line }) => line))
     setCandidates([]); setInstant(''); setConflict(null); setLatest(null); setError(''); setField(null); setNotice('')
     requestAnimationFrame(() => document.getElementById('meal-form-title')?.focus())
@@ -178,7 +176,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     sending.current = true; setBusy(true); setError('')
     const version = formGeneration.current
     try {
-      const form = await read<{ occurred_at: string; category: string | null; lines: Line[] }>(`/api/meals/${meal.id}/repeat-form`)
+      const form = await read<{ occurred_at: string; lines: Line[] }>(`/api/meals/${meal.id}/repeat-form`)
       if (version !== formGeneration.current) return
       repeatForm.current = form
       onInput()
@@ -206,7 +204,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
     finally { sending.current = false; setBusy(false) }
   }
   function clear() {
-    setLines([]); setCategory(''); setEditing(null); setCandidates([]); setInstant(''); setConflict(null); setLatest(null); setError(''); setField(null)
+    setLines([]); setEditing(null); setCandidates([]); setInstant(''); setConflict(null); setLatest(null); setError(''); setField(null)
     initialized.current = false; setLocalTime('')
     void initialize().catch(() => setError('Не удалось получить время формы. Повторите подключение.'))
   }
@@ -255,7 +253,7 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
         }
         if (version !== formGeneration.current) return
         request = { path: editing ? `/api/meals/${editing.id}` : '/api/meals', method: editing ? 'PUT' : 'POST', action: 'save',
-          body: JSON.stringify({ operation_id: crypto.randomUUID(), occurred_at: instant || time.candidates[0], category: category || null,
+          body: JSON.stringify({ operation_id: crypto.randomUUID(), occurred_at: instant || time.candidates[0],
             lines: lines.map(({ portions, ...line }) => line), ...(editing ? { expected_revision: editing.revision } : {}) }) }
         setPending(request)
       }
@@ -304,7 +302,6 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
               <label htmlFor="meal-time">Время приёма — Москва</label><input id="meal-time" type="datetime-local" step="60" required value={localTime} onChange={e => { initialized.current = true; setLocalTime(e.target.value); setCandidates([]); setInstant('') }} {...invalid('occurred_at')} />{inlineError('occurred_at')}
               <button type="button" disabled={!latestGlucoseAt} onClick={() => { if (latestGlucoseAt) { initialized.current = true; setLocalTime(localMinute(latestGlucoseAt)); setInstant(latestGlucoseAt); setCandidates([]) } }}>Время последнего измерения сахара</button>
               {candidates.length > 1 && <><label htmlFor="meal-offset">Смещение времени приёма</label><select id="meal-offset" required value={instant} onChange={e => setInstant(e.target.value)}><option value="">Выберите смещение UTC</option>{candidates.map(value => <option key={value} value={value}>UTC{value.slice(-6)}</option>)}</select></>}
-              <label htmlFor="meal-category">Категория приёма</label><select id="meal-category" value={category} onChange={e => setCategory(e.target.value)} {...invalid('category')}><option value="">Без категории</option>{categories.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
               <h3>Состав</h3>{!lines.length && <p>Добавьте продукт из каталога или разовую еду.</p>}
               <button type="button" onClick={() => setLines(current => [...current, { id: crypto.randomUUID(), kind: 'one_off', name: '', unit: null, quantity: null, protein: null, fat: null, carbohydrate: null, calories: null, product_id: null, product_revision: null, portion: null }])}>Добавить разовую еду</button>
               {lines.map((line, index) => {

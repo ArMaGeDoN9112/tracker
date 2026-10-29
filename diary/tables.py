@@ -88,7 +88,7 @@ product_portion = table(
 )
 
 meal = table(
-    "meal", column("id", Text), column("occurred_at", BigInteger), column("category", Text),
+    "meal", column("id", Text), column("occurred_at", BigInteger),
     column("revision", BigInteger), column("created_at", BigInteger),
     column("updated_at", BigInteger), column("deleted_at", BigInteger),
 )

@@ -12,7 +12,7 @@ from diary.application.meals import (
 )
 from diary.application.operations import RevisionInput
 from diary.domain.nutrition import (
-    Category, MealLineRecord, MealRecord, NUTRIENTS, NutrientValues,
+    MealLineRecord, MealRecord, NUTRIENTS, NutrientValues,
     NutritionTotals, contribution, nutrition_totals, rounded,
 )
 from diary.interfaces.http.outputs import ReceiptOutput, receipt_output, timestamp
@@ -24,14 +24,12 @@ class MealLineOutput(MealLineInput):
 
 class RepeatMealOutput(BaseModel):
     occurred_at: str
-    category: Category | None
     lines: list[MealLineInput]
 
 
 class MealOutput(BaseModel):
     id: str
     occurred_at: str
-    category: Category | None
     revision: int
     created_at: str
     updated_at: str
@@ -47,7 +45,7 @@ def meal_output(record: MealRecord, lines: list[MealLineRecord]) -> MealOutput:
             **line_input(line).model_dump(),
             totals=NutrientValues(**{name: rounded(value) if (value := contribution(line, name)) is not None else None for name in NUTRIENTS}),
         ))
-    return MealOutput(id=record.id, occurred_at=timestamp(record.occurred_at), category=record.category,
+    return MealOutput(id=record.id, occurred_at=timestamp(record.occurred_at),
                       revision=record.revision, created_at=timestamp(record.created_at), updated_at=timestamp(record.updated_at),
                       deleted_at=timestamp(record.deleted_at) if record.deleted_at is not None else None,
                       lines=outputs, totals=nutrition_totals(lines))
@@ -68,7 +66,7 @@ def register_meals(app: FastAPI, cases: MealUseCases, clock: Callable[[], int]) 
     @app.get("/api/meals/{meal_id}/repeat-form", response_model=RepeatMealOutput)
     def repeat_meal(meal_id: UUID) -> RepeatMealOutput:
         result = cases.repeat.execute(MealQuery(meal_id=str(meal_id)))
-        return RepeatMealOutput(occurred_at=timestamp(result.occurred_at), category=result.category, lines=result.lines)
+        return RepeatMealOutput(occurred_at=timestamp(result.occurred_at), lines=result.lines)
 
     @app.post("/api/meal-product-preview", response_model=MealProductPreview)
     def preview_product(payload: MealProductPreviewInput) -> MealProductPreview:

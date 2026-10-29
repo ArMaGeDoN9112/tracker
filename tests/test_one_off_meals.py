@@ -83,7 +83,7 @@ def test_product_preview_is_explicit_rounded_and_independent(diary):
 def test_repeat_freezes_history_and_server_time_without_writing(diary, monkeypatch):
     client, _ = diary
     source = line(client)
-    path = '/api/meals/' + client.post('/api/meals', json=meal([source, one_off(carbohydrate='12')], category='lunch')).json()['result_id']
+    path = '/api/meals/' + client.post('/api/meals', json=meal([source, one_off(carbohydrate='12')])).json()['result_id']
     original = client.get(path).json()
     from test_products import product
     assert client.put('/api/products/' + source['product_id'], json=product(expected_revision=1, name='Изменён', carbohydrate='99')).status_code == 200
@@ -92,14 +92,14 @@ def test_repeat_freezes_history_and_server_time_without_writing(diary, monkeypat
     assert response.status_code == 200
     draft = response.json()
     assert draft['occurred_at'] == '2026-10-20T12:40:00.123Z'
-    assert draft['category'] == 'lunch'
+    assert 'category' not in draft
     assert [row['id'] for row in draft['lines']] != [row['id'] for row in original['lines']]
     assert len(set(row['id'] for row in draft['lines'])) == 2
     assert draft['lines'][0]['carbohydrate'] == '20.00'
     assert draft['lines'][1]['quantity'] is None
     assert len(client.get('/api/nutrition-day?day=2026-10-19').json()['meals']) == 1
     assert client.get('/api/nutrition-day?day=2026-10-20').json()['meals'] == []
-    assert client.put(path, json=meal([source], expected_revision=1, category='dinner')).status_code == 200
+    assert client.put(path, json=meal([source], expected_revision=1)).status_code == 200
     draft['lines'][0]['quantity'] = '90'
     payload = {'operation_id': str(uuid4()), **draft}
     created = client.post('/api/meals', json=payload)
@@ -110,7 +110,7 @@ def test_repeat_freezes_history_and_server_time_without_writing(diary, monkeypat
     assert len(repeated['lines']) == 2
     assert repeated['totals']['carbohydrate']['value'] == '30.00'
     assert repeated['occurred_at'] == draft['occurred_at']
-    assert client.get(path).json()['category'] == 'dinner'
+    assert 'category' not in client.get(path).json()
     assert len(client.get(path).json()['lines']) == 1
     assert client.post(path + '/delete', json={'operation_id': str(uuid4()), 'expected_revision': 2}).status_code == 200
     assert client.get(path + '/repeat-form').status_code == 404

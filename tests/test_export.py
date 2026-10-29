@@ -70,7 +70,7 @@ def test_empty_export_is_private_download(diary):
     assert response.headers["content-disposition"].startswith('attachment; filename="diabetes-diary-')
     result = response.json()
     validate_export(result)
-    assert result["schema_version"] == 3
+    assert result["schema_version"] == 4
     assert result["settings"] == {"timezone": "Europe/Moscow", "theme": "dark",
                                   "water": {"volumes_ml": [200, 250, 500], "revision": 1}}
     assert result["products"] == result["meals"] == result["water"] == []
@@ -146,8 +146,9 @@ def test_export_preserves_full_history_and_exact_values(diary):
     assert set(result["account"]) == {"id", "login", "created_at"}
 
 
-def test_documented_example_matches_schema():
-    validate_export(json.loads(Path("docs/export/example-v1.json").read_text()))
+@pytest.mark.parametrize('version', [1, 2, 3])
+def test_documented_example_matches_schema(version):
+    validate_export(json.loads(Path(f"docs/export/example-v{version}.json").read_text()))
 
 
 def test_export_nutrition_preserves_catalog_and_independent_history(diary):
@@ -178,11 +179,11 @@ def test_export_nutrition_preserves_catalog_and_independent_history(diary):
     assert client.get("/api/meals/" + copy.json()["result_id"]).json()["totals"] == historical["totals"]
 
 
-def test_v3_contract_and_example_match_application_dto():
+def test_v4_contract_and_example_match_application_dto():
     from diary.interfaces.export import FullExport
-    schema = json.loads(Path("docs/export/schema-v3.json").read_text())
+    schema = json.loads(Path("docs/export/schema-v4.json").read_text())
     assert schema == FullExport.model_json_schema()
-    example = json.loads(Path("docs/export/example-v3.json").read_text())
+    example = json.loads(Path("docs/export/example-v4.json").read_text())
     validate_export(example)
     assert FullExport.model_validate(example).model_dump(mode="json") == example
 

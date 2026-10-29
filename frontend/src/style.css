@@ -379,6 +379,15 @@ button,input,select,textarea,a { scroll-margin-block:20px; }
 .calendar-chart-options input { width:20px; min-height:20px; height:20px; margin:0; accent-color:var(--accent); }
 .calendar-day-chart>p,.calendar-chart-options legend { font-size:.8125rem; }
 .calendar-chart-scales { display:flex; flex-wrap:wrap; gap:4px 16px; padding:0; list-style:none; color:var(--muted); font-size:.8rem; }
+.calendar-meals h5 { margin:4px 16px 12px; font-size:.8125rem; color:var(--muted); }
+.calendar-meal-track { position:relative; margin:0 16px; padding:0; list-style:none; border-top:1px solid var(--border); }
+.calendar-meal-stem { position:absolute; top:0; border-left:1px solid var(--border); pointer-events:none; }
+.calendar-meal-stem::before { content:''; position:absolute; left:-4px; top:-4px; width:7px; height:7px; border-radius:50%; background:var(--accent); }
+.calendar-day-chart .calendar-meal-card { position:absolute; z-index:1; display:flex; flex-direction:column; align-items:flex-start; gap:3px; height:76px; min-height:0; margin:0; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); text-align:left; font-size:.8125rem; line-height:1.25; cursor:pointer; }
+.calendar-meal-card>span,.calendar-meal-card>small { width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.calendar-meal-card>small { color:var(--muted); font-size:.75rem; }
+.calendar-day-chart .calendar-meal-card:hover,.calendar-day-chart .calendar-meal-card[aria-pressed=true] { border-color:var(--accent); background:var(--surface); }
+.calendar-meal-details { margin:8px 0; padding-bottom:6px; border-bottom:1px solid var(--border); }
 
 .calendar-day-chart .day-chart-tooltip { pointer-events:auto; font-size:.875rem; line-height:1.4; overscroll-behavior:contain; }
 .calendar-day-chart .day-chart-tooltip p { margin:2px 0 6px; }

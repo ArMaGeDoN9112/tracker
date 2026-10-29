@@ -17,7 +17,7 @@ def line(client, **changes):
 
 def meal(items, **changes):
     return {'operation_id': str(uuid4()), 'occurred_at': '2026-10-19T00:00:00.123+03:00',
-            'category': None, 'lines': items, **changes}
+            'lines': items, **changes}
 
 
 def test_catalog_meal_calculates_exact_values_and_day(diary):
@@ -70,7 +70,7 @@ def test_snapshots_survive_catalog_changes_and_edit_uses_historical_basis(diary)
     # A draft picked before the card changed must also retain its snapshot.
     draft_id = client.post('/api/meals', json=meal([source])).json()['result_id']
     assert client.get('/api/meals/' + draft_id).json()['lines'] == before['lines']
-    update = {**first, 'operation_id': str(uuid4()), 'expected_revision': 1, 'category': 'lunch',
+    update = {**first, 'operation_id': str(uuid4()), 'expected_revision': 1,
               'lines': [{**source, 'quantity': '90'}]}
     assert client.put(meal_path, json=update).status_code == 200
     changed = client.get(meal_path).json()
@@ -161,7 +161,7 @@ def test_unknown_partial_huge_results_normalization_and_invalid_header(diary):
     assert client.post('/api/meals', json=meal([second])).status_code == 200
     day = client.get('/api/nutrition-day?day=2026-10-19').json()
     assert day['totals']['protein'] == {'value': '4611686014132.42', 'known_count': 1, 'unknown_count': 1, 'incomplete': True}
-    for changes in [{'lines': []}, {'lines': [source, source]}, {'category': 'other'}, {'occurred_at': '2026-10-19T12:00:00'}, {'operation_id': 'bad'}]:
+    for changes in [{'lines': []}, {'lines': [source, source]}, {'occurred_at': '2026-10-19T12:00:00'}, {'operation_id': 'bad'}]:
         assert client.post('/api/meals', json=meal([source], **changes)).status_code == 422
 
 
@@ -211,7 +211,7 @@ def test_access_body_limit_and_conflicting_operation(diary):
     assert client.post('/api/meals', json=payload, headers={'Origin': 'https://other.test'}).status_code == 403
     assert client.put(path, json={**payload, 'expected_revision': 1}, headers={'X-CSRF-Token': 'wrong'}).status_code == 403
     assert client.post(path + '/delete', json={'operation_id': str(uuid4()), 'expected_revision': 1}, headers={'X-CSRF-Token': 'wrong'}).status_code == 403
-    assert client.post('/api/meals', json={**payload, 'category': 'lunch'}).json()['code'] == 'operation_conflict'
+    assert client.post('/api/meals', json={**payload, 'occurred_at': '2026-10-19T12:00:00Z'}).json()['code'] == 'operation_conflict'
     assert client.put(path, json={**payload, 'expected_revision': 1}).json()['code'] == 'operation_conflict'
     assert client.post('/api/meals', content=b' ' * 65537).status_code == 413
     with TestClient(create_app(database, ORIGIN), base_url=ORIGIN) as anonymous:
@@ -239,7 +239,7 @@ def test_concurrent_creation_and_competing_edit_delete(diary):
         responses = list(pool.map(send, [('POST', '/api/meals', payload)] * 2))
     assert sorted(r.json()['replayed'] for r in responses) == [False, True]
     path = '/api/meals/' + responses[0].json()['result_id']
-    edit = {**payload, 'operation_id': str(uuid4()), 'expected_revision': 1, 'category': 'snack'}
+    edit = {**payload, 'operation_id': str(uuid4()), 'expected_revision': 1}
     deletion = {'operation_id': str(uuid4()), 'expected_revision': 1}
     with ThreadPoolExecutor(max_workers=2) as pool:
         responses = list(pool.map(send, [('PUT', path, edit), ('POST', path + '/delete', deletion)]))

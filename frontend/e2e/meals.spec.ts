@@ -73,7 +73,7 @@ test('catalog composition, independent product creation, frozen draft, totals af
   await choose(page, second)
   await page.getByLabel('Количество строки 2, г').fill('30')
   await page.getByLabel('Время приёма — Москва').fill('2026-10-19T12:00')
-  await page.getByLabel('Категория приёма').selectOption('lunch')
+  await expect(page.getByLabel('Категория приёма')).toHaveCount(0)
   await expect(page.getByLabel('Количество строки 1, г')).toHaveValue('90')
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await expect(form(page).getByRole('status')).toContainText('Приём пищи сохранён')
@@ -83,10 +83,10 @@ test('catalog composition, independent product creation, frozen draft, totals af
   await expect(saved).toContainText('216.00 ккал')
   await saved.getByRole('button', { name: 'Изменить приём', exact: true }).click()
   await page.getByLabel('Количество строки 1, г').fill('30')
-  await page.getByLabel('Категория приёма').selectOption('snack')
+  await expect(page.getByLabel('Категория приёма')).toHaveCount(0)
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await expect(saved).toContainText('108.00 ккал')
-  await expect(saved).toContainText('Перекус')
+  await expect(saved).toContainText('Приём пищи')
   await saved.getByRole('button', { name: 'Удалить приём', exact: true }).click()
   await expect(saved).toHaveCount(0)
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
@@ -154,16 +154,16 @@ test('field errors, confirmed save with refresh failure and real revision confli
   const day = await (await page.request.get('/api/nutrition-day?day=2026-10-19')).json()
   const row = day.meals.find((meal: { lines: { name: string }[] }) => meal.lines.some(line => line.name === name))
   const csrf = (await (await page.request.get('/api/auth/csrf')).json()).csrf_token
-  const { id, occurred_at, category, revision, lines } = row
+  const { id, occurred_at, revision, lines } = row
   const response = await page.request.put(`/api/meals/${id}`, { headers: { Origin: 'https://localhost:5173', 'X-CSRF-Token': csrf }, data: {
-    operation_id: crypto.randomUUID(), occurred_at, category: 'dinner', expected_revision: revision, lines: lines.map(({ totals, ...line }: Record<string, unknown>) => line),
+    operation_id: crypto.randomUUID(), occurred_at, expected_revision: revision, lines: lines.map(({ totals, ...line }: Record<string, unknown>) => line),
   } })
   expect(response.ok()).toBeTruthy()
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await expect(page.locator('#meal-error')).toContainText('изменён на другом устройстве')
   await expect(page.getByLabel('Количество строки 1, г')).toHaveValue('90')
   await page.getByRole('button', { name: 'Загрузить актуальный приём', exact: true }).click()
-  await expect(page.getByRole('region', { name: 'Актуальный приём', exact: true })).toContainText('Ужин')
+  await expect(page.getByRole('region', { name: 'Актуальный приём', exact: true })).toContainText('Приём пищи')
   await page.getByRole('button', { name: 'Продолжить с моим составом', exact: true }).click()
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await expect(saved).toContainText('162.00 ккал')
@@ -178,7 +178,7 @@ test('exact half-up saved totals, historical milliseconds, movement between days
   const source = { id: crypto.randomUUID(), kind: 'product', name, unit: 'g', quantity: '50', basis_quantity: '100',
     protein: null, fat: '0', carbohydrate: '0.01', calories: null, product_id: product.id, product_revision: 1, portion: null }
   const created = await page.request.post('/api/meals', { headers: { Origin: 'https://localhost:5173', 'X-CSRF-Token': csrf }, data: {
-    operation_id: crypto.randomUUID(), occurred_at: '2026-10-19T15:00:12.123+03:00', category: null, lines: [source, { ...source, id: crypto.randomUUID() }],
+    operation_id: crypto.randomUUID(), occurred_at: '2026-10-19T15:00:12.123+03:00', lines: [source, { ...source, id: crypto.randomUUID() }],
   } })
   expect(created.ok()).toBeTruthy()
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
@@ -191,7 +191,7 @@ test('exact half-up saved totals, historical milliseconds, movement between days
   await expect(saved.getByRole('listitem').nth(1)).toContainText('Углеводы: 0.01 г')
   await expect(saved.getByRole('definition').filter({ hasText: '0.01 г' })).toHaveCount(1)
   await expect(form(page).locator('.meal-totals')).toHaveCount(0)
-  await page.getByLabel('Категория приёма').selectOption('lunch')
+  await expect(page.getByLabel('Категория приёма')).toHaveCount(0)
   await page.getByRole('button', { name: 'Сохранить приём пищи', exact: true }).click()
   await expect(saved).toContainText('15:00')
   const recorded = await (await page.request.get(`/api/meals/${(await created.json()).result_id}`)).json()

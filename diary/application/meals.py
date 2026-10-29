@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_va
 from diary.application.entries import EntryInput
 from diary.application.operations import OperationInput, RevisionInput
 from diary.application.products import NamedInput, PortionInput, ProductInput
-from diary.domain.nutrition import Category, MealRecord, MealLineRecord, NUTRIENTS, NutrientValues, rounded
+from diary.domain.nutrition import MealRecord, MealLineRecord, NUTRIENTS, NutrientValues, rounded
 from diary.domain.precision import hundredths, rate_string
 from diary.domain.time import milliseconds
 from diary.application.errors import ApplicationError, NotFound, RevisionConflict, UndoExpired
@@ -84,8 +84,13 @@ class MealLineInput(NamedInput):
 
 class MealInput(OperationInput):
     occurred_at: str
-    category: Category | None = None
     lines: list[MealLineInput] = Field(min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def legacy_header(cls, value: object) -> object:
+        # Accept retries from clients opened before meal categories were removed.
+        return {key: item for key, item in value.items() if key != "category"} if isinstance(value, dict) else value
 
     @field_validator("occurred_at")
     @classmethod
@@ -134,7 +139,6 @@ class MealRevisionCommand(RevisionInput):
 
 class RepeatMealResult(BaseModel):
     occurred_at: int
-    category: Category | None
     lines: list[MealLineInput]
 
 
@@ -205,7 +209,7 @@ class RepeatMeal:
             source = uow.meals.get(query.meal_id)
             if source is None or source.record.deleted_at is not None:
                 raise NotFound("Неудалённый приём пищи не найден.")
-            return RepeatMealResult(occurred_at=self.clock(), category=source.record.category,
+            return RepeatMealResult(occurred_at=self.clock(),
                 lines=[line_input(line).model_copy(update={"id": self.new_id()}) for line in source.lines])
 
 
@@ -250,7 +254,7 @@ class MealOperations:
                 return ReceiptResult(receipt=replay, replayed=True)
             now = self.clock()
             result_id = meal_id or self.new_id()
-            record = MealRecord(id=result_id, occurred_at=0, category=None, revision=1,
+            record = MealRecord(id=result_id, occurred_at=0, revision=1,
                                 created_at=now, updated_at=now, deleted_at=None)
             lines: list[MealLineRecord] = []
             if isinstance(payload, RevisionInput):
@@ -266,7 +270,6 @@ class MealOperations:
                 record.updated_at = now
             if isinstance(payload, MealInput):
                 record.occurred_at = milliseconds(datetime.fromisoformat(payload.occurred_at))
-                record.category = payload.category
                 lines = [line_record(line, result_id, position) for position, line in enumerate(payload.lines)]
             else:
                 record.deleted_at = now if action == OperationAction.DELETE_MEAL else None
