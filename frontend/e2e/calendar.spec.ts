@@ -16,13 +16,13 @@ test('month calendar opens the complete Moscow day and clears unfinished input',
   const csrf = (await (await page.request.get('/api/auth/csrf')).json()).csrf_token
   const headers = { Origin: 'https://localhost:5173', 'X-CSRF-Token': csrf }
   for (const [path, data] of [
-    ['/api/meals', { lines: [{ id: crypto.randomUUID(), kind: 'one_off', name: 'Обед в календаре', calories: '123.45', protein: '7' }] }],
+    ['/api/meals', { lines: [{ id: crypto.randomUUID(), kind: 'one_off', name: 'Обед в календаре', calories: '123.45', protein: '7' }, { id: crypto.randomUUID(), kind: 'one_off', name: 'Чай' }] }],
     ['/api/water', { volume_ml: 750 }],
     ['/api/entries', { glucose: '5.6', bolus: '1.2', reason: 'food', comment: 'Запись календаря' }],
     ['/api/entries', { glucose: '7.0' }],
     ['/api/entries', { bolus: '0.5' }],
   ] as const) {
-    expect((await page.request.post(path, { headers, data: { operation_id: crypto.randomUUID(), occurred_at: `${day}T23:59:59.999+03:00`, ...data } })).ok()).toBeTruthy()
+    expect((await page.request.post(path, { headers, data: { operation_id: crypto.randomUUID(), occurred_at: `${day}T${path === '/api/meals' ? '23:59:00' : '23:59:59.999'}+03:00`, ...data } })).ok()).toBeTruthy()
   }
   await page.getByLabel('Комментарий', { exact: true }).fill('Черновик остаётся')
   await page.getByRole('link', { name: 'Календарь', exact: true }).click()
@@ -44,7 +44,12 @@ test('month calendar opens the complete Moscow day and clears unfinished input',
   await open.focus(); await page.keyboard.press('Enter')
   const details = calendar.getByRole('region', { name: 'Подробная сводка дня', exact: true })
   await expect(details.getByRole('heading', { name: `Сводка за ${day}` })).toBeFocused()
-  await expect(details).not.toContainText('Обед в календаре')
+  const records = details.locator('.calendar-records')
+  await expect(records.getByRole('columnheader')).toHaveText(['Время', 'Сахар, ммоль/л', 'Подколка, ед.', 'Комментарий', 'Еда'])
+  await expect(records.locator('tbody tr')).toHaveCount(1)
+  await expect(records.locator('tbody tr').getByRole('cell')).toHaveText(['23:59', '5,6; 7,0', '1,2; 0,0; 0,5', 'Запись календаря', 'Обед в календаре, Чай'])
+  await expect(records).not.toContainText('123.45')
+  await expect(records).not.toContainText('ккал')
   await expect(details).toContainText('123.45 ккал')
   await expect(details).toContainText('750 мл')
   const glucoseChart = details.getByRole('slider', { name: 'Показатели дня по времени' })
@@ -53,7 +58,6 @@ test('month calendar opens the complete Moscow day and clears unfinished input',
   await expect(details.getByRole('tooltip', { name: 'Показатели дня' })).toContainText('5,6 ммоль/л')
   await expect(details.getByRole('tooltip', { name: 'Показатели дня' })).toContainText('7,0 ммоль/л')
   await expect(details.getByRole('tooltip', { name: 'Показатели дня' })).toContainText('1,2 ед.')
-  await expect(details.locator('.calendar-records')).toContainText('Запись календаря')
   await expect(details).not.toContainText('Известных строк')
   await expect(details).not.toContainText('Основа:')
   await expect(details).not.toContainText('редакция')
@@ -87,7 +91,11 @@ test('month calendar opens the complete Moscow day and clears unfinished input',
   await days.first().click()
   await expect(details).toContainText('Нет записей еды')
   await expect(details).toContainText('Нет записей воды')
-  await expect(details).toContainText('Нет записей сахара и подколок')
+  await expect(details).toContainText('Нет записей сахара, подколок, комментариев и еды')
+  expect((await page.request.post('/api/meals', { headers, data: { operation_id: crypto.randomUUID(), occurred_at: '2025-02-02T08:00:00+03:00', lines: [{ id: crypto.randomUUID(), kind: 'one_off', name: 'Только еда' }] } })).ok()).toBeTruthy()
+  await days.nth(1).click()
+  await expect(records.locator('tbody tr')).toHaveCount(1)
+  await expect(records.locator('tbody tr').getByRole('cell')).toHaveText(['08:00', '—', '—', '—', 'Только еда'])
   await page.reload()
   await expect(page.getByRole('link', { name: 'Календарь', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(calendar).toBeVisible()
@@ -100,7 +108,7 @@ test('calendar charts show loading and errors and discard a late response for a 
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   const details = page.getByRole('region', { name: 'Подробная сводка дня' })
-  await expect(details).toContainText('Нет записей сахара и подколок.')
+  await expect(details).toContainText('Нет записей сахара, подколок, комментариев и еды.')
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
   let received!: () => void

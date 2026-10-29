@@ -6,6 +6,7 @@ import { CalendarDayChart } from './CalendarDayChart'
 import type { TemporaryPeriod } from './TemporaryBasal'
 import { basalText, localMinute, moscowLabel } from './time'
 import type { GlucoseDay } from './GlucoseCharts'
+import { calendarRecords } from './calendarRecords'
 
 type CalendarDay = { day: string; meal_count: number; totals: Totals; water_total_ml: number | null; glucose_average: string | null }
 export type DiaryDay = {
@@ -45,6 +46,8 @@ function DaySummary({ active, day, generation, summary, calendar, onClose, onAna
     return () => { cancelled = true }
   }, [active, day, generation])
 
+  const records = data ? calendarRecords(data.diary.entries, data.nutrition.meals) : []
+
   return <section className="calendar-details" aria-label="Подробная сводка дня">
     <div className="calendar-detail-heading"><h3 tabIndex={-1} ref={heading}>Сводка за {day}</h3><button onClick={onClose}>Закрыть сводку</button></div>
     <p className="muted">Все события и границы дня — по Москве.</p>
@@ -66,7 +69,13 @@ function DaySummary({ active, day, generation, summary, calendar, onClose, onAna
           </details>}
           <section className="calendar-records"><span className="eyebrow">СОБЫТИЯ ДНЯ</span><h4>Записи дня</h4>
             <a href={`?section=charts&day=${day}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onAnalysis(day) } }}>Записи диабета</a>
-            {!data.diary.entries.length ? <p className="muted">Нет записей сахара и подколок.</p> : <div className="console-table-scroll"><table><thead><tr><th>Время</th><th>Сахар, ммоль/л</th><th>Подколка, ед.</th><th>Комментарий</th></tr></thead><tbody>{data.diary.entries.map(entry => <tr key={entry.id}><td>{localMinute(entry.occurred_at).slice(11)}</td><td>{entry.glucose?.replace('.', ',') ?? '—'}</td><td>{entry.bolus.replace('.', ',')}</td><td>{entry.comment || '—'}</td></tr>)}</tbody></table></div>}
+            {!records.length ? <p className="muted">Нет записей сахара, подколок, комментариев и еды.</p> : <div className="console-table-scroll"><table><thead><tr><th>Время</th><th>Сахар, ммоль/л</th><th>Подколка, ед.</th><th>Комментарий</th><th>Еда</th></tr></thead><tbody>{records.map(record => <tr key={record.time}>
+              <td>{localMinute(new Date(record.time).toISOString()).slice(11)}</td>
+              <td>{record.entries.flatMap(entry => entry.glucose === null ? [] : [entry.glucose.replace('.', ',')]).join('; ') || '—'}</td>
+              <td>{record.entries.map(entry => entry.bolus.replace('.', ',')).join('; ') || '—'}</td>
+              <td>{record.entries.map(entry => entry.comment).filter(Boolean).join('; ') || '—'}</td>
+              <td>{record.meals.map(meal => meal.lines.map(line => line.name).join(', ')).join('; ') || '—'}</td>
+            </tr>)}</tbody></table></div>}
           </section>
         </>}
       </div>
