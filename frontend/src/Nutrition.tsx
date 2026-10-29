@@ -298,7 +298,6 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
       <div className="diary-layout nutrition-layout">
         <section aria-label="Форма приёма пищи" hidden={!visible && !editing && !(pending?.action === 'save' && pending.method === 'PUT')}>
           <span className="eyebrow">СЪЕДЕННАЯ ЕДА</span><h2 id="meal-form-title" tabIndex={-1}>{editing ? 'Изменение приёма пищи' : 'Новый приём пищи'}</h2>
-          <p className="muted">Выберите еду по карточкам из каталога или добавьте разовую еду.</p>
           {!localTime && <button onClick={() => void initialize().catch(() => setError('Не удалось подключиться.'))}>Повторить подключение питания</button>}
           <form onSubmit={save} aria-busy={busy}>
             <fieldset disabled={locked}>
@@ -326,7 +325,6 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
                       setField(null); setError('')
                     }}>Добавить порцию {portion.name} · {portion.quantity} {unit}</button>)}
                   </div>}
-                  {line.portion && <p>Последняя добавленная порция: {line.portion.name} · {line.portion.quantity} {unit}; каждое нажатие прибавляет её к количеству.</p>}
                   <label htmlFor={`meal-quantity-${line.id}`}>Количество строки {index + 1}, {unit}</label><input id={`meal-quantity-${line.id}`} required={line.kind === 'product' || !!line.basis_quantity} inputMode="decimal" value={line.quantity ?? ''} onChange={e => set({ quantity: e.target.value || null })} {...invalid(`lines.${index}.quantity`)} />{inlineError(`lines.${index}.quantity`)}
                   {line.kind === 'one_off' && <p>Значения за всю исходную порцию. {line.basis_quantity === undefined ? 'При первом сохранении количество станет исходной основой.' : line.basis_quantity === null ? 'Исходное количество неизвестно: новый вес сам по себе не пересчитывает ценность.' : `Сохранённая основа: ${line.basis_quantity} ${unit}; пересчёт без накопления округлений.`}</p>}
                   <details open={line.kind === 'one_off'}><summary>{line.kind === 'product' ? `Исходные значения на ${line.basis_quantity} ${unit}` : 'Исходная порция и её ценность'}</summary>
@@ -338,7 +336,6 @@ export function Nutrition({ authorized, visible, summaryVisible, catalogVisible,
                 </fieldset>
               })}
               <button type="button" id="choose-product" disabled={locked} onClick={() => { setChoosingProduct(true); requestAnimationFrame(() => document.getElementById('catalog-title')?.focus()) }}>Выбрать из каталога</button>
-              <p className="muted">Пустое значение — неизвестно; 0 — известный ноль. Калории с этикетки независимы от БЖУ.</p>
             </fieldset>
             {pending?.action === 'save' && <p role="status">{confirmed ? 'Сохранение подтверждено.' : 'Результат запроса неизвестен.'} Явный повтор отправит прежние данные, время и UUID.</p>}
             <button type="submit" disabled={busy || !!conflict || (!!pending && pending.action !== 'save') || !localTime}>{busy ? 'Сохраняем…' : pending?.action === 'save' ? 'Повторить сохранение приёма' : 'Сохранить приём пищи'}</button>
