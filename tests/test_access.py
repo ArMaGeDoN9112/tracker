@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from diary.app import create_app
+from diary.app import create_app, from_env
 from diary.infrastructure.database import migrate
 from admin_setup import create_account
 from admin_setup import reset_password
@@ -14,6 +14,43 @@ def login(client, password=PASSWORD, name="owner"):
     csrf = client.get("/api/auth/csrf").json()["csrf_token"]
     return client.post("/api/auth/login", json={"login": name, "password": password},
                        headers={"Origin": ORIGIN, "X-CSRF-Token": csrf})
+
+
+def test_additional_origins_allow_login_through_proxy_with_local_host(tmp_path, monkeypatch):
+    database = tmp_path / "diary.sqlite3"
+    migrate(database)
+    create_account(database, "owner", PASSWORD)
+    local_origin = "https://192.168.1.78:5173"
+    public_origin = "https://tracker.bamsbams.site"
+    monkeypatch.setenv("DIARY_DATABASE", str(database))
+    monkeypatch.setenv("DIARY_ORIGIN", local_origin)
+    monkeypatch.setenv("DIARY_ADDITIONAL_ORIGINS", f" {public_origin}, https://second.test ")
+
+    with TestClient(from_env(), base_url=local_origin) as client:
+        payload = {"login": "owner", "password": PASSWORD}
+        for origin in (public_origin, local_origin, "https://second.test"):
+            csrf = client.get("/api/auth/csrf").json()["csrf_token"]
+            response = client.post("/api/auth/login", json=payload,
+                                   headers={"Origin": origin, "X-CSRF-Token": csrf})
+            assert response.status_code == 200
+        csrf = client.get("/api/auth/csrf").json()["csrf_token"]
+        for headers in (
+            {"Origin": public_origin, "X-CSRF-Token": "wrong"},
+            {"Origin": "https://foreign.test", "X-CSRF-Token": csrf,
+             "X-Forwarded-Host": "tracker.bamsbams.site"},
+            {"X-CSRF-Token": csrf},
+        ):
+            assert client.post("/api/auth/login", json=payload, headers=headers).status_code == 403
+        assert client.get("/api/auth/session", headers={"Host": "foreign.test"}).status_code == 400
+
+
+@pytest.mark.parametrize("extra", ["http://other.test", "https://other.test/", "https://ok.test,"])
+def test_additional_origins_are_validated_at_startup(tmp_path, monkeypatch, extra):
+    monkeypatch.setenv("DIARY_DATABASE", str(tmp_path / "diary.sqlite3"))
+    monkeypatch.setenv("DIARY_ORIGIN", ORIGIN)
+    monkeypatch.setenv("DIARY_ADDITIONAL_ORIGINS", extra)
+    with pytest.raises(ValueError):
+        from_env()
 
 
 def test_private_routes_are_closed_by_default(tmp_path):

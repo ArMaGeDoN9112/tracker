@@ -16,8 +16,9 @@ from diary.interfaces.http.access import validate_origin
 from diary.interfaces.http.body_limit import BodyLimit
 
 
-def create_app(database: Path, origin: str) -> FastAPI:
-    validate_origin(origin)
+def create_app(database: Path, origin: str, additional_origins: tuple[str, ...] = ()) -> FastAPI:
+    for allowed_origin in (origin, *additional_origins):
+        validate_origin(allowed_origin)
     engine = database_engine(database)
 
     @asynccontextmanager
@@ -31,7 +32,7 @@ def create_app(database: Path, origin: str) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     register_application_errors(app)
     app.add_middleware(BodyLimit)
-    register_access_http(app, engine, origin)
+    register_access_http(app, engine, origin, additional_origins)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_input(request: Request, error: RequestValidationError) -> Response:
@@ -112,4 +113,8 @@ def create_app(database: Path, origin: str) -> FastAPI:
 
 
 def from_env() -> FastAPI:
-    return create_app(Path(os.environ["DIARY_DATABASE"]), os.environ["DIARY_ORIGIN"])
+    additional = os.environ.get("DIARY_ADDITIONAL_ORIGINS", "")
+    return create_app(
+        Path(os.environ["DIARY_DATABASE"]), os.environ["DIARY_ORIGIN"],
+        tuple(value.strip() for value in additional.split(",")) if additional else (),
+    )

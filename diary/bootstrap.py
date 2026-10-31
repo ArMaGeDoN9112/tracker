@@ -140,7 +140,7 @@ def register_backup_status_http(app: FastAPI, database: "Path") -> None:
     register_backup_status(app, GetBackupStatus(backup_storage(database), lambda: datetime.now(timezone.utc)))
 
 
-def register_access_http(app: FastAPI, engine: Engine, origin: str) -> None:
+def register_access_http(app: FastAPI, engine: Engine, origin: str, additional_origins: tuple[str, ...] = ()) -> None:
     from diary.application.access import CheckCsrf, GetCsrf, GetSession, Login, Logout
     from diary.infrastructure.access import access_uow
     from diary.infrastructure import security
@@ -155,7 +155,7 @@ def register_access_http(app: FastAPI, engine: Engine, origin: str) -> None:
         login=Login(writes, clock, crypto, dummy_hash), logout=Logout(writes, crypto),
         session=GetSession(reads, clock, crypto), csrf=GetCsrf(writes, clock, crypto),
         check_csrf=CheckCsrf(reads, clock, crypto),
-    ), origin)
+    ), origin, additional_origins)
 
 
 @contextmanager

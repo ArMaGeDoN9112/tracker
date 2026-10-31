@@ -6,6 +6,7 @@ services:
     environment:
       DIARY_DATABASE: /data/diary.sqlite3
       DIARY_ORIGIN: ${DIARY_ORIGIN:-https://localhost:5173}
+      DIARY_ADDITIONAL_ORIGINS: ${DIARY_ADDITIONAL_ORIGINS:-}
     volumes:
       - diary_data:/data
     restart: unless-stopped

@@ -43,8 +43,9 @@ def clear_cookie(response: Response, name: str) -> None:
     response.delete_cookie(name, secure=True, httponly=True, samesite="lax", path="/")
 
 
-def register_access(app: FastAPI, cases: AccessUseCases, origin: str) -> None:
+def register_access(app: FastAPI, cases: AccessUseCases, origin: str, additional_origins: tuple[str, ...] = ()) -> None:
     host = validate_origin(origin)
+    allowed_origins = {origin, *additional_origins}
 
     def authorize(request: Request) -> Response | None:
         if request.headers.get("host") != host:
@@ -59,7 +60,7 @@ def register_access(app: FastAPI, cases: AccessUseCases, origin: str) -> None:
         if not public and not session:
             return failure("unauthenticated", "Войдите в дневник.", 401)
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
-            if request.headers.get("origin") != origin:
+            if request.headers.get("origin") not in allowed_origins:
                 return failure("csrf", "Обновите страницу и повторите запрос.", 403)
             cases.check_csrf.execute(CheckCsrfInput(
                 session_token=request.state.session_token, pre_token=request.cookies.get(PRE_COOKIE, ""),
