@@ -124,7 +124,7 @@ class ExportTemporary(BaseModel):
 
 class FullExport(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schema_version: Literal[4] = 4
+    schema_version: Literal[5] = 5
     exported_at: Timestamp
     timezone: Literal["Europe/Moscow"] = "Europe/Moscow"
     units: ExportUnits = ExportUnits()

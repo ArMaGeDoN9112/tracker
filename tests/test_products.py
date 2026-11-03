@@ -274,7 +274,7 @@ def test_remove_archive_keeps_products_photos_portions_and_history(tmp_path, pre
     from diary.infrastructure.database import database_engine, migrate
     from diary.tables import product as product_table
     from test_access import ORIGIN, PASSWORD, login
-    from test_meals import meal
+    from test_meals import meal, legacy_meal
     database = tmp_path / 'catalog.sqlite3'
     config = Config()
     config.set_main_option('script_location', str(Path(__file__).resolve().parents[1] / 'migrations'))
@@ -292,9 +292,8 @@ def test_remove_archive_keeps_products_photos_portions_and_history(tmp_path, pre
     with TestClient(create_app(database, ORIGIN), base_url=ORIGIN) as client:
         login(client)
         client.headers.update({'Origin': ORIGIN, 'X-CSRF-Token': client.get('/api/auth/csrf').json()['csrf_token']})
-        receipt = client.post('/api/meals', json=meal([source])).json()
-        path = '/api/meals/' + receipt['result_id']
-        before = client.get(path).json()
+        before = legacy_meal(database, meal([source]))
+        path = '/api/meals/' + before['id']
         if interrupted:
             def fail_rebuild(connection, cursor, statement, parameters, context, executemany):
                 if statement.startswith('ALTER TABLE _alembic_tmp_product'):

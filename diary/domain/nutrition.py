@@ -1,4 +1,5 @@
 from fractions import Fraction
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel
@@ -9,6 +10,13 @@ from diary.domain.precision import rate_string
 NUTRIENTS = ("protein", "fat", "carbohydrate", "calories")
 
 
+class MealType(StrEnum):
+    BREAKFAST = "breakfast"
+    LUNCH = "lunch"
+    DINNER = "dinner"
+    SNACK = "snack"
+
+
 class MealRecord(BaseModel):
     id: str
     occurred_at: int
@@ -16,6 +24,7 @@ class MealRecord(BaseModel):
     created_at: int
     updated_at: int
     deleted_at: int | None
+    meal_type: MealType | None = None
 
 
 class MealLineRecord(BaseModel):

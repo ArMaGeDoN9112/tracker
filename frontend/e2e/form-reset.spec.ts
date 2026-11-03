@@ -186,7 +186,7 @@ for (const section of ['diary', 'nutrition', 'catalog', 'basal', 'temporary'] as
       } else if (section === 'nutrition') {
         await button('Добавить разовую еду').click()
         await field('Название строки 1').fill('Несохранённая еда')
-        await expect(page.getByLabel('Категория приёма')).toHaveCount(0)
+        await expect(page.getByLabel('Тип приёма пищи', { exact: true })).toHaveValue('')
         await field('Объём воды, мл').fill('321')
         await button('Настроить кнопки воды').click()
         await field('Объёмы кнопок воды, мл').fill('123, 456')
@@ -209,7 +209,7 @@ for (const section of ['diary', 'nutrition', 'catalog', 'basal', 'temporary'] as
         for (const name of ['Сахар, ммоль/л', 'Подколка, ед.', 'Комментарий']) await expect(field(name)).toHaveValue('')
       } else if (section === 'nutrition') {
         await expect(field('Название строки 1')).toHaveCount(0)
-        await expect(page.getByLabel('Категория приёма')).toHaveCount(0)
+        await expect(page.getByLabel('Тип приёма пищи', { exact: true })).toHaveValue('')
         await expect(field('Объём воды, мл')).toHaveValue('')
         await expect(field('Объёмы кнопок воды, мл')).toHaveCount(0)
       } else if (section === 'catalog') {

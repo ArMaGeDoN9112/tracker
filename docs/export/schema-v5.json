@@ -1,0 +1,1083 @@
+{
+  "$defs": {
+    "ExportAccount": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "login": {
+          "title": "Login",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "login",
+        "created_at"
+      ],
+      "title": "ExportAccount",
+      "type": "object"
+    },
+    "ExportEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "glucose": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+\\.[0-9]$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Glucose"
+        },
+        "bolus": {
+          "pattern": "^[0-9]+\\.[0-9]$",
+          "title": "Bolus",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "food",
+                "correction",
+                "food_and_correction"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "comment": {
+          "title": "Comment",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "deleted_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Deleted At"
+        }
+      },
+      "required": [
+        "id",
+        "occurred_at",
+        "glucose",
+        "bolus",
+        "reason",
+        "comment",
+        "created_at",
+        "updated_at",
+        "revision",
+        "deleted_at"
+      ],
+      "title": "ExportEntry",
+      "type": "object"
+    },
+    "ExportMeal": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "meal_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MealType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "deleted_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Deleted At"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/MealLineOutput"
+          },
+          "minItems": 1,
+          "title": "Lines",
+          "type": "array"
+        },
+        "totals": {
+          "$ref": "#/$defs/NutritionTotals"
+        }
+      },
+      "required": [
+        "id",
+        "occurred_at",
+        "meal_type",
+        "revision",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+        "lines",
+        "totals"
+      ],
+      "title": "ExportMeal",
+      "type": "object"
+    },
+    "ExportProduct": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "unit": {
+          "enum": [
+            "g",
+            "ml"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "photo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Photo"
+        },
+        "protein": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+\\.[0-9]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Protein"
+        },
+        "fat": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+\\.[0-9]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fat"
+        },
+        "carbohydrate": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+\\.[0-9]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Carbohydrate"
+        },
+        "calories": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+\\.[0-9]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Calories"
+        },
+        "portions": {
+          "items": {
+            "$ref": "#/$defs/PortionInput"
+          },
+          "title": "Portions",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "unit",
+        "protein",
+        "fat",
+        "carbohydrate",
+        "calories",
+        "portions",
+        "revision",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "ExportProduct",
+      "type": "object"
+    },
+    "ExportSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "timezone": {
+          "const": "Europe/Moscow",
+          "default": "Europe/Moscow",
+          "title": "Timezone",
+          "type": "string"
+        },
+        "theme": {
+          "const": "dark",
+          "default": "dark",
+          "title": "Theme",
+          "type": "string"
+        },
+        "water": {
+          "$ref": "#/$defs/ExportWaterSettings"
+        }
+      },
+      "required": [
+        "water"
+      ],
+      "title": "ExportSettings",
+      "type": "object"
+    },
+    "ExportTemporary": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "starts_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Starts At",
+          "type": "string"
+        },
+        "ends_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Ends At",
+          "type": "string"
+        },
+        "effective_ends_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effective Ends At"
+        },
+        "duration_minutes": {
+          "title": "Duration Minutes",
+          "type": "integer"
+        },
+        "percent": {
+          "title": "Percent",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "deleted_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Deleted At"
+        }
+      },
+      "required": [
+        "id",
+        "starts_at",
+        "ends_at",
+        "effective_ends_at",
+        "duration_minutes",
+        "percent",
+        "created_at",
+        "updated_at",
+        "revision",
+        "deleted_at"
+      ],
+      "title": "ExportTemporary",
+      "type": "object"
+    },
+    "ExportUnits": {
+      "additionalProperties": false,
+      "properties": {
+        "timestamps": {
+          "const": "RFC 3339 UTC, milliseconds",
+          "default": "RFC 3339 UTC, milliseconds",
+          "title": "Timestamps",
+          "type": "string"
+        },
+        "glucose": {
+          "const": "mmol/L",
+          "default": "mmol/L",
+          "title": "Glucose",
+          "type": "string"
+        },
+        "bolus": {
+          "const": "U",
+          "default": "U",
+          "title": "Bolus",
+          "type": "string"
+        },
+        "rate": {
+          "const": "U/h",
+          "default": "U/h",
+          "title": "Rate",
+          "type": "string"
+        },
+        "duration_minutes": {
+          "const": "minute",
+          "default": "minute",
+          "title": "Duration Minutes",
+          "type": "string"
+        },
+        "percent": {
+          "const": "percent",
+          "default": "percent",
+          "title": "Percent",
+          "type": "string"
+        },
+        "minute": {
+          "const": "minute of Moscow day",
+          "default": "minute of Moscow day",
+          "title": "Minute",
+          "type": "string"
+        },
+        "food_quantity": {
+          "const": "g or ml; see unit",
+          "default": "g or ml; see unit",
+          "title": "Food Quantity",
+          "type": "string"
+        },
+        "nutrients": {
+          "const": "g per basis_quantity",
+          "default": "g per basis_quantity",
+          "title": "Nutrients",
+          "type": "string"
+        },
+        "calories": {
+          "const": "kcal per basis_quantity",
+          "default": "kcal per basis_quantity",
+          "title": "Calories",
+          "type": "string"
+        },
+        "water": {
+          "const": "integer ml",
+          "default": "integer ml",
+          "title": "Water",
+          "type": "string"
+        }
+      },
+      "title": "ExportUnits",
+      "type": "object"
+    },
+    "ExportWater": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "volume_ml": {
+          "maximum": 2147483647,
+          "minimum": 1,
+          "title": "Volume Ml",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "deleted_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Deleted At"
+        }
+      },
+      "required": [
+        "id",
+        "volume_ml",
+        "occurred_at",
+        "revision",
+        "created_at",
+        "updated_at",
+        "deleted_at"
+      ],
+      "title": "ExportWater",
+      "type": "object"
+    },
+    "ExportWaterSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "volumes_ml": {
+          "items": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "title": "Volumes Ml",
+          "type": "array"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "volumes_ml",
+        "revision"
+      ],
+      "title": "ExportWaterSettings",
+      "type": "object"
+    },
+    "IntervalInput": {
+      "additionalProperties": false,
+      "properties": {
+        "minute": {
+          "description": "Минута от московской полуночи",
+          "maximum": 1439,
+          "minimum": 0,
+          "title": "Minute",
+          "type": "integer"
+        },
+        "rate": {
+          "description": "От 0 до 21474836.47 ед/ч; сотые, точка или запятая; завершающие нули допустимы",
+          "maxLength": 10000,
+          "title": "Rate",
+          "type": "string"
+        }
+      },
+      "required": [
+        "minute",
+        "rate"
+      ],
+      "title": "IntervalInput",
+      "type": "object"
+    },
+    "MealLineOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "product",
+            "one_off"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "basis_quantity": {
+          "anyOf": [
+            {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Basis Quantity"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "enum": [
+                "g",
+                "ml"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "protein": {
+          "anyOf": [
+            {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protein"
+        },
+        "fat": {
+          "anyOf": [
+            {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fat"
+        },
+        "carbohydrate": {
+          "anyOf": [
+            {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Carbohydrate"
+        },
+        "calories": {
+          "anyOf": [
+            {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Calories"
+        },
+        "product_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Id"
+        },
+        "product_revision": {
+          "anyOf": [
+            {
+              "maximum": 9223372036854775806,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Revision"
+        },
+        "portion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortionInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "totals": {
+          "$ref": "#/$defs/NutrientValues"
+        }
+      },
+      "required": [
+        "name",
+        "id",
+        "kind",
+        "totals"
+      ],
+      "title": "MealLineOutput",
+      "type": "object"
+    },
+    "MealType": {
+      "enum": [
+        "breakfast",
+        "lunch",
+        "dinner",
+        "snack"
+      ],
+      "title": "MealType",
+      "type": "string"
+    },
+    "NutrientTotal": {
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "known_count": {
+          "title": "Known Count",
+          "type": "integer"
+        },
+        "unknown_count": {
+          "title": "Unknown Count",
+          "type": "integer"
+        },
+        "incomplete": {
+          "title": "Incomplete",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "value",
+        "known_count",
+        "unknown_count",
+        "incomplete"
+      ],
+      "title": "NutrientTotal",
+      "type": "object"
+    },
+    "NutrientValues": {
+      "properties": {
+        "protein": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Protein"
+        },
+        "fat": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fat"
+        },
+        "carbohydrate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Carbohydrate"
+        },
+        "calories": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Calories"
+        }
+      },
+      "required": [
+        "protein",
+        "fat",
+        "carbohydrate",
+        "calories"
+      ],
+      "title": "NutrientValues",
+      "type": "object"
+    },
+    "NutritionTotals": {
+      "properties": {
+        "protein": {
+          "$ref": "#/$defs/NutrientTotal"
+        },
+        "fat": {
+          "$ref": "#/$defs/NutrientTotal"
+        },
+        "carbohydrate": {
+          "$ref": "#/$defs/NutrientTotal"
+        },
+        "calories": {
+          "$ref": "#/$defs/NutrientTotal"
+        }
+      },
+      "required": [
+        "protein",
+        "fat",
+        "carbohydrate",
+        "calories"
+      ],
+      "title": "NutritionTotals",
+      "type": "object"
+    },
+    "PortionInput": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "quantity": {
+          "maxLength": 10000,
+          "title": "Quantity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "id",
+        "quantity"
+      ],
+      "title": "PortionInput",
+      "type": "object"
+    },
+    "ScheduleOutput": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "starts_at": {
+          "format": "date-time",
+          "title": "Starts At",
+          "type": "string"
+        },
+        "ends_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "format": "date-time",
+          "title": "Ends At"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "intervals": {
+          "items": {
+            "$ref": "#/$defs/IntervalInput"
+          },
+          "title": "Intervals",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "starts_at",
+        "ends_at",
+        "created_at",
+        "intervals"
+      ],
+      "title": "ScheduleOutput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 5,
+      "default": 5,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "exported_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "title": "Exported At",
+      "type": "string"
+    },
+    "timezone": {
+      "const": "Europe/Moscow",
+      "default": "Europe/Moscow",
+      "title": "Timezone",
+      "type": "string"
+    },
+    "units": {
+      "$ref": "#/$defs/ExportUnits",
+      "default": {
+        "timestamps": "RFC 3339 UTC, milliseconds",
+        "glucose": "mmol/L",
+        "bolus": "U",
+        "rate": "U/h",
+        "duration_minutes": "minute",
+        "percent": "percent",
+        "minute": "minute of Moscow day",
+        "food_quantity": "g or ml; see unit",
+        "nutrients": "g per basis_quantity",
+        "calories": "kcal per basis_quantity",
+        "water": "integer ml"
+      }
+    },
+    "settings": {
+      "$ref": "#/$defs/ExportSettings"
+    },
+    "account": {
+      "$ref": "#/$defs/ExportAccount"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/ExportEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "basal_schedules": {
+      "items": {
+        "$ref": "#/$defs/ScheduleOutput"
+      },
+      "title": "Basal Schedules",
+      "type": "array"
+    },
+    "temporary_basals": {
+      "items": {
+        "$ref": "#/$defs/ExportTemporary"
+      },
+      "title": "Temporary Basals",
+      "type": "array"
+    },
+    "products": {
+      "items": {
+        "$ref": "#/$defs/ExportProduct"
+      },
+      "title": "Products",
+      "type": "array"
+    },
+    "meals": {
+      "items": {
+        "$ref": "#/$defs/ExportMeal"
+      },
+      "title": "Meals",
+      "type": "array"
+    },
+    "water": {
+      "items": {
+        "$ref": "#/$defs/ExportWater"
+      },
+      "title": "Water",
+      "type": "array"
+    }
+  },
+  "required": [
+    "exported_at",
+    "settings",
+    "account",
+    "entries",
+    "basal_schedules",
+    "temporary_basals",
+    "products",
+    "meals",
+    "water"
+  ],
+  "title": "FullExport",
+  "type": "object"
+}

@@ -20,6 +20,38 @@ def meal(items, **changes):
             'lines': items, **changes}
 
 
+def legacy_meal(database, values, *, deleted=False):
+    # Seed the old schema directly: current HTTP DTOs require the new meal_type column.
+    from datetime import datetime
+    from sqlalchemy import MetaData, Table, insert
+    from diary.application.meals import MealInput, line_record
+    from diary.application.operations import OperationAction, request_hash
+    from diary.domain.nutrition import MealRecord
+    from diary.domain.time import milliseconds
+    from diary.infrastructure.database import database_engine
+    from diary.interfaces.http.meals import meal_output
+    from diary.tables import operation_receipt
+    payload = MealInput.model_validate(values)
+    record = MealRecord(id=str(uuid4()), occurred_at=milliseconds(datetime.fromisoformat(payload.occurred_at)),
+        revision=2 if deleted else 1, created_at=0, updated_at=0, deleted_at=0 if deleted else None)
+    lines = [line_record(line, record.id, position) for position, line in enumerate(payload.lines)]
+    engine = database_engine(database)
+    try:
+        with engine.begin() as connection:
+            previous = Table('meal', MetaData(), autoload_with=connection)
+            connection.execute(insert(previous).values(**{key: value for key, value in record.model_dump().items() if key in previous.c}))
+            previous_lines = Table('meal_line', MetaData(), autoload_with=connection)
+            for line in lines:
+                connection.execute(insert(previous_lines).values(**{key: value for key, value in line.model_dump().items() if key in previous_lines.c}))
+            normalized = payload.model_dump(exclude={'operation_id', 'meal_type'}) | {'meal_id': None, 'category': None}
+            connection.execute(insert(operation_receipt).values(operation_id=payload.operation_id,
+                action=OperationAction.CREATE_MEAL, request_hash=request_hash(normalized), result_id=record.id,
+                revision=1, completed_at=0))
+    finally:
+        engine.dispose()
+    return meal_output(record, lines).model_dump(mode='json')
+
+
 def test_catalog_meal_calculates_exact_values_and_day(diary):
     client, _ = diary
     payload = meal([line(client)])

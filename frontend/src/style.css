@@ -390,7 +390,6 @@ button,input,select,textarea,a { scroll-margin-block:20px; }
 .calendar-event-stem::before { content:''; position:absolute; left:-4px; top:-4px; width:7px; height:7px; border-radius:50%; background:var(--event-color); }
 .calendar-day-chart .calendar-event-card { position:relative; grid-column:1; align-self:start; z-index:1; display:flex; align-items:center; justify-content:center; gap:4px; min-height:44px; margin:0; padding:8px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--event-color); cursor:pointer; }
 .calendar-event-card svg,.calendar-water-icon svg { flex-shrink:0; width:20px; height:20px; }
-.calendar-event-card>small { color:var(--text); font-size:.75rem; white-space:nowrap; }
 .calendar-day-chart .calendar-event-card:hover,.calendar-day-chart .calendar-event-card[aria-pressed=true] { border-color:var(--event-color); background:var(--surface); }
 .calendar-meal-details { margin:8px 0; padding-bottom:6px; border-bottom:1px solid var(--border); }
 

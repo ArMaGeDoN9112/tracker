@@ -180,7 +180,7 @@ def test_upgrade_previous_schema_preserves_diary_and_meals(tmp_path):
     from admin_setup import create_account
     from test_access import PASSWORD
     from test_entries import entry
-    from test_meals import meal
+    from test_meals import meal, legacy_meal
     database = tmp_path / 'previous.sqlite3'
     config = Config()
     config.set_main_option('script_location', str(Path(__file__).resolve().parents[1] / 'migrations'))
@@ -194,12 +194,11 @@ def test_upgrade_previous_schema_preserves_diary_and_meals(tmp_path):
         login(client)
         client.headers.update({'Origin': ORIGIN, 'X-CSRF-Token': client.get('/api/auth/csrf').json()['csrf_token']})
         assert client.post('/api/entries', json=entry()).status_code == 200
-        record = client.post('/api/meals', json=meal([{'id': str(uuid4()), 'kind': 'one_off', 'name': 'Еда'}])).json()
+        old_meal = legacy_meal(database, meal([{'id': str(uuid4()), 'kind': 'one_off', 'name': 'Еда'}]))
         old_entry = client.get('/api/day?day=2026-10-19').json()
-        old_meal = client.get('/api/meals/' + record['result_id']).json()
         migrate(database)
         migrate(database)
         assert client.get('/api/day?day=2026-10-19').json() == old_entry
-        assert client.get('/api/meals/' + record['result_id']).json() == old_meal
+        assert client.get('/api/meals/' + old_meal['id']).json() == old_meal
         assert client.get('/api/water-settings').json() == {'volumes_ml': [200, 250, 500], 'revision': 1}
         assert client.get('/api/nutrition-day?day=2026-10-19').json()['water_total_ml'] is None

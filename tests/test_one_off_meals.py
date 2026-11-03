@@ -170,6 +170,7 @@ def test_upgrade_preserves_catalog_meals_deletions_receipts_and_session(tmp_path
     from test_access import ORIGIN, PASSWORD, login
     from test_entries import entry
     from test_products import legacy_product
+    from test_meals import legacy_meal
     database = tmp_path / 'previous.sqlite3'
     config = Config()
     config.set_main_option('script_location', str(Path(__file__).resolve().parents[1] / 'migrations'))
@@ -185,12 +186,12 @@ def test_upgrade_preserves_catalog_meals_deletions_receipts_and_session(tmp_path
         assert client.post('/api/entries', json=entry(comment='Прежний дневник')).status_code == 200
         source, catalog = legacy_product(database)
         payload = meal([source])
-        receipt = client.post('/api/meals', json=payload).json()
-        path = '/api/meals/' + receipt['result_id']
-        deleted_path = '/api/meals/' + client.post('/api/meals', json=meal([source])).json()['result_id']
-        assert client.post(deleted_path + '/delete', json={'operation_id': str(uuid4()), 'expected_revision': 1}).status_code == 200
+        saved = legacy_meal(database, payload)
+        deleted = legacy_meal(database, meal([source]), deleted=True)
+        path = '/api/meals/' + saved['id']
+        deleted_path = '/api/meals/' + deleted['id']
         routes = [path, deleted_path, '/api/day?day=2026-10-19']
-        before = [client.get(route).json() for route in routes]
+        before = [saved, deleted, client.get(routes[2]).json()]
         migrate(database)
         migrate(database)
         assert [client.get(route).json() for route in routes] == before

@@ -36,7 +36,7 @@ test('calendar aligns event icons, filters metrics and tooltips, and preserves b
   const cards = events.getByRole('button', { name: /Еда:/ })
   await expect(cards).toHaveCount(2)
   await expect(cards.first()).toHaveAccessibleName('12:00 · Еда: Гречка, курица')
-  await expect(cards.first().locator('svg title')).toHaveText('Крупы и паста')
+  await expect(cards.first().locator('svg title')).toHaveText('Еда')
   await expect(events.getByRole('button', { name: /Подколка:/ })).toHaveCount(1)
   await cards.first().focus()
   await expect(tip).toContainText('Гречка, курица · 150 г')
@@ -157,6 +157,7 @@ test('meal timeline keeps day edges, unknown carbs and food-only selection', asy
     day, totals, water_total_ml: null, water: [],
     meals: ['00:00:00.000', '08:00:00.000', '12:30:00.000', '12:31:00.000', '23:59:59.999'].map((time, index) => ({
       id: `meal-${index}`, occurred_at: `${day}T${time}+03:00`,
+      meal_type: [null, 'breakfast', 'lunch', 'snack', 'dinner'][index],
       totals: { ...totals, carbohydrate: index === 0 ? total('0') : index === 4 ? total(null, true) : total('40', index === 3) },
       lines: (index === 2 ? lunchFoods : [['Чай', 'Омлет, хлеб', '', 'Яблоко', 'Кефир'][index]]).map((name, line) => ({ id: `line-${index}-${line}`, name, quantity: '150', unit: 'g' })),
     })),
@@ -171,14 +172,12 @@ test('meal timeline keeps day edges, unknown carbs and food-only selection', asy
   const cards = track.getByRole('button')
   await expect(cards).toHaveCount(5)
   await expect(cards.first()).toHaveAccessibleName('00:00 · Еда: Чай')
-  await expect(cards.last()).toHaveAccessibleName('23:59 · Еда: Кефир')
-  await expect(cards.nth(2).locator('svg')).toHaveCount(3)
-  await expect(cards.nth(2).locator('svg title')).toHaveText(['Крупы и паста', 'Мясо', 'Овощи'])
-  await expect(cards.nth(1).locator('svg title')).toHaveText('Яйца')
-  await expect(cards.nth(2)).toContainText('+2')
+  await expect(cards.last()).toHaveAccessibleName('23:59 · Ужин: Кефир')
+  await expect(cards.nth(2).locator('svg')).toHaveCount(1)
+  await expect(cards.locator('svg title')).toHaveText(['Еда', 'Завтрак', 'Обед', 'Перекус', 'Ужин'])
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 })
-    await expect(cards.nth(2)).toHaveAccessibleName(`12:30 · Еда: ${lunchFoods.join(', ')}`)
+    await expect(cards.nth(2)).toHaveAccessibleName(`12:30 · Обед: ${lunchFoods.join(', ')}`)
     await expect.poll(async () => {
       const bounds = (await track.boundingBox())!
       const boxes = await cards.evaluateAll(elements => elements.map(element => {
@@ -203,7 +202,7 @@ test('meal timeline keeps day edges, unknown carbs and food-only selection', asy
   if (process.env.DIARY_ACCEPTANCE_DIR) await chart.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-meals-day-${info.project.name}.png` })
 })
 
-test('event timeline groups foods, shows water and boluses, and does not snap to basal changes', async ({ page }, info) => {
+test('event timeline shows the meal type, water and boluses without snapping to basal changes', async ({ page }, info) => {
   const day = '2089-03-12'
   const occurred_at = `${day}T16:01:00+03:00`
   const total = { value: '40', incomplete: false, known_count: 1, unknown_count: 0 }
@@ -211,7 +210,7 @@ test('event timeline groups foods, shows water and boluses, and does not snap to
   await page.route('**/api/nutrition-day?*', route => route.fulfill({ json: {
     day, totals, water_total_ml: 750,
     water: [{ id: 'water-1', occurred_at, volume_ml: 250 }, { id: 'water-2', occurred_at, volume_ml: 500 }],
-    meals: [{ id: 'meal', occurred_at, totals, lines: ['Гречка', 'Куриная грудка', 'Авторское блюдо', 'Чай'].map((name, index) => ({ id: `line-${index}`, name, quantity: '150', unit: 'g' })) }],
+    meals: [{ id: 'meal', occurred_at, meal_type: 'lunch', totals, lines: ['Гречка', 'Куриная грудка', 'Авторское блюдо', 'Чай'].map((name, index) => ({ id: `line-${index}`, name, quantity: '150', unit: 'g' })) }],
   } }))
   await page.route('**/api/day?*', route => route.fulfill({ json: {
     basal: '0.50', temporary_percent: null, temporary_basals: [],
@@ -224,13 +223,13 @@ test('event timeline groups foods, shows water and boluses, and does not snap to
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   const chart = page.getByRole('region', { name: 'Общий график дня', exact: true })
   const track = chart.getByRole('list', { name: 'События дня по времени' })
-  const meal = track.getByRole('button', { name: /Еда:/ })
+  const meal = track.getByRole('button', { name: /Обед:/ })
   const water = track.getByRole('button', { name: /Вода:/ })
   const bolus = track.getByRole('button', { name: /Подколка:/ })
   const tip = chart.getByRole('tooltip')
   await expect(track.getByRole('button')).toHaveCount(4)
-  await expect(meal.locator('svg title')).toHaveText(['Крупы и паста', 'Мясо', 'Еда'])
-  await expect(meal).toContainText('+1')
+  await expect(meal.locator('svg title')).toHaveText('Обед')
+  await expect(meal.locator('svg')).toHaveCount(1)
   await expect(water).toHaveCount(2)
   await expect(water.first().locator('svg title')).toHaveText('Вода')
   await expect(bolus).toHaveAccessibleName('16:01 · Подколка: 1,2 ед.')

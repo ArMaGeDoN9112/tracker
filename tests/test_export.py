@@ -28,7 +28,7 @@ def nutrition_history(client):
         {"id": str(uuid4()), "kind": "one_off", "name": "Порция", "quantity": "60", "unit": "g", "calories": "180"},
         {"id": str(uuid4()), "kind": "one_off", "name": "Без веса", "fat": "0"},
         {"id": str(uuid4()), "kind": "one_off", "name": "Неизвестно"},
-    ]))
+    ], meal_type='lunch'))
     assert response.status_code == 200
     historical = client.get("/api/meals/" + response.json()["result_id"]).json()
     assert client.put("/api/products/" + source["product_id"], json=product(
@@ -39,7 +39,7 @@ def nutrition_history(client):
     edited = {**source, "id": str(uuid4()), "name": current["name"], "unit": current["unit"],
               "protein": current["protein"], "fat": current["fat"], "calories": current["calories"],
               "product_revision": 2, "portion": current["portions"][0]}
-    moved = client.post("/api/meals", json=meal([edited])).json()["result_id"]
+    moved = client.post("/api/meals", json=meal([edited], meal_type='dinner')).json()["result_id"]
     assert client.put("/api/meals/" + moved, json=meal([edited], expected_revision=1,
                       occurred_at="2026-10-20T00:00:00+03:00")).status_code == 200
     assert client.post("/api/meals/" + moved + "/delete", json={
@@ -70,7 +70,7 @@ def test_empty_export_is_private_download(diary):
     assert response.headers["content-disposition"].startswith('attachment; filename="diabetes-diary-')
     result = response.json()
     validate_export(result)
-    assert result["schema_version"] == 4
+    assert result["schema_version"] == 5
     assert result["settings"] == {"timezone": "Europe/Moscow", "theme": "dark",
                                   "water": {"volumes_ml": [200, 250, 500], "revision": 1}}
     assert result["products"] == result["meals"] == result["water"] == []
@@ -146,7 +146,7 @@ def test_export_preserves_full_history_and_exact_values(diary):
     assert set(result["account"]) == {"id", "login", "created_at"}
 
 
-@pytest.mark.parametrize('version', [1, 2, 3])
+@pytest.mark.parametrize('version', [1, 2, 3, 4])
 def test_documented_example_matches_schema(version):
     validate_export(json.loads(Path(f"docs/export/example-v{version}.json").read_text()))
 
@@ -179,11 +179,11 @@ def test_export_nutrition_preserves_catalog_and_independent_history(diary):
     assert client.get("/api/meals/" + copy.json()["result_id"]).json()["totals"] == historical["totals"]
 
 
-def test_v4_contract_and_example_match_application_dto():
+def test_v5_contract_and_example_match_application_dto():
     from diary.interfaces.export import FullExport
-    schema = json.loads(Path("docs/export/schema-v4.json").read_text())
+    schema = json.loads(Path("docs/export/schema-v5.json").read_text())
     assert schema == FullExport.model_json_schema()
-    example = json.loads(Path("docs/export/example-v4.json").read_text())
+    example = json.loads(Path("docs/export/example-v5.json").read_text())
     validate_export(example)
     assert FullExport.model_validate(example).model_dump(mode="json") == example
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_va
 from diary.application.entries import EntryInput
 from diary.application.operations import OperationInput, RevisionInput
 from diary.application.products import NamedInput, PortionInput, ProductInput
-from diary.domain.nutrition import MealRecord, MealLineRecord, NUTRIENTS, NutrientValues, rounded
+from diary.domain.nutrition import MealRecord, MealLineRecord, MealType, NUTRIENTS, NutrientValues, rounded
 from diary.domain.precision import hundredths, rate_string
 from diary.domain.time import milliseconds
 from diary.application.errors import ApplicationError, NotFound, RevisionConflict, UndoExpired
@@ -84,6 +84,7 @@ class MealLineInput(NamedInput):
 
 class MealInput(OperationInput):
     occurred_at: str
+    meal_type: MealType | None = Field(default=None, strict=False)
     lines: list[MealLineInput] = Field(min_length=1)
 
     @model_validator(mode="before")
@@ -139,6 +140,7 @@ class MealRevisionCommand(RevisionInput):
 
 class RepeatMealResult(BaseModel):
     occurred_at: int
+    meal_type: MealType | None
     lines: list[MealLineInput]
 
 
@@ -209,7 +211,7 @@ class RepeatMeal:
             source = uow.meals.get(query.meal_id)
             if source is None or source.record.deleted_at is not None:
                 raise NotFound("Неудалённый приём пищи не найден.")
-            return RepeatMealResult(occurred_at=self.clock(),
+            return RepeatMealResult(occurred_at=self.clock(), meal_type=source.record.meal_type,
                 lines=[line_input(line).model_copy(update={"id": self.new_id()}) for line in source.lines])
 
 
@@ -247,6 +249,8 @@ class MealOperations:
 
     def change(self, action: OperationAction, payload: MealInput | RevisionInput, meal_id: str | None = None) -> ReceiptResult:
         normalized = payload.model_dump(exclude={"operation_id", "meal_id"})
+        if isinstance(payload, MealInput) and "meal_type" not in payload.model_fields_set:
+            normalized.pop("meal_type")
         normalized["meal_id"] = meal_id
         with self.uow() as uow:
             replay = replay_receipt(uow.receipts, action, payload.operation_id, normalized)
@@ -270,6 +274,8 @@ class MealOperations:
                 record.updated_at = now
             if isinstance(payload, MealInput):
                 record.occurred_at = milliseconds(datetime.fromisoformat(payload.occurred_at))
+                if "meal_type" in payload.model_fields_set:
+                    record.meal_type = payload.meal_type
                 lines = [line_record(line, result_id, position) for position, line in enumerate(payload.lines)]
             else:
                 record.deleted_at = now if action == OperationAction.DELETE_MEAL else None

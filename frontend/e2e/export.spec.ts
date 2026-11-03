@@ -29,7 +29,7 @@ test('settings download readable full JSON with a privacy warning', async ({ pag
     const portion = { id: crypto.randomUUID(), name: 'Ломтик', quantity: '30' }
     const card = { name: 'Историческая карточка', unit: 'g', protein: '10', fat: '5', carbohydrate: '20', calories: '180', portions: [portion] }
     const product = await send('/api/products', card)
-    const meal = await send('/api/meals', { occurred_at: '1970-01-01T00:00:00.123Z', lines: [
+    const meal = await send('/api/meals', { occurred_at: '1970-01-01T00:00:00.123Z', meal_type: 'lunch', lines: [
       { id: crypto.randomUUID(), kind: 'product', ...card, quantity: '30', basis_quantity: '100',
         product_id: product.result_id, product_revision: 1, portion, portions: undefined },
       { id: crypto.randomUUID(), kind: 'one_off', name: 'Без веса', protein: '0' },
@@ -51,7 +51,7 @@ test('settings download readable full JSON with a privacy warning', async ({ pag
   expect(await download.failure()).toBeNull()
   const path = await download.path()
   const document = JSON.parse(await readFile(path!, 'utf8'))
-  expect(document.schema_version).toBe(4)
+  expect(document.schema_version).toBe(5)
   expect(document.timezone).toBe('Europe/Moscow')
   expect(document.entries).toContainEqual(expect.objectContaining({
     id: ids.entry, occurred_at: '1970-01-01T00:00:00.123Z', comment: 'Старое 😀\nУдалено', glucose: null, bolus: '0.0', revision: 2,

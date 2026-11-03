@@ -1,0 +1,335 @@
+{
+  "schema_version": 5,
+  "exported_at": "2026-10-20T15:21:37.000Z",
+  "timezone": "Europe/Moscow",
+  "units": {
+    "timestamps": "RFC 3339 UTC, milliseconds",
+    "glucose": "mmol/L",
+    "bolus": "U",
+    "rate": "U/h",
+    "duration_minutes": "minute",
+    "percent": "percent",
+    "minute": "minute of Moscow day",
+    "food_quantity": "g or ml; see unit",
+    "nutrients": "g per basis_quantity",
+    "calories": "kcal per basis_quantity",
+    "water": "integer ml"
+  },
+  "settings": {
+    "timezone": "Europe/Moscow",
+    "theme": "dark",
+    "water": {
+      "volumes_ml": [
+        330,
+        125
+      ],
+      "revision": 2
+    }
+  },
+  "account": {
+    "id": 1,
+    "login": "example-owner",
+    "created_at": "1970-01-01T00:00:00.000Z"
+  },
+  "entries": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "occurred_at": "1970-01-01T00:00:00.123Z",
+      "glucose": null,
+      "bolus": "0.0",
+      "reason": null,
+      "comment": "Заметка 😀\nУдалённые данные тоже сохраняются.",
+      "created_at": "1970-01-01T00:00:01.000Z",
+      "updated_at": "1970-01-01T00:00:02.000Z",
+      "revision": 2,
+      "deleted_at": "1970-01-01T00:00:02.000Z"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "occurred_at": "1970-01-01T01:00:00.123Z",
+      "glucose": "5.6",
+      "bolus": "1.2",
+      "reason": "food_and_correction",
+      "comment": "Еда и коррекция",
+      "created_at": "1970-01-01T01:00:00.123Z",
+      "updated_at": "1970-01-01T01:00:00.123Z",
+      "revision": 1,
+      "deleted_at": null
+    }
+  ],
+  "basal_schedules": [
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "starts_at": "1970-01-01T00:00:00.000Z",
+      "ends_at": null,
+      "created_at": "1970-01-01T00:00:00.000Z",
+      "intervals": [
+        {
+          "minute": 0,
+          "rate": "0.55"
+        },
+        {
+          "minute": 720,
+          "rate": "0.00"
+        }
+      ]
+    }
+  ],
+  "temporary_basals": [
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "starts_at": "1970-01-01T00:00:00.000Z",
+      "ends_at": "1970-01-01T02:00:00.000Z",
+      "effective_ends_at": "1970-01-01T01:00:00.000Z",
+      "duration_minutes": 120,
+      "percent": 110,
+      "created_at": "1970-01-01T00:00:00.000Z",
+      "updated_at": "1970-01-01T00:00:00.000Z",
+      "revision": 1,
+      "deleted_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "starts_at": "1970-01-01T01:00:00.000Z",
+      "ends_at": "1970-01-01T01:30:00.000Z",
+      "effective_ends_at": "1970-01-01T01:30:00.000Z",
+      "duration_minutes": 30,
+      "percent": 0,
+      "created_at": "1970-01-01T01:00:00.000Z",
+      "updated_at": "1970-01-01T01:00:00.000Z",
+      "revision": 1,
+      "deleted_at": null
+    }
+  ],
+  "products": [
+    {
+      "id": "ce046f3d-5c26-4015-bed0-5e83667b164c",
+      "name": "Новая карточка",
+      "unit": "ml",
+      "protein": "99.00",
+      "fat": "0.00",
+      "carbohydrate": "0.00",
+      "calories": null,
+      "portions": [
+        {
+          "name": "Стакан",
+          "id": "3e05e8d7-6240-414b-98c0-d6ef60dde3e5",
+          "quantity": "200.00"
+        }
+      ],
+      "revision": 2,
+      "created_at": "2026-10-20T15:21:36.612Z",
+      "updated_at": "2026-10-20T15:21:36.657Z",
+      "photo": null
+    }
+  ],
+  "meals": [
+    {
+      "id": "2e7f32ac-e459-4bcc-952b-a310d7d5809d",
+      "occurred_at": "2026-10-18T21:00:00.123Z",
+      "revision": 1,
+      "created_at": "2026-10-20T15:21:36.632Z",
+      "updated_at": "2026-10-20T15:21:36.632Z",
+      "deleted_at": null,
+      "lines": [
+        {
+          "name": "Творог",
+          "id": "c2d40c86-9c9f-4e6c-9314-ffd6458cddbe",
+          "kind": "product",
+          "basis_quantity": "100.00",
+          "quantity": "30.00",
+          "unit": "g",
+          "protein": "0.00",
+          "fat": null,
+          "carbohydrate": "20.00",
+          "calories": "180.00",
+          "product_id": "ce046f3d-5c26-4015-bed0-5e83667b164c",
+          "product_revision": 1,
+          "portion": {
+            "name": "Пачка",
+            "id": "9a6b36d6-393f-41ca-9298-1fa8ebe47917",
+            "quantity": "180.00"
+          },
+          "totals": {
+            "protein": "0.00",
+            "fat": null,
+            "carbohydrate": "6.00",
+            "calories": "54.00"
+          }
+        },
+        {
+          "name": "Порция",
+          "id": "1cffc4ea-6dc2-4593-acb0-0a125395546e",
+          "kind": "one_off",
+          "basis_quantity": "60.00",
+          "quantity": "60.00",
+          "unit": "g",
+          "protein": null,
+          "fat": null,
+          "carbohydrate": null,
+          "calories": "180.00",
+          "product_id": null,
+          "product_revision": null,
+          "portion": null,
+          "totals": {
+            "protein": null,
+            "fat": null,
+            "carbohydrate": null,
+            "calories": "180.00"
+          }
+        },
+        {
+          "name": "Без веса",
+          "id": "d705c690-ecac-43f6-b1fd-3c41ed843c52",
+          "kind": "one_off",
+          "basis_quantity": null,
+          "quantity": null,
+          "unit": null,
+          "protein": null,
+          "fat": "0.00",
+          "carbohydrate": null,
+          "calories": null,
+          "product_id": null,
+          "product_revision": null,
+          "portion": null,
+          "totals": {
+            "protein": null,
+            "fat": "0.00",
+            "carbohydrate": null,
+            "calories": null
+          }
+        },
+        {
+          "name": "Неизвестно",
+          "id": "bfe23c30-c385-4274-ac7d-e19e8f131f43",
+          "kind": "one_off",
+          "basis_quantity": null,
+          "quantity": null,
+          "unit": null,
+          "protein": null,
+          "fat": null,
+          "carbohydrate": null,
+          "calories": null,
+          "product_id": null,
+          "product_revision": null,
+          "portion": null,
+          "totals": {
+            "protein": null,
+            "fat": null,
+            "carbohydrate": null,
+            "calories": null
+          }
+        }
+      ],
+      "totals": {
+        "protein": {
+          "value": "0.00",
+          "known_count": 1,
+          "unknown_count": 3,
+          "incomplete": true
+        },
+        "fat": {
+          "value": "0.00",
+          "known_count": 1,
+          "unknown_count": 3,
+          "incomplete": true
+        },
+        "carbohydrate": {
+          "value": "6.00",
+          "known_count": 1,
+          "unknown_count": 3,
+          "incomplete": true
+        },
+        "calories": {
+          "value": "234.00",
+          "known_count": 2,
+          "unknown_count": 2,
+          "incomplete": true
+        }
+      },
+      "meal_type": "breakfast"
+    },
+    {
+      "id": "4c252183-160b-40dd-8ca6-842cb816020b",
+      "occurred_at": "2026-10-19T21:00:00.000Z",
+      "revision": 3,
+      "created_at": "2026-10-20T15:21:36.679Z",
+      "updated_at": "2026-10-20T15:21:36.711Z",
+      "deleted_at": "2026-10-20T15:21:36.711Z",
+      "lines": [
+        {
+          "name": "Новая карточка",
+          "id": "92c8d66a-41be-46d2-a508-5d6c9a736324",
+          "kind": "product",
+          "basis_quantity": "100.00",
+          "quantity": "30.00",
+          "unit": "ml",
+          "protein": "99.00",
+          "fat": "0.00",
+          "carbohydrate": "20.00",
+          "calories": null,
+          "product_id": "ce046f3d-5c26-4015-bed0-5e83667b164c",
+          "product_revision": 2,
+          "portion": {
+            "name": "Стакан",
+            "id": "3e05e8d7-6240-414b-98c0-d6ef60dde3e5",
+            "quantity": "200.00"
+          },
+          "totals": {
+            "protein": "29.70",
+            "fat": "0.00",
+            "carbohydrate": "6.00",
+            "calories": null
+          }
+        }
+      ],
+      "totals": {
+        "protein": {
+          "value": "29.70",
+          "known_count": 1,
+          "unknown_count": 0,
+          "incomplete": false
+        },
+        "fat": {
+          "value": "0.00",
+          "known_count": 1,
+          "unknown_count": 0,
+          "incomplete": false
+        },
+        "carbohydrate": {
+          "value": "6.00",
+          "known_count": 1,
+          "unknown_count": 0,
+          "incomplete": false
+        },
+        "calories": {
+          "value": null,
+          "known_count": 0,
+          "unknown_count": 1,
+          "incomplete": true
+        }
+      },
+      "meal_type": "lunch"
+    }
+  ],
+  "water": [
+    {
+      "id": "3d593ec1-a2ec-4872-b63b-9d35b880b668",
+      "volume_ml": 250,
+      "occurred_at": "2026-10-19T09:00:00.000Z",
+      "revision": 1,
+      "created_at": "2026-10-20T15:21:36.730Z",
+      "updated_at": "2026-10-20T15:21:36.730Z",
+      "deleted_at": null
+    },
+    {
+      "id": "ed0d1212-c505-42c8-a01d-1ff3652da724",
+      "volume_ml": 330,
+      "occurred_at": "2026-10-19T21:00:00.000Z",
+      "revision": 3,
+      "created_at": "2026-10-20T15:21:36.745Z",
+      "updated_at": "2026-10-20T15:21:36.779Z",
+      "deleted_at": "2026-10-20T15:21:36.779Z"
+    }
+  ]
+}
