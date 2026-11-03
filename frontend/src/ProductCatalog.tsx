@@ -43,7 +43,7 @@ export function ProductCatalog({ authorized, visible, catalogPage, csrfToken, on
       const response = await privateFetch('/api/products')
       if (!response.ok) throw new Error('Не удалось загрузить каталог.')
       const rows: Product[] = await response.json()
-      if (sequence === generation.current) setProducts(rows)
+      if (sequence === generation.current) setProducts(rows.sort((a, b) => a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' })))
     } catch (failure) {
       if (sequence === generation.current) setLoadError(failure instanceof Error ? failure.message : 'Ошибка сети при чтении каталога.')
       throw failure

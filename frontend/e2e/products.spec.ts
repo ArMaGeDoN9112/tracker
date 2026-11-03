@@ -16,6 +16,21 @@ async function newDraft(page: Page) {
   return name
 }
 
+test('catalog sorts products alphabetically and preserves order when searching', async ({ page }) => {
+  await page.route('**/api/products', route => route.fulfill({ json: ['яблоко', 'Желе', 'банан', 'Ёжевика', 'Апельсин'].map((name, index) => ({
+    id: `product-${index}`, revision: 1, name, unit: 'g', photo: null,
+    protein: null, fat: null, carbohydrate: null, calories: null, portions: [],
+  })) }))
+  await page.goto('/?section=catalog')
+  await signIn(page)
+  const names = page.locator('.food-card h3')
+  await expect(names).toHaveText(['Апельсин', 'банан', 'Ёжевика', 'Желе', 'яблоко'])
+  await page.getByLabel('Поиск продуктов', { exact: true }).fill('А')
+  await expect(names).toHaveText(['Апельсин', 'банан', 'Ёжевика'])
+  await page.getByLabel('Поиск продуктов', { exact: true }).clear()
+  await expect(names).toHaveText(['Апельсин', 'банан', 'Ёжевика', 'Желе', 'яблоко'])
+})
+
 test('catalog forms reset on navigation and login; saved products retain portions and search', async ({ page }) => {
   await page.goto('/?section=catalog')
   await signIn(page)
