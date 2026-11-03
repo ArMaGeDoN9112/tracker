@@ -142,17 +142,33 @@ export function CalendarDayChart({ day, meals, water, diary }: { day: string; me
         </li>)}
       </ul>}
     </div>}
-    {selected !== null && <ChartTooltip {...position}><div role="tooltip" aria-label="Показатели дня"><strong>{clock(selected)}</strong>
-      {selectedMeals.map((meal, index) => <div key={meal.id} className="calendar-meal-details">
-        <strong>{meal.meal_type ? mealTypes[meal.meal_type] : selectedMeals.length > 1 ? `Приём ${index + 1}` : 'Еда'}</strong>
-        {meal.lines.map(line => <p key={line.id}>{line.name}{line.quantity !== null && line.unit !== null && ` · ${line.quantity.replace('.', ',')} ${line.unit === 'g' ? 'г' : 'мл'}`}</p>)}
-        {nutrients.map(([key, label, unit]) => <p key={key}>{label}: {meal.totals[key].value === null ? 'Неизвестно' : `${meal.totals[key].value!.replace('.', ',')} ${unit}`}{meal.totals[key].incomplete && ' · Неполные данные'}</p>)}
+    {selected !== null && <ChartTooltip {...position}><div className="calendar-tooltip" role="tooltip" aria-label="Показатели дня">
+      <div className="calendar-tooltip-time"><span>Время · Москва</span><strong>{clock(selected)}</strong></div>
+      {selectedMeals.map((meal, index) => <div key={meal.id} className="calendar-tooltip-block calendar-event-meal">
+        <strong className="calendar-tooltip-heading">{meal.meal_type ? mealTypes[meal.meal_type] : selectedMeals.length > 1 ? `Приём ${index + 1}` : 'Еда'}</strong>
+        <ul className="calendar-tooltip-foods" aria-label="Состав приёма пищи">{meal.lines.map(line => <li key={line.id}>
+          <span>{line.name}</span>{line.quantity !== null && line.unit !== null && <span className="calendar-tooltip-quantity"> · {line.quantity.replace('.', ',')} {line.unit === 'g' ? 'г' : 'мл'}</span>}
+        </li>)}</ul>
+        <div className="calendar-tooltip-totals"><span className="calendar-tooltip-caption">Итого за приём</span>
+          <dl>{[nutrients[3], ...nutrients.slice(0, 3)].map(([key, label, unit]) => <div key={key}>
+            <dt>{label}: </dt><dd>{meal.totals[key].value === null ? 'Неизвестно' : `${meal.totals[key].value!.replace('.', ',')} ${unit}`}
+              {meal.totals[key].incomplete && <span className="calendar-tooltip-warning"> · Неполные данные</span>}
+            </dd>
+          </div>)}</dl>
+        </div>
       </div>)}
-      {selectedWater.length > 0 && <div className="calendar-meal-details"><strong>Вода</strong>{selectedWater.map(record => <p key={record.id}>{record.volume_ml} мл</p>)}</div>}
-      {metrics.filter(metric => visible.includes(metric.key)).map(metric => <div key={metric.key}>
-        <strong>{metric.label} · {metric.unit}</strong>
-        {metric.key === 'basal' ? <p>{activeBasal ? `${clock(activeBasal.time)}–${clock(activeBasal.end)} · ${basalText(activeBasal.basal)}` : 'Неизвестно'}</p>
-          : selectedEntries.length ? selectedEntries.map((entry, index) => <p key={entry.id}>{selectedEntries.length > 1 && `Запись ${index + 1}: `}{entry[metric.key] === null ? 'Сахар не указан' : `${entry[metric.key]!.replace('.', ',')} ${metric.unit}`}</p>) : <p>Нет записи в этот момент</p>}
+      {selectedWater.length > 0 && <div className="calendar-tooltip-block calendar-event-water">
+        <strong className="calendar-tooltip-heading">Вода</strong>{selectedWater.map((record, index) => <p key={record.id} className="calendar-tooltip-reading">
+          <span>{selectedWater.length > 1 ? `Запись ${index + 1}` : 'Объём'}</span><strong>{record.volume_ml} мл</strong>
+        </p>)}
+      </div>}
+      {metrics.filter(metric => visible.includes(metric.key)).map(metric => <div key={metric.key} className={`calendar-tooltip-block calendar-tooltip-${metric.key}`}>
+        <strong className="calendar-tooltip-heading">{metric.label}</strong>
+        {metric.key === 'basal' ? activeBasal ? <p className="calendar-tooltip-rate"><strong>{basalText(activeBasal.basal)}</strong><span>Период: {clock(activeBasal.time)}–{clock(activeBasal.end)}</span></p> : <p className="muted">Неизвестно</p>
+          : selectedEntries.length ? selectedEntries.map((entry, index) => <p key={entry.id} className="calendar-tooltip-reading">
+            {selectedEntries.length > 1 && <span>Запись {index + 1}</span>}
+            {entry[metric.key] === null ? <span className="muted">Сахар не указан</span> : <strong>{entry[metric.key]!.replace('.', ',')} {metric.unit}</strong>}
+          </p>) : <p className="muted">Нет записи в этот момент</p>}
       </div>)}
     </div></ChartTooltip>}
   </section>

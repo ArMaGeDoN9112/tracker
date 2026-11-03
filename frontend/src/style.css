@@ -391,10 +391,30 @@ button,input,select,textarea,a { scroll-margin-block:20px; }
 .calendar-day-chart .calendar-event-card { position:relative; grid-column:1; align-self:start; z-index:1; display:flex; align-items:center; justify-content:center; gap:4px; min-height:44px; margin:0; padding:8px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--event-color); cursor:pointer; }
 .calendar-event-card svg,.calendar-water-icon svg { flex-shrink:0; width:20px; height:20px; }
 .calendar-day-chart .calendar-event-card:hover,.calendar-day-chart .calendar-event-card[aria-pressed=true] { border-color:var(--event-color); background:var(--surface); }
-.calendar-meal-details { margin:8px 0; padding-bottom:6px; border-bottom:1px solid var(--border); }
-
-.calendar-day-chart .day-chart-tooltip { pointer-events:auto; font-size:.875rem; line-height:1.4; overscroll-behavior:contain; }
-.calendar-day-chart .day-chart-tooltip p { margin:2px 0 6px; }
+.calendar-day-chart .day-chart-tooltip { pointer-events:auto; z-index:41; width:320px; padding:12px; font-size:.875rem; line-height:1.5; overscroll-behavior:contain; }
+.calendar-tooltip { display:grid; gap:10px; }
+.calendar-tooltip-time { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+.calendar-tooltip-time>span,.calendar-tooltip-caption { color:var(--muted); font-size:.75rem; }
+.calendar-tooltip-time>strong { font-size:1.125rem; }
+.calendar-tooltip-block { padding:8px 10px; border-left:3px solid var(--event-color, var(--muted)); border-radius:4px; background:var(--surface); min-width:0; }
+.calendar-tooltip-glucose { --event-color:var(--calendar-glucose); }
+.calendar-tooltip-bolus { --event-color:var(--calendar-bolus); }
+.calendar-tooltip-heading { display:block; margin-bottom:6px; color:var(--event-color, var(--muted)); }
+.calendar-tooltip-foods { list-style:none; margin:0; padding:0; }
+.calendar-tooltip-foods>li { display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:4px 0; }
+.calendar-tooltip-foods>li+li { border-top:1px solid var(--border); }
+.calendar-tooltip-quantity { flex-shrink:0; color:var(--muted); }
+.calendar-tooltip-totals { margin-top:8px; padding:8px; border-top:1px solid var(--border); border-radius:4px; background:var(--raised); }
+.calendar-tooltip-totals dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; margin:6px 0 0; }
+.calendar-tooltip-totals dt { color:var(--muted); font-size:.75rem; }
+.calendar-tooltip-totals dd { margin:0; font-weight:600; }
+.calendar-tooltip-warning { display:block; color:var(--warning); font-size:.75rem; font-weight:400; }
+.calendar-day-chart .calendar-tooltip p { margin:0; }
+.calendar-tooltip-reading { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 12px; padding:4px 0; }
+.calendar-tooltip-reading+.calendar-tooltip-reading { border-top:1px solid var(--border); }
+.calendar-tooltip-reading>span,.calendar-tooltip-rate>span { color:var(--muted); font-size:.8125rem; }
+.calendar-tooltip-reading>strong,.calendar-tooltip-rate>strong { font-size:1rem; }
+.calendar-tooltip-rate { display:grid; gap:4px; }
 
 /* Page compositions from the selected C prototype. */
 .page-heading { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:30px; }
