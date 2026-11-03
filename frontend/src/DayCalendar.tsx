@@ -63,7 +63,7 @@ function DaySummary({ active, day, generation, summary, calendar, onClose, onAna
       </>}</aside>
       <div className="calendar-summary-chart">
         {error ? <p role="alert" className="error">{error}</p> : !data ? <p role="status">Загружаем сводку дня…</p> : <>
-          <CalendarDayChart key={day} day={day} meals={data.nutrition.meals} diary={data.diary} />
+          <CalendarDayChart key={day} day={day} meals={data.nutrition.meals} water={data.nutrition.water} diary={data.diary} />
           {data.diary.temporary_basals.length > 0 && <details className="calendar-temporary"><summary>Временная база</summary>
             {data.diary.temporary_basals.map(period => <p key={period.id}>{period.percent}% · {moscowLabel(period.starts_at)} — {moscowLabel(period.effective_ends_at)} (не включая)</p>)}
           </details>}

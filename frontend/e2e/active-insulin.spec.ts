@@ -71,7 +71,7 @@ test('analysis shows Fiasp carryover, delivery jumps and an accessible tooltip o
   await chart.screenshot({ path: `test-results/active-insulin-${info.project.name}.png` })
   await page.getByRole('link', { name: 'Календарь', exact: true }).click()
   await expect(plot).toBeHidden()
-  await expect(page.getByRole('region', { name: 'Общий график дня', exact: true }).getByRole('checkbox')).toHaveCount(4)
+  await expect(page.getByRole('region', { name: 'Общий график дня', exact: true }).getByRole('checkbox')).toHaveCount(5)
 })
 
 test('does not display an underestimated IOB when the preceding day fails to load', async ({ page }) => {

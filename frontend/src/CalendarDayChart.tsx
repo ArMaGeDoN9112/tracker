@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from './ChartTooltip'
+import { CalendarEventIcon } from './CalendarEventIcon'
 import { useChartTooltipDismiss } from './useChartTooltipDismiss'
 import type { DiaryDay } from './DayCalendar'
 import type { Day } from './Nutrition'
@@ -14,10 +15,12 @@ const metrics = [
 ] as const
 type Metric = typeof metrics[number]['key']
 type Point = { time: number; value: number | null }
+type CalendarEvent = { id: string; time: number; kind: 'meal' | 'water' | 'bolus'; label: string; foods: string[] }
 
-export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Day['meals']; diary: DiaryDay }) {
+export function CalendarDayChart({ day, meals, water, diary }: { day: string; meals: Day['meals']; water: Day['water']; diary: DiaryDay }) {
   const [visible, setVisible] = useState<Metric[]>(metrics.map(metric => metric.key))
   const [showMeals, setShowMeals] = useState(true)
+  const [showWater, setShowWater] = useState(true)
   const section = useRef<HTMLElement>(null)
   const [width, setWidth] = useState(0)
   useEffect(() => {
@@ -42,34 +45,41 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
   const axes = [...new Set(metrics.filter(metric => visible.includes(metric.key)).map(metric => metric.axis))]
   const bars = diary.entries.map(entry => ({ time: Date.parse(entry.occurred_at), bolus: Number(entry.bolus) })).sort((a, b) => a.time - b.time)
   const maximum = (axis: typeof metrics[number]['axis']) => axis === 'glucose' ? 30 : (axis === 'basal' ? 3 : 1) * Math.max(1, ...metrics.filter(metric => metric.axis === axis && visible.includes(metric.key)).flatMap(metric => data[metric.key].map(point => point.value ?? 0)))
-  const times = [...new Set([start, end - 1, ...(showMeals ? meals.map(meal => Date.parse(meal.occurred_at)) : []), ...metrics.filter(metric => visible.includes(metric.key)).flatMap(metric => data[metric.key].map(point => point.time))])].filter(time => time < end).sort((a, b) => a - b)
+  const events: CalendarEvent[] = [
+    ...(showMeals ? meals.map(meal => ({ id: `meal-${meal.id}`, time: Date.parse(meal.occurred_at), kind: 'meal' as const, label: `Еда: ${meal.lines.map(line => line.name).join(', ') || 'Приём пищи'}`, foods: meal.lines.map(line => line.name) })) : []),
+    ...(showWater ? water.map(record => ({ id: `water-${record.id}`, time: Date.parse(record.occurred_at), kind: 'water' as const, label: `Вода: ${record.volume_ml} мл`, foods: [] })) : []),
+    ...(visible.includes('bolus') ? diary.entries.filter(entry => Number(entry.bolus) > 0).map(entry => ({ id: `bolus-${entry.id}`, time: Date.parse(entry.occurred_at), kind: 'bolus' as const, label: `Подколка: ${entry.bolus.replace('.', ',')} ед.`, foods: [] })) : []),
+  ].sort((a, b) => a.time - b.time)
+  const snapTimes = [...new Set([...events.map(event => event.time), ...(visible.includes('glucose') ? data.glucose.map(point => point.time) : [])])]
+  const times = [...new Set([start, end - 1, ...snapTimes, ...(visible.includes('basal') ? data.basal.map(point => point.time) : [])])].filter(time => time < end).sort((a, b) => a - b)
   const ticks = Array.from({ length: 5 }, (_, index) => start + (end - start) * index / 4)
   const activeBasal = segments.find(point => selected !== null && point.time <= selected && selected < point.end)
   const selectedMeals = showMeals ? meals.filter(meal => Date.parse(meal.occurred_at) === selected) : []
   const selectedEntries = diary.entries.filter(entry => Date.parse(entry.occurred_at) === selected)
-  const cardWidth = Math.min(width, width < 400 ? 148 : 190)
+  const selectedWater = showWater ? water.filter(record => Date.parse(record.occurred_at) === selected) : []
   const rowEnds: number[] = []
-  const cards = [...meals].sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at)).map(meal => {
-    const anchor = Math.max(0, Math.min(width, (Date.parse(meal.occurred_at) - start) / (end - start) * width))
+  const cards = events.map(event => {
+    const cardWidth = Math.min(width, Math.max(44, Math.min(3, event.foods.length) * 24 + 16 + (event.foods.length > 3 ? 24 : 0)))
+    const anchor = Math.max(0, Math.min(width, (event.time - start) / (end - start) * width))
     const left = Math.max(0, Math.min(width - cardWidth, anchor - cardWidth / 2))
     let row = rowEnds.findIndex(end => end + 8 <= left)
     if (row === -1) row = rowEnds.length
     rowEnds[row] = left + cardWidth
-    return { meal, anchor, left, row }
+    return { event, anchor, left, row, cardWidth }
   })
 
-  function selectMeal(meal: Day['meals'][number], element: HTMLElement) {
+  function selectEvent(event: CalendarEvent, element: HTMLElement) {
     const bounds = element.getBoundingClientRect()
-    setSelected(Date.parse(meal.occurred_at))
+    setSelected(event.time)
     setPosition({ x: bounds.left, y: bounds.bottom })
   }
 
   function select(event: PointerEvent<HTMLDivElement>) {
-    if (!visible.length && !showMeals) return
+    if (!visible.length && !showMeals && !showWater) return
     const bounds = event.currentTarget.getBoundingClientRect()
     const width = bounds.width - 32
     const target = start + Math.max(0, Math.min(1, (event.clientX - bounds.left - 16) / width)) * (end - start - 1)
-    const nearest = times.reduce((nearest, time) => Math.abs(time - target) < Math.abs(nearest - target) ? time : nearest)
+    const nearest = snapTimes.reduce((nearest, time) => Math.abs(time - target) < Math.abs(nearest - target) ? time : nearest, snapTimes[0] ?? target)
     setSelected(Math.abs(nearest - target) <= (end - start) * 12 / width ? nearest : Math.round(target))
     setPosition({ x: event.clientX, y: event.clientY })
   }
@@ -80,6 +90,7 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
     <h4>График дня</h4>
     <fieldset className="calendar-chart-options"><legend>Показатели на графике</legend>
       <label><input type="checkbox" checked={showMeals} onChange={event => { setShowMeals(event.target.checked); setSelected(null) }} /><svg width="24" height="12" aria-hidden="true"><circle cx="12" cy="6" r="4" fill="var(--accent)" /></svg>Еда</label>
+      <label><input type="checkbox" checked={showWater} onChange={event => { setShowWater(event.target.checked); setSelected(null) }} /><span className="calendar-water-icon"><CalendarEventIcon kind="water" /></span>Вода</label>
       {metrics.map(metric => <label key={metric.key}><input type="checkbox" checked={visible.includes(metric.key)} onChange={event => {
         setVisible(event.target.checked ? [...visible, metric.key] : visible.filter(key => key !== metric.key))
         setSelected(null)
@@ -93,7 +104,7 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
     <ul className="calendar-chart-scales" aria-label="Шкалы показателей">{axes.map(axis => <li key={axis}>{metrics.filter(metric => metric.axis === axis && visible.includes(metric.key)).map(metric => metric.label).join(', ')}: 0–{maximum(axis)} {metrics.find(metric => metric.axis === axis)!.unit}</li>)}</ul>
     {end - start !== 86400000 && <p className="muted">В этот день переводились часы. Повторяющиеся часы показаны в порядке событий.</p>}
     {!diary.entries.length && <p className="muted">Нет записей сахара и подколок.</p>}
-    {!visible.length && !showMeals ? <p role="status">Выберите хотя бы один показатель.</p> : <div className="diabetes-day-plot" role="slider" tabIndex={0} aria-label="Показатели дня по времени"
+    {!visible.length && !showMeals && !showWater ? <p role="status">Выберите хотя бы один показатель.</p> : <div className="diabetes-day-plot" role="slider" tabIndex={0} aria-label="Показатели дня по времени"
       aria-valuemin={start} aria-valuemax={end - 1} aria-valuenow={selected ?? start} aria-valuetext={selected === null ? 'Выберите время' : clock(selected)}
       onPointerMove={select} onPointerDown={event => { event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); select(event) }}
       onFocus={event => { const bounds = event.currentTarget.getBoundingClientRect(); setPosition({ x: bounds.left + bounds.width / 2, y: bounds.top + 32 }); setSelected(time => time ?? start) }}
@@ -117,17 +128,15 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
         </ComposedChart>
       </ResponsiveContainer>
     </div>}
-    {showMeals && <div className="calendar-meals">
-      <h5>Еда</h5>
-      {!meals.length ? <p className="muted">Нет приёмов пищи.</p> : <ul className="calendar-meal-track" aria-label="Приёмы пищи по времени">
-        {cards.map(({ meal, anchor, left, row }) => <li key={meal.id}>
-          <span className="calendar-meal-stem" aria-hidden="true" style={{ left: anchor, gridRow: `1 / span ${row + 1}` }} />
-          <button type="button" className="calendar-meal-card" aria-pressed={selected === Date.parse(meal.occurred_at)} style={{ marginLeft: left, gridRow: row + 1, width: cardWidth }}
-            onPointerEnter={event => { if (event.pointerType === 'mouse') selectMeal(meal, event.currentTarget) }}
-            onFocus={event => selectMeal(meal, event.currentTarget)} onClick={event => selectMeal(meal, event.currentTarget)}>
-            <strong>{clock(Date.parse(meal.occurred_at))}</strong>
-            <span className="calendar-meal-foods">{meal.lines.length ? meal.lines.map(line => <span key={line.id}>{line.name}</span>) : 'Приём пищи'}</span>
-            <small>У {meal.totals.carbohydrate.value === null ? 'неизвестно' : `${meal.totals.carbohydrate.value.replace('.', ',')} г`}{meal.totals.carbohydrate.incomplete && ' · неполные данные'}</small>
+    {(showMeals || showWater || visible.includes('bolus')) && <div className="calendar-events">
+      <h5>События дня</h5>
+      {!events.length ? <p className="muted">Нет событий выбранных типов.</p> : <ul className="calendar-event-track" aria-label="События дня по времени">
+        {cards.map(({ event: item, anchor, left, row, cardWidth }) => <li key={item.id}>
+          <span className={`calendar-event-stem calendar-event-${item.kind}`} aria-hidden="true" style={{ left: anchor, gridRow: `1 / span ${row + 1}` }} />
+          <button type="button" className={`calendar-event-card calendar-event-${item.kind}`} aria-label={`${clock(item.time)} · ${item.label}`} aria-pressed={selected === item.time} style={{ marginLeft: left, gridRow: row + 1, width: cardWidth }}
+            onPointerEnter={event => { if (event.pointerType === 'mouse') selectEvent(item, event.currentTarget) }}
+            onFocus={event => selectEvent(item, event.currentTarget)} onClick={event => selectEvent(item, event.currentTarget)}>
+            {item.foods.length ? <>{item.foods.slice(0, 3).map((food, index) => <CalendarEventIcon key={index} kind="meal" food={food} />)}{item.foods.length > 3 && <small>+{item.foods.length - 3}</small>}</> : <CalendarEventIcon kind={item.kind} />}
           </button>
         </li>)}
       </ul>}
@@ -138,6 +147,7 @@ export function CalendarDayChart({ day, meals, diary }: { day: string; meals: Da
         {meal.lines.map(line => <p key={line.id}>{line.name}{line.quantity !== null && line.unit !== null && ` · ${line.quantity.replace('.', ',')} ${line.unit === 'g' ? 'г' : 'мл'}`}</p>)}
         {nutrients.map(([key, label, unit]) => <p key={key}>{label}: {meal.totals[key].value === null ? 'Неизвестно' : `${meal.totals[key].value!.replace('.', ',')} ${unit}`}{meal.totals[key].incomplete && ' · Неполные данные'}</p>)}
       </div>)}
+      {selectedWater.length > 0 && <div className="calendar-meal-details"><strong>Вода</strong>{selectedWater.map(record => <p key={record.id}>{record.volume_ml} мл</p>)}</div>}
       {metrics.filter(metric => visible.includes(metric.key)).map(metric => <div key={metric.key}>
         <strong>{metric.label} · {metric.unit}</strong>
         {metric.key === 'basal' ? <p>{activeBasal ? `${clock(activeBasal.time)}–${clock(activeBasal.end)} · ${basalText(activeBasal.basal)}` : 'Неизвестно'}</p>

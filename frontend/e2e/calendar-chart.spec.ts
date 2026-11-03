@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 
-test('calendar aligns meal cards, filters metrics and tooltips, and preserves basal gaps', async ({ page }, info) => {
+test('calendar aligns event icons, filters metrics and tooltips, and preserves basal gaps', async ({ page }, info) => {
   const day = '2026-10-20'
   const total = (value: string | null, incomplete = false) => ({ value, incomplete, known_count: value === null ? 0 : 1, unknown_count: incomplete || value === null ? 1 : 0 })
   const totals = { calories: total('350', true), protein: total('15'), fat: total(null, true), carbohydrate: total('40') }
@@ -23,19 +23,21 @@ test('calendar aligns meal cards, filters metrics and tooltips, and preserves ba
   const tip = chart.getByRole('tooltip', { name: 'Показатели дня' })
   await expect(plot).toBeVisible()
   await expect(chart.locator('.recharts-wrapper')).toHaveCount(1)
-  await expect(chart.getByRole('checkbox')).toHaveCount(4)
+  await expect(chart.getByRole('checkbox')).toHaveCount(5)
   for (const option of await chart.getByRole('checkbox').all()) await expect(option).toBeChecked()
-  const colors = await chart.locator('.calendar-chart-options svg > *').evaluateAll(marks => marks.map(mark => getComputedStyle(mark)[mark.tagName === 'line' ? 'stroke' : 'fill']))
+  const colors = await chart.locator('.calendar-chart-options svg > :is(circle, rect, line, path)').evaluateAll(marks => marks.map(mark => getComputedStyle(mark)[['line', 'path'].includes(mark.tagName) ? 'stroke' : 'fill']))
   expect(colors).not.toContain('none')
-  expect(new Set(colors).size).toBe(4)
+  expect(new Set(colors).size).toBe(5)
   await expect(plot.locator('.recharts-line')).toHaveCount(2)
   await expect(plot.locator('.recharts-bar')).toHaveCount(1)
   await expect(plot.locator('.recharts-line-curve')).toHaveCount(1)
   expect(await plot.locator('.recharts-bar-rectangle').count()).toBeGreaterThan(0)
-  const meals = chart.getByRole('list', { name: 'Приёмы пищи по времени' })
-  const cards = meals.getByRole('button')
+  const events = chart.getByRole('list', { name: 'События дня по времени' })
+  const cards = events.getByRole('button', { name: /Еда:/ })
   await expect(cards).toHaveCount(2)
-  await expect(cards.first()).toContainText('12:00Гречка, курицаУ 40 г')
+  await expect(cards.first()).toHaveAccessibleName('12:00 · Еда: Гречка, курица')
+  await expect(cards.first().locator('svg title')).toHaveText('Крупы и паста')
+  await expect(events.getByRole('button', { name: /Подколка:/ })).toHaveCount(1)
   await cards.first().focus()
   await expect(tip).toContainText('Гречка, курица · 150 г')
   await expect(plot.locator('.recharts-reference-line')).toHaveCount(1)
@@ -76,7 +78,8 @@ test('calendar aligns meal cards, filters metrics and tooltips, and preserves ba
   }
   if (process.env.DIARY_ACCEPTANCE_DIR) await page.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-combined-${info.project.name}.png` })
   await chart.getByRole('checkbox', { name: 'Еда', exact: true }).uncheck()
-  await expect(meals).toHaveCount(0)
+  await expect(cards).toHaveCount(0)
+  await expect(events.getByRole('button', { name: /Подколка:/ })).toHaveCount(1)
   await expect(plot.locator('.recharts-bar')).toHaveCount(1)
   await plot.focus()
   await plot.press('Home')
@@ -164,18 +167,18 @@ test('meal timeline keeps day edges, unknown carbs and food-only selection', asy
   await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   const chart = page.getByRole('region', { name: 'Общий график дня', exact: true })
-  const track = chart.getByRole('list', { name: 'Приёмы пищи по времени' })
+  const track = chart.getByRole('list', { name: 'События дня по времени' })
   const cards = track.getByRole('button')
   await expect(cards).toHaveCount(5)
-  await expect(cards.first()).toContainText('00:00ЧайУ 0 г')
-  await expect(cards.nth(3)).toContainText('неполные данные')
-  await expect(cards.last()).toContainText('23:59КефирУ неизвестно')
+  await expect(cards.first()).toHaveAccessibleName('00:00 · Еда: Чай')
+  await expect(cards.last()).toHaveAccessibleName('23:59 · Еда: Кефир')
+  await expect(cards.nth(2).locator('svg')).toHaveCount(3)
+  await expect(cards.nth(2).locator('svg title')).toHaveText(['Крупы и паста', 'Мясо', 'Овощи'])
+  await expect(cards.nth(1).locator('svg title')).toHaveText('Яйца')
+  await expect(cards.nth(2)).toContainText('+2')
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 })
-    for (const food of lunchFoods) await expect(cards.nth(2)).toContainText(food)
-    await expect.poll(() => cards.evaluateAll(elements => elements.every(card => [...card.querySelectorAll('span, small')].every(text =>
-      text.scrollWidth <= text.clientWidth && text.scrollHeight <= text.clientHeight && text.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom
-    )))).toBe(true)
+    await expect(cards.nth(2)).toHaveAccessibleName(`12:30 · Еда: ${lunchFoods.join(', ')}`)
     await expect.poll(async () => {
       const bounds = (await track.boundingBox())!
       const boxes = await cards.evaluateAll(elements => elements.map(element => {
@@ -186,6 +189,8 @@ test('meal timeline keeps day edges, unknown carbs and food-only selection', asy
     }).toBe(true)
   }
   for (const name of ['Сахар', 'Подколки', 'База']) await chart.getByRole('checkbox', { name, exact: true }).uncheck()
+  await cards.nth(2).click()
+  for (const food of lunchFoods) await expect(chart.getByRole('tooltip')).toContainText(food)
   await cards.last().click()
   const tip = chart.getByRole('tooltip')
   await expect(tip).toContainText('Углеводы: Неизвестно · Неполные данные')
@@ -196,4 +201,74 @@ test('meal timeline keeps day edges, unknown carbs and food-only selection', asy
   await chart.getByRole('checkbox', { name: 'Сахар', exact: true }).blur()
   if (info.project.name === 'phone') await page.setViewportSize({ width: 390, height: 844 })
   if (process.env.DIARY_ACCEPTANCE_DIR) await chart.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-meals-day-${info.project.name}.png` })
+})
+
+test('event timeline groups foods, shows water and boluses, and does not snap to basal changes', async ({ page }, info) => {
+  const day = '2089-03-12'
+  const occurred_at = `${day}T16:01:00+03:00`
+  const total = { value: '40', incomplete: false, known_count: 1, unknown_count: 0 }
+  const totals = { calories: total, protein: total, fat: total, carbohydrate: total }
+  await page.route('**/api/nutrition-day?*', route => route.fulfill({ json: {
+    day, totals, water_total_ml: 750,
+    water: [{ id: 'water-1', occurred_at, volume_ml: 250 }, { id: 'water-2', occurred_at, volume_ml: 500 }],
+    meals: [{ id: 'meal', occurred_at, totals, lines: ['Гречка', 'Куриная грудка', 'Авторское блюдо', 'Чай'].map((name, index) => ({ id: `line-${index}`, name, quantity: '150', unit: 'g' })) }],
+  } }))
+  await page.route('**/api/day?*', route => route.fulfill({ json: {
+    basal: '0.50', temporary_percent: null, temporary_basals: [],
+    basal_changes: [{ occurred_at: `${day}T16:00:00+03:00`, basal: '0.60' }, { occurred_at: `${day}T20:00:00+03:00`, basal: '0.70' }],
+    entries: [{ id: 'bolus', occurred_at, glucose: '5.6', bolus: '1.2' }, { id: 'zero', occurred_at, glucose: null, bolus: '0.0' }],
+  } }))
+  await page.goto(`/?section=calendar&day=${day}`)
+  await page.getByLabel('Логин', { exact: true }).fill('synthetic-owner')
+  await page.getByLabel('Пароль', { exact: true }).fill('😀'.repeat(600))
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  const chart = page.getByRole('region', { name: 'Общий график дня', exact: true })
+  const track = chart.getByRole('list', { name: 'События дня по времени' })
+  const meal = track.getByRole('button', { name: /Еда:/ })
+  const water = track.getByRole('button', { name: /Вода:/ })
+  const bolus = track.getByRole('button', { name: /Подколка:/ })
+  const tip = chart.getByRole('tooltip')
+  await expect(track.getByRole('button')).toHaveCount(4)
+  await expect(meal.locator('svg title')).toHaveText(['Крупы и паста', 'Мясо', 'Еда'])
+  await expect(meal).toContainText('+1')
+  await expect(water).toHaveCount(2)
+  await expect(water.first().locator('svg title')).toHaveText('Вода')
+  await expect(bolus).toHaveAccessibleName('16:01 · Подколка: 1,2 ед.')
+  await water.first().click()
+  for (const value of ['16:01', '250 мл', '500 мл', 'Авторское блюдо', '1,2 ед.']) await expect(tip).toContainText(value)
+  await water.first().press('Escape')
+  await expect(tip).toHaveCount(0)
+  await meal.focus()
+  await expect(tip).toContainText('Гречка · 150 г')
+  await meal.press('Escape')
+  const plot = chart.getByRole('slider')
+  await plot.scrollIntoViewIfNeeded()
+  const bounds = (await plot.boundingBox())!
+  async function selectMinute(minute: number) {
+    const x = bounds.x + 16 + (bounds.width - 32) * minute / 1440, y = bounds.y + 80
+    if (info.project.name === 'phone') await page.touchscreen.tap(x, y)
+    else await page.mouse.move(x, y)
+  }
+  await selectMinute(16 * 60)
+  await expect(tip).toContainText('16:01')
+  await expect(tip).toContainText('Гречка · 150 г')
+  await expect(tip).toContainText('16:00–20:00 · 0,60 ед/ч')
+  await page.keyboard.press('Escape')
+  await selectMinute(19 * 60 + 50)
+  const selectedTime = Number(await plot.getAttribute('aria-valuenow'))
+  expect(selectedTime).toBeLessThan(Date.parse(`${day}T20:00:00+03:00`))
+  expect(Math.abs(selectedTime - Date.parse(`${day}T19:50:00+03:00`))).toBeLessThan(86400000 / (bounds.width - 32) + 1)
+  await expect(tip).not.toContainText('Гречка')
+  await chart.getByRole('checkbox', { name: 'Вода', exact: true }).uncheck()
+  await expect(water).toHaveCount(0)
+  await meal.click()
+  await expect(tip).not.toContainText('мл')
+  await chart.getByRole('checkbox', { name: 'Подколки', exact: true }).uncheck()
+  await expect(bolus).toHaveCount(0)
+  await meal.click()
+  await expect(tip).not.toContainText('Подколки')
+  await chart.getByRole('checkbox', { name: 'Вода', exact: true }).check()
+  await chart.getByRole('checkbox', { name: 'Подколки', exact: true }).check()
+  await meal.press('Escape')
+  if (process.env.DIARY_ACCEPTANCE_DIR) await chart.screenshot({ path: `${process.env.DIARY_ACCEPTANCE_DIR}/calendar-events-${info.project.name}.png` })
 })
